@@ -1,4 +1,4 @@
-// Controller support (XInput / Xbox-style pads), laid out like the Infinity Blade II controller
+// Controller support (Xbox-style pads), laid out like the Infinity Blade II controller
 // mod but built into the game: the left stick moves an on-screen cursor, touches are virtual
 // fingers (the real mouse is never moved), and buttons press the same game actions as the
 // keyboard (game/actions.h). So they follow the same rules: a button only works when its
@@ -12,13 +12,14 @@
 //   D-pad        left / up / right: magic slots 1-3; down: boss info / final strike
 //   Back         accept the prompt                   Start     back out of a menu, else the menu
 //   L3           fast-forward cutscenes (hold)       L3 + R3   show / hide the controls legend
+// Reading the pad is platform code (game/pad.h).
 #include "foundation/foundation.h"
 #include "game/game.h"
+#include "game/pad.h"
 #include "gles/gl.h"
 #include "settings.h"
 #include "uikit/uikit.h"
 #include <windows.h>
-#include <xinput.h>
 #include <atomic>
 #include <cmath>
 #include <mutex>
@@ -30,21 +31,16 @@ namespace game {
 
 namespace {
 
-struct Pad {
-    bool connected = false;
-    WORD buttons = 0;
-    float lx = 0, ly = 0, rx = 0, ry = 0;  // -1..1, up is positive
-    float lt = 0, rt = 0;                  // 0..1
-};
+using Pad = pad::State;
 
-constexpr double kW = 736, kH = 414;  // the screen, in points
+constexpr double kH = 414;                              // screen height, in points
+double screen_w() { return uikit::g_device.width_pt; }  // 736, or wider on phones
 constexpr int kFingerCursor = 70, kFingerCamera = 71, kFingerSwipe = 72, kFingerScroll = 73;
 constexpr float kDeadzone = 0.22f, kTrigger = 0.15f;
 constexpr float kCameraStart = 0.40f, kSwipeStart = 0.55f, kSwipeEnd = 0.35f;
 constexpr double kSwipeSeconds = 0.07, kSwipeStickySeconds = 0.7;
 
-using GetStateFn = DWORD(WINAPI*)(DWORD, XINPUT_STATE*);
-GetStateFn g_get_state = nullptr;
+bool g_pad_ok = false;
 
 std::mutex g_fake_mutex;
 bool g_fake = false;
@@ -52,11 +48,9 @@ Pad g_fake_pad;
 
 // Shared with the overlay (render thread).
 std::mutex g_overlay_mutex;
-CGPoint g_cursor{kW / 2, kH / 2};
+CGPoint g_cursor{368, kH / 2};
 bool g_cursor_shown = false, g_legend_shown = false;
 std::atomic<bool> g_pad_active{false};
-
-float axis(SHORT v) { return std::max(-1.0f, v / 32767.0f); }
 
 void apply_deadzone(float& x, float& y) {
     float m = std::sqrt(x * x + y * y);
@@ -78,25 +72,13 @@ Pad read_pad() {
         if (fake) p = g_fake_pad;
     }
     // Hidden test runs only listen to the scripted pad, never to a real controller.
-    if (!fake && g_get_state && !uikit::g_test_mode) {
-        for (DWORD i = 0; i < XUSER_MAX_COUNT; i++) {
-            XINPUT_STATE st{};
-            if (g_get_state(i, &st) != ERROR_SUCCESS) continue;
-            const XINPUT_GAMEPAD& g = st.Gamepad;
-            p.connected = true;
-            p.buttons = g.wButtons;
-            p.lx = axis(g.sThumbLX), p.ly = axis(g.sThumbLY);
-            p.rx = axis(g.sThumbRX), p.ry = axis(g.sThumbRY);
-            p.lt = g.bLeftTrigger / 255.0f, p.rt = g.bRightTrigger / 255.0f;
-            break;
-        }
-    }
+    if (!fake && g_pad_ok && !uikit::g_test_mode) pad::read(p);
     apply_deadzone(p.lx, p.ly);
     apply_deadzone(p.rx, p.ry);
     return p;
 }
 
-CGPoint on_screen(CGPoint p) { return {std::clamp(p.x, 0.0, kW - 1), std::clamp(p.y, 0.0, kH - 1)}; }
+CGPoint on_screen(CGPoint p) { return {std::clamp(p.x, 0.0, screen_w() - 1), std::clamp(p.y, 0.0, kH - 1)}; }
 
 // A virtual finger (touches are delivered on the main thread, in order).
 struct Finger {
@@ -129,7 +111,7 @@ struct Finger {
         down = false;
         post(2);
     }
-    bool at_edge() const { return pos.x <= 0 || pos.y <= 0 || pos.x >= kW - 1 || pos.y >= kH - 1; }
+    bool at_edge() const { return pos.x <= 0 || pos.y <= 0 || pos.x >= screen_w() - 1 || pos.y >= kH - 1; }
 };
 
 void run() {
@@ -139,11 +121,11 @@ void run() {
     const double camera_speed = kH * 1.2 * st.camera_speed / 100;
     const double swipe_length = kH * 0.52 * st.swipe_size / 100;
     const double scroll_speed = kH * 1.0;
-    const CGPoint centre{kW / 2, kH * 0.46};  // where the enemy stands
+    const CGPoint centre{screen_w() / 2, kH * 0.46};  // where the enemy stands
 
     Finger cursor_finger{kFingerCursor}, camera_finger{kFingerCamera}, swipe_finger{kFingerSwipe},
         scroll_finger{kFingerScroll};
-    CGPoint cursor{kW / 2, kH / 2};
+    CGPoint cursor{screen_w() / 2, kH / 2};
     std::set<std::string> held;
     Pad prev;
     bool active = false, a_tap_pending = false, legend_combo = false;
@@ -168,7 +150,7 @@ void run() {
         double dt = std::min(0.1, (now - last) / 1000.0);
         last = now;
         Pad p = read_pad();
-        bool focused = uikit::g_test_mode || GetForegroundWindow() == (HWND)uikit::main_window();
+        bool focused = uikit::g_test_mode || pad::game_in_foreground();
         if (!p.connected || !focused) {  // leave the game alone while it is in the background
             if (active) {
                 release_everything();
@@ -186,30 +168,30 @@ void run() {
             track_hud(true);
         }
         g_pad_active = true;
-        auto pressed = [&](WORD b) { return (p.buttons & b) != 0; };
-        auto went_down = [&](WORD b) { return (p.buttons & b) && !(prev.buttons & b); };
+        auto pressed = [&](u16 b) { return (p.buttons & b) != 0; };
+        auto went_down = [&](u16 b) { return (p.buttons & b) && !(prev.buttons & b); };
 
         // L3 + R3 shows / hides the legend (and is neither fast-forward nor scrolling).
-        bool l3 = pressed(XINPUT_GAMEPAD_LEFT_THUMB), r3 = pressed(XINPUT_GAMEPAD_RIGHT_THUMB);
-        if (l3 && r3 && (went_down(XINPUT_GAMEPAD_LEFT_THUMB) || went_down(XINPUT_GAMEPAD_RIGHT_THUMB))) {
+        bool l3 = pressed(pad::kLeftThumb), r3 = pressed(pad::kRightThumb);
+        if (l3 && r3 && (went_down(pad::kLeftThumb) || went_down(pad::kRightThumb))) {
             legend_until = now < legend_until ? 0 : now + 12000;
             legend_combo = true;
         }
         if (!l3 && !r3) legend_combo = false;
 
         // Buttons: game actions, held while the button is.
-        action("DodgeLeft", pressed(XINPUT_GAMEPAD_LEFT_SHOULDER));
-        action("DodgeRight", pressed(XINPUT_GAMEPAD_RIGHT_SHOULDER));
-        action("Block", pressed(XINPUT_GAMEPAD_B) || p.lt > kTrigger);
-        action("Magic", pressed(XINPUT_GAMEPAD_X));
-        action("SuperMove", pressed(XINPUT_GAMEPAD_Y));
-        action("Magic1", pressed(XINPUT_GAMEPAD_DPAD_LEFT));
-        action("Magic2", pressed(XINPUT_GAMEPAD_DPAD_UP));
-        action("Magic3", pressed(XINPUT_GAMEPAD_DPAD_RIGHT));
-        action("BossInfo", pressed(XINPUT_GAMEPAD_DPAD_DOWN));  // only one of these two exists at a time
-        action("FinalStrike", pressed(XINPUT_GAMEPAD_DPAD_DOWN));
-        action("Accept", pressed(XINPUT_GAMEPAD_BACK));
-        action("@StartButton", pressed(XINPUT_GAMEPAD_START));
+        action("DodgeLeft", pressed(pad::kLeftShoulder));
+        action("DodgeRight", pressed(pad::kRightShoulder));
+        action("Block", pressed(pad::kB) || p.lt > kTrigger);
+        action("Magic", pressed(pad::kX));
+        action("SuperMove", pressed(pad::kY));
+        action("Magic1", pressed(pad::kDpadLeft));
+        action("Magic2", pressed(pad::kDpadUp));
+        action("Magic3", pressed(pad::kDpadRight));
+        action("BossInfo", pressed(pad::kDpadDown));  // only one of these two exists at a time
+        action("FinalStrike", pressed(pad::kDpadDown));
+        action("Accept", pressed(pad::kBack));
+        action("@StartButton", pressed(pad::kStart));
         action("FastForward", l3 && !legend_combo);
 
         // Left stick: the cursor (quadratic response for fine aiming).
@@ -221,7 +203,7 @@ void run() {
 
         // A: stab and clash-mash (the game ignores whichever makes no sense), then tap at the
         // cursor a moment later; holding A keeps the finger down so the cursor drags.
-        if (went_down(XINPUT_GAMEPAD_A)) {
+        if (went_down(pad::kA)) {
             for (const char* id : {"Stab", "ClashMash"}) {
                 press_action(id, true);
                 press_action(id, false);
@@ -230,14 +212,14 @@ void run() {
             a_tap_pending = true;
             last_cursor_use = now;
         }
-        if (pressed(XINPUT_GAMEPAD_A)) {
+        if (pressed(pad::kA)) {
             if (a_tap_pending && now - a_down_at >= 60) {
                 a_tap_pending = false;
                 cursor_finger.press(cursor);
             } else {
                 cursor_finger.move(cursor);
             }
-        } else if (prev.buttons & XINPUT_GAMEPAD_A) {
+        } else if (prev.buttons & pad::kA) {
             if (a_tap_pending) cursor_finger.press(cursor);  // quick tap: down and up
             a_tap_pending = false;
             cursor_finger.release();
@@ -307,7 +289,7 @@ void run() {
     }
 }
 
-// The controls legend, drawn once with GDI.
+// The controls legend, rendered once.
 struct Legend {
     int w = 0, h = 0;
     std::vector<u8> rgba;
@@ -316,60 +298,15 @@ struct Legend {
 const Legend& legend() {
     static Legend l = [] {
         Legend l;
-        const wchar_t* lines[] = {
-            L"Left stick  cursor       A  tap, hold to drag (also stab / clash)       Right stick  camera, swipes in fights",
-            L"RT + right stick  swipe       R3 + right stick  scroll       LB / RB  left / right fight button       LT or B  center button",
-            L"X  magic       Y  super move       D-pad  spells 1-3, down: boss info / final strike       Back  accept prompt",
-            L"Start  menu / back       L3  fast-forward cutscenes (hold)       L3 + R3  show / hide these controls",
-        };
-        constexpr int kLines = 4, kLineH = 40, kPad = 16;
-        HFONT font = CreateFontW(-24, 0, 0, 0, FW_SEMIBOLD, 0, 0, 0, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
-                                 CLEARTYPE_QUALITY, DEFAULT_PITCH, L"Segoe UI");
-        {  // size the panel to the longest line
-            HDC measure = CreateCompatibleDC(nullptr);
-            HGDIOBJ f = SelectObject(measure, font);
-            int widest = 0;
-            for (auto* line : lines) {
-                RECT r{0, 0, 0, 0};
-                DrawTextW(measure, line, -1, &r, DT_CALCRECT | DT_SINGLELINE);
-                widest = std::max(widest, (int)r.right);
-            }
-            SelectObject(measure, f);
-            DeleteDC(measure);
-            l.w = widest + 2 * kPad + 8;
-            l.h = kLines * kLineH + 2 * kPad;
-        }
-        BITMAPINFO bi{};
-        bi.bmiHeader = {sizeof(BITMAPINFOHEADER), l.w, -l.h, 1, 32, BI_RGB};
-        void* bits = nullptr;
-        HDC dc = CreateCompatibleDC(nullptr);
-        HBITMAP bmp = CreateDIBSection(dc, &bi, DIB_RGB_COLORS, &bits, nullptr, 0);
-        HGDIOBJ old_bmp = SelectObject(dc, bmp);
-        RECT all{0, 0, l.w, l.h};
-        HBRUSH bg = CreateSolidBrush(RGB(14, 20, 34));
-        FillRect(dc, &all, bg);
-        DeleteObject(bg);
-        HGDIOBJ old_font = SelectObject(dc, font);
-        SetBkMode(dc, TRANSPARENT);
-        SetTextColor(dc, RGB(225, 235, 245));
-        for (int i = 0; i < kLines; i++) {
-            RECT r{kPad + 4, kPad + i * kLineH, l.w - kPad, kPad + (i + 1) * kLineH};
-            DrawTextW(dc, lines[i], -1, &r, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
-        }
-        GdiFlush();
-        l.rgba.resize((size_t)l.w * l.h * 4);
-        const u8* src = static_cast<const u8*>(bits);
-        for (size_t i = 0; i < l.rgba.size(); i += 4) {
-            l.rgba[i] = src[i + 2];
-            l.rgba[i + 1] = src[i + 1];
-            l.rgba[i + 2] = src[i];
-            l.rgba[i + 3] = 255;
-        }
-        SelectObject(dc, old_font);
-        SelectObject(dc, old_bmp);
-        DeleteObject(font);
-        DeleteObject(bmp);
-        DeleteDC(dc);
+        std::string back = pad::kBackName, start = pad::kStartName;
+        pad::render_legend(
+            {
+                "Left stick  cursor       A  tap, hold to drag (also stab / clash)       Right stick  camera, swipes in fights",
+                "RT + right stick  swipe       R3 + right stick  scroll       LB / RB  left / right fight button       LT or B  center button",
+                "X  magic       Y  super move       D-pad  spells 1-3, down: boss info / final strike       " + back + "  accept prompt",
+                start + "  menu / back       L3  fast-forward cutscenes (hold)       L3 + R3  show / hide these controls",
+            },
+            l.rgba, l.w, l.h);
         return l;
     }();
     return l;
@@ -388,10 +325,10 @@ void draw_controller_overlay(int sw, int sh) {
         show_legend = g_legend_shown;
     }
     // The game image is letterboxed into the window the same way touches are mapped.
-    double ow = sw, oh = sw * kH / kW;
+    double kW = screen_w(), ow = sw, oh = sw * kH / kW;
     if (oh > sh) oh = sh, ow = sh * kW / kH;
     double ox = (sw - ow) / 2, oy = (sh - oh) / 2, scale = oh / kH;
-    if (show_legend) {
+    if (show_legend && !legend().rgba.empty()) {
         const Legend& l = legend();
         int dw = (int)std::min(ow * 0.96, (double)l.w * scale / 2.0);
         int dh = dw * l.h / l.w;
@@ -416,12 +353,12 @@ void set_fake_pad(const std::string& control, float v) {
     g_fake = true;
     Pad& p = g_fake_pad;
     p.connected = true;
-    static const std::pair<const char*, WORD> buttons[] = {
-        {"A", XINPUT_GAMEPAD_A}, {"B", XINPUT_GAMEPAD_B}, {"X", XINPUT_GAMEPAD_X}, {"Y", XINPUT_GAMEPAD_Y},
-        {"LB", XINPUT_GAMEPAD_LEFT_SHOULDER}, {"RB", XINPUT_GAMEPAD_RIGHT_SHOULDER}, {"BACK", XINPUT_GAMEPAD_BACK},
-        {"START", XINPUT_GAMEPAD_START}, {"L3", XINPUT_GAMEPAD_LEFT_THUMB}, {"R3", XINPUT_GAMEPAD_RIGHT_THUMB},
-        {"UP", XINPUT_GAMEPAD_DPAD_UP}, {"DOWN", XINPUT_GAMEPAD_DPAD_DOWN}, {"LEFT", XINPUT_GAMEPAD_DPAD_LEFT},
-        {"RIGHT", XINPUT_GAMEPAD_DPAD_RIGHT},
+    static const std::pair<const char*, u16> buttons[] = {
+        {"A", pad::kA}, {"B", pad::kB}, {"X", pad::kX}, {"Y", pad::kY},
+        {"LB", pad::kLeftShoulder}, {"RB", pad::kRightShoulder}, {"BACK", pad::kBack},
+        {"START", pad::kStart}, {"L3", pad::kLeftThumb}, {"R3", pad::kRightThumb},
+        {"UP", pad::kDpadUp}, {"DOWN", pad::kDpadDown}, {"LEFT", pad::kDpadLeft},
+        {"RIGHT", pad::kDpadRight},
     };
     for (auto& [name, bit] : buttons)
         if (control == name) p.buttons = v > 0.5f ? (p.buttons | bit) : (p.buttons & ~bit);
@@ -435,13 +372,7 @@ void set_fake_pad(const std::string& control, float v) {
 
 void start_controller() {
     if (!settings::get().controller) return;
-    for (const wchar_t* dll : {L"xinput1_4.dll", L"xinput1_3.dll", L"xinput9_1_0.dll"}) {
-        if (HMODULE m = LoadLibraryW(dll)) {
-            g_get_state = reinterpret_cast<GetStateFn>(GetProcAddress(m, "XInputGetState"));
-            if (g_get_state) break;
-        }
-    }
-    if (!g_get_state) LOG_WARN("controller: XInput is not available");
+    g_pad_ok = pad::init();
     gles::g_overlay = draw_controller_overlay;
     std::thread(run).detach();
 }

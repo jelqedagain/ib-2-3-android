@@ -135,6 +135,63 @@ Layout layout(const Font* f, const std::u32string& text, float px, float max_wid
 
 }  // namespace
 
+void render_text_panel(const std::vector<std::string>& lines, float px, std::vector<u8>& rgba, int& w, int& h) {
+    std::lock_guard lock(g_font_mutex);
+    bool fake_bold = false;
+    const Font* f = font(false, fake_bold);
+    w = h = 0;
+    rgba.clear();
+    if (!f) return;
+    constexpr int kPad = 16;
+    std::vector<Layout> layouts;
+    float widest = 0;
+    for (auto& line : lines) {
+        std::u32string text;
+        for (size_t i = 0; i < line.size();) {  // UTF-8
+            u8 c = (u8)line[i];
+            int n = c < 0x80 ? 1 : (c >> 5) == 6 ? 2 : (c >> 4) == 14 ? 3 : 4;
+            char32_t cp = n == 1 ? c : c & (0x3f >> (n - 1));
+            for (int k = 1; k < n && i + k < line.size(); k++) cp = (cp << 6) | ((u8)line[i + k] & 0x3f);
+            text += cp;
+            i += n;
+        }
+        layouts.push_back(layout(f, text, px, 0, true));
+        widest = std::max(widest, layouts.back().width);
+    }
+    float line_h = layouts.empty() ? px : layouts[0].line_height * 1.35f;
+    w = (int)std::ceil(widest) + 2 * kPad + 8;
+    h = (int)std::ceil(line_h * lines.size()) + 2 * kPad;
+    rgba.resize((size_t)w * h * 4);
+    for (size_t i = 0; i < rgba.size(); i += 4) rgba[i] = 14, rgba[i + 1] = 20, rgba[i + 2] = 34, rgba[i + 3] = 255;
+    for (size_t li = 0; li < layouts.size(); li++) {
+        const Layout& l = layouts[li];
+        float x = kPad + 4, baseline = kPad + line_h * li + (line_h - l.line_height) / 2 + l.ascent;
+        const std::u32string& s = l.lines[0];
+        for (size_t i = 0; i < s.size(); i++) {
+            int x0, y0, x1, y1;
+            float fx = x - std::floor(x);
+            stbtt_GetCodepointBitmapBoxSubpixel(&f->info, (int)s[i], l.scale, l.scale, fx, 0, &x0, &y0, &x1, &y1);
+            int gw = x1 - x0, gh = y1 - y0;
+            if (gw > 0 && gh > 0) {
+                std::vector<u8> cov((size_t)gw * gh);
+                stbtt_MakeCodepointBitmapSubpixel(&f->info, cov.data(), gw, gh, gw, l.scale, l.scale, fx, 0, (int)s[i]);
+                int ox = (int)std::floor(x) + x0, oy = (int)std::lround(baseline) + y0;
+                for (int yy = 0; yy < gh; yy++)
+                    for (int xx = 0; xx < gw; xx++) {
+                        int px_ = ox + xx, py = oy + yy;
+                        if (px_ < 0 || py < 0 || px_ >= w || py >= h) continue;
+                        float a = cov[(size_t)yy * gw + xx] / 255.0f;
+                        u8* d = &rgba[((size_t)py * w + px_) * 4];
+                        d[0] = (u8)(d[0] * (1 - a) + 225 * a);
+                        d[1] = (u8)(d[1] * (1 - a) + 235 * a);
+                        d[2] = (u8)(d[2] * (1 - a) + 245 * a);
+                    }
+            }
+            x += advance(f, l.scale, s[i], i + 1 < s.size() ? s[i + 1] : 0);
+        }
+    }
+}
+
 CGSize measure_text(const std::u16string& text, double font_size, bool bold, double max_width) {
     std::lock_guard lock(g_font_mutex);
     bool fake_bold = false;
