@@ -12,6 +12,10 @@ extern const char* const kHomePath;    // app sandbox (Documents, Library, tmp)
 // Host directories (set in main before running guest code).
 void set_roots(const std::string& host_bundle, const std::string& host_home);
 const std::string& host_home();
+const std::string& host_bundle();
+
+// Serves `host_path` in place of a file of the app bundle (`bundle_relative`, e.g. "Binaries/Commands.txt").
+void override_bundle_file(const std::string& bundle_relative, const std::string& host_path);
 
 // Maps a guest path (absolute or relative to the guest cwd) to a host UTF-8 path.
 // Returns "" for paths outside the sandbox that have no host equivalent.

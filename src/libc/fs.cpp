@@ -19,6 +19,12 @@ const char* const kHomePath = "/var/mobile/Containers/Data/Application/5E1B3000-
 
 namespace {
 std::string g_host_bundle, g_host_home;
+std::unordered_map<std::string, std::string> g_overrides;  // lowercase bundle-relative path ("/binaries/x") -> host path
+
+std::string lower(std::string s) {
+    for (char& c : s) c = (char)std::tolower((unsigned char)c);
+    return s;
+}
 std::string g_cwd = "/";
 std::mutex g_cwd_mutex;
 
@@ -56,6 +62,11 @@ void set_roots(const std::string& host_bundle, const std::string& host_home) {
 }
 
 const std::string& host_home() { return g_host_home; }
+const std::string& host_bundle() { return g_host_bundle; }
+
+void override_bundle_file(const std::string& bundle_relative, const std::string& host_path) {
+    g_overrides[lower(normalize("/" + bundle_relative))] = host_path;
+}
 
 void set_cwd(const std::string& p) {
     std::lock_guard lock(g_cwd_mutex);
@@ -73,7 +84,19 @@ std::string to_host(const char* guest_path) {
     p = normalize(p);
     // /private/var is the same as /var on iOS.
     if (p.rfind("/private/var/", 0) == 0) p = p.substr(8);
-    if (starts_with(p, kBundlePath)) return g_host_bundle + p.substr(strlen(kBundlePath));
+    if (starts_with(p, kBundlePath)) {
+        std::string rel = p.substr(strlen(kBundlePath));
+        if (!g_overrides.empty()) {
+            auto it = g_overrides.find(lower(rel));
+            if (it != g_overrides.end()) {
+                static std::unordered_map<std::string, bool> logged;
+                if (!logged[it->first]) LOG_INFO("vfs: serving %s in place of %s", it->second.c_str(), rel.c_str());
+                logged[it->first] = true;
+                return it->second;
+            }
+        }
+        return g_host_bundle + rel;
+    }
     if (starts_with(p, kHomePath)) return g_host_home + p.substr(strlen(kHomePath));
     return {};
 }

@@ -4,8 +4,12 @@
 #include "game/game.h"
 #include "game/unreal.h"
 #include "hook.h"
+#include "libc/vfs.h"
 #include "macho.h"
 #include "settings.h"
+#include <filesystem>
+#include <fstream>
+#include <iterator>
 
 namespace game {
 
@@ -63,6 +67,40 @@ void on_load_coalesced(cpu::Thread& t) {
     apply(t, config);
 }
 
+std::string read_file(const std::string& path) {
+    std::ifstream f(path, std::ios::binary);
+    return std::string(std::istreambuf_iterator<char>(f), {});
+}
+
+// For games whose engine functions cannot be found by name (Infinity Blade II ships with them
+// stripped), the settings become console commands the engine runs at startup instead: its command
+// line (CookedIPhone/UE3CommandLine.txt) can run a file of commands, as the Community Patches do
+// with Binaries/Commands.txt. The game is served copies of both with the settings added.
+// Only the shadow resolution is changed: turning on effects the game's own settings leave off (bloom,
+// depth of field...) broke Infinity Blade II's picture.
+void apply_as_startup_commands() {
+    const settings::Settings& s = settings::get();
+    std::string commands = read_file(vfs::host_bundle() + "/Binaries/Commands.txt");
+    commands += "\n; Added by the port: sharper character shadows at today's screen resolutions\n";
+    commands += std::string("Scale Set MaxShadowResolution ") + (s.high_res_shadows ? "2048" : "1024") + "\n";
+
+    std::string command_line = read_file(vfs::host_bundle() + "/CookedIPhone/UE3CommandLine.txt");
+    if (command_line.find("-exec=") == std::string::npos) command_line += " -exec=\"Commands.txt\"";
+    else if (command_line.find("Commands.txt") == std::string::npos) {
+        LOG_WARN("settings: the game's command line runs another file; graphics settings not applied");
+        return;
+    }
+
+    std::string dir = vfs::host_home() + "/Library/Caches/port";
+    std::error_code ec;
+    std::filesystem::create_directories(dir, ec);
+    std::ofstream(dir + "/Commands.txt", std::ios::binary) << commands;
+    std::ofstream(dir + "/UE3CommandLine.txt", std::ios::binary) << command_line;
+    vfs::override_bundle_file("Binaries/Commands.txt", dir + "/Commands.txt");
+    vfs::override_bundle_file("CookedIPhone/UE3CommandLine.txt", dir + "/UE3CommandLine.txt");
+    LOG_INFO("settings: shadow resolution %s set by a startup command", s.high_res_shadows ? "2048" : "1024");
+}
+
 }  // namespace
 
 void install_config(const macho::Image& img) {
@@ -71,7 +109,8 @@ void install_config(const macho::Image& img) {
     g_engine_ini = img.find("_GEngineIni");
     g_system_ini = img.find("_GSystemSettingsIni");
     if (!load || !g_set_string || !g_engine_ini || !g_system_ini) {
-        LOG_WARN("settings: engine config functions not found; graphics settings not applied");
+        LOG_WARN("settings: engine config functions not found; the game keeps its own graphics settings");
+        apply_as_startup_commands();
         return;
     }
     g_load_original = hook::install(load, "FConfigCacheIni::LoadCoalescedFile", on_load_coalesced);

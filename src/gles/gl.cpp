@@ -478,6 +478,26 @@ std::string fix_global_initializers(const std::string& src) {
     return out;
 }
 
+// Infinity Blade II's modulated-shadow projection reconstructs each pixel's position from the scene
+// depth texture in the shader's default precision (mediump, and lowp samplers). Apple's GPUs read
+// depth at full precision anyway; others really use 16 bits, and device depth (close to 1.0) then
+// snaps to a few values, so shadow edges come out as screen-aligned blocks. Run the shader at full
+// precision. It also takes a single sample of the shadow map (bilinear on Apple's GPUs, the nearest
+// texel elsewhere): use the engine's 3x3 PCF filter (ManualPCF) that the shader already contains,
+// if the engine supplied the texel size.
+std::string smooth_modulated_shadows(const std::string& src) {
+    static const std::string single = "float Shadow = CalculateOcclusion( ReprojectedSceneDepth, ShadowDepth );";
+    static const std::string medium = "precision mediump float;";
+    size_t at = src.find(single), pcf = src.find("float  ManualPCF("), precision = src.find(medium);
+    if (at == std::string::npos || pcf == std::string::npos || pcf > at || precision > pcf) return src;
+    std::string out = src;
+    out.replace(at, single.size(),
+                "float Shadow = ShadowTexelSize.x > 0.0 ? ManualPCF( vec4(ShadowPosition.xy, ReprojectedSceneDepth, 1.0) )"
+                " : CalculateOcclusion( ReprojectedSceneDepth, ShadowDepth );");
+    out.replace(precision, medium.size(), "precision highp float;\nprecision highp sampler2D;");
+    return out;
+}
+
 void install_gl() {
 #define REGISTER(name, ret, params, args)     hle::fn("_" #name, [] params -> ret { ErrorCheck check{#name}; return p_##name args; });
     GL_FUNCS(REGISTER)
@@ -566,7 +586,7 @@ void install_gl() {
         std::string src;
         for (GLsizei i = 0; i < count; i++)
             src += lengths && lengths[i] >= 0 ? std::string(strings[i], lengths[i]) : std::string(strings[i]);
-        std::string fixed = fix_global_initializers(src);
+        std::string fixed = smooth_modulated_shadows(fix_global_initializers(src));
         if (fixed == src) return p_glShaderSource(s, count, strings, lengths);
         const char* one = fixed.c_str();
         p_glShaderSource(s, 1, &one, nullptr);
