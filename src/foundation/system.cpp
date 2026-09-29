@@ -306,6 +306,10 @@ void install_system() {
         else fs::create_directory(host_path(path), ec);
         return !ec;
     });
+    method(F, "createDirectoryAtURL:withIntermediateDirectories:attributes:error:", [](id self, SEL, id url, bool inter, id attrs, u64* err) {
+        return objc::send(self, "createDirectoryAtPath:withIntermediateDirectories:attributes:error:",
+                          {objc::send(url, "path"), inter, attrs, gaddr(err)}) & 0xff;
+    });
     method(F, "createDirectoryAtPath:attributes:", [](id, SEL, id path, id) {
         std::error_code ec;
         fs::create_directories(host_path(path), ec);

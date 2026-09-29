@@ -365,7 +365,16 @@ void install_misc() {
     method(MQ, "startQuery", [](id, SEL) { return false; });
     method(MQ, "resultCount", [](id, SEL) -> u64 { return 0; });
     method(MQ, "results", [](id, SEL) { return array({}); });
-    objc::host_class("NSFileVersion");
+    // Infinity Blade II resolves iCloud save conflicts through NSFileVersion: there are none.
+    Class FV = objc::host_class("NSFileVersion");
+    class_method(FV, "currentVersionOfItemAtURL:", [](Class, SEL, id) -> id { return 0; });
+    class_method(FV, "unresolvedConflictVersionsOfItemAtURL:", [](Class, SEL, id) { return array({}); });
+    class_method(FV, "otherVersionsOfItemAtURL:", [](Class, SEL, id) { return array({}); });
+    class_method(FV, "removeOtherVersionsOfItemAtURL:error:", [](Class, SEL, id, u64* err) {
+        if (err) *err = 0;
+        return true;
+    });
+    method(FV, "setResolved:", [](id, SEL, bool) {});
 
     // ---------------- GameKit: never authenticated ----------------
     Class GLP = objc::host_class("GKLocalPlayer", "GKPlayer");
@@ -410,6 +419,39 @@ void install_misc() {
     class_method(objc::class_named("GKMatchmaker"), "sharedMatchmaker", [](Class c, SEL) {
         static id s = objc::alloc(c);
         return s;
+    });
+    // Infinity Blade II also loads leaderboard scores and player names, and keeps achievement progress.
+    method(objc::class_named("GKLeaderboard"), "loadScoresWithCompletionHandler:", [](id, SEL, GuestAddr b) { complete_later(b, 0); });
+    class_method(objc::class_named("GKPlayer"), "loadPlayersForIdentifiers:withCompletionHandler:",
+                 [](Class, SEL, id, GuestAddr b) { complete_later(b, 0); });
+    method(objc::class_named("GKAchievement"), "setPercentComplete:", [](id, SEL, double) {});
+    method(objc::class_named("GKAchievement"), "percentComplete", [](id, SEL) { return 0.0; });
+
+    // ---------------- Twitter requests, iAd attribution: not available ----------------
+    // Each request with a completion handler gets the answer of an offline iPhone, so the game never
+    // waits for a reply (accounts: see "social" below).
+    for (const char* c : {"SLRequest", "TWRequest"})
+        method(objc::host_class(c), "performRequestWithHandler:", [](id, SEL, GuestAddr b) {  // (data, response, error)
+            if (!b) return;
+            GuestAddr bb = objc::block_copy(b);
+            post_to_main([bb] {
+                objc::call_block(bb, {0, 0, not_available_error()});
+                objc::block_release(bb);
+            });
+        });
+    Class ADC = objc::host_class("ADClient");
+    class_method(ADC, "sharedClient", [](Class c, SEL) {
+        static id s = objc::alloc(c);
+        return s;
+    });
+    method(ADC, "determineAppInstallationAttributionWithCompletionHandler:", [](id, SEL, GuestAddr b) { complete_later(b, 0); });
+    method(ADC, "lookupAdConversionDetails:", [](id, SEL, GuestAddr b) {  // (purchase date, impression date)
+        if (!b) return;
+        GuestAddr bb = objc::block_copy(b);
+        post_to_main([bb] {
+            objc::call_block(bb, {0, 0});
+            objc::block_release(bb);
+        });
     });
 
     // ---------------- StoreKit: purchases unavailable ----------------
@@ -510,6 +552,18 @@ void install_misc() {
             objc::call_block(bb, {0, 0});
             objc::block_release(bb);
         });
+    });
+    // Infinity Blade II uses the older request and renews credentials: no access, renewal failed.
+    method(ACS, "requestAccessToAccountsWithType:withCompletionHandler:", [](id, SEL, id, GuestAddr b) {
+        if (!b) return;
+        GuestAddr bb = objc::block_copy(b);
+        post_to_main([bb] {
+            objc::call_block(bb, {0, 0});
+            objc::block_release(bb);
+        });
+    });
+    method(ACS, "renewCredentialsForAccount:completion:", [](id, SEL, id, GuestAddr b) {
+        complete_later(b, 2);  // ACAccountCredentialRenewResultFailed
     });
     Class CMM = objc::host_class("CMMotionManager");
     for (const char* s : {"isDeviceMotionAvailable", "isAccelerometerAvailable", "isGyroAvailable", "isMagnetometerAvailable",
