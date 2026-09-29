@@ -11,6 +11,8 @@
 #include "launcher/launcher.h"
 #include "settings.h"
 #include "gles/gl.h"
+#include "audio/video.h"
+#include "win/image.h"
 #include <atomic>
 #include <thread>
 #include <vector>
@@ -354,7 +356,115 @@ void open_saves() {
 
 // --- Main window --------------------------------------------------------------------------
 
-constexpr int kWidth = 640, kHeaderH = 84;
+constexpr int kWidth = 640, kHeaderH = 180;
+
+// --- Header art ---------------------------------------------------------------------------
+// With the game installed, the header shows the "INFINITY BLADE III" title card from the end
+// of the player's own IB3_Origins movie (cached as game\launcher-banner.png) and the window
+// uses the game's icon. None of the game's art ships with this program.
+
+constexpr UINT WM_BANNER_READY = WM_APP + 3;
+constexpr int kBannerW = 1280, kBannerH = 360;  // same aspect as the header
+HBITMAP g_banner = nullptr;
+HICON g_game_icon_big = nullptr, g_game_icon_small = nullptr;
+
+// Title card, scaled so the logo fills the height, centred on black with faded edges.
+bool compose_banner(std::vector<u8>& out) {
+    std::vector<u8> frame;
+    int fw = 0, fh = 0;
+    if (!video::grab_frame(app_dir() + L"IB3_Origins.m4v", 141.0, frame, fw, fh)) return false;
+    double y0 = fh * 45.0 / 720, y1 = fh * 675.0 / 720;  // the logo, with a little margin
+    double scale = kBannerH / (y1 - y0);
+    double dw = fw * scale, dx = (kBannerW - dw) / 2, fade = kBannerW * 0.11;
+    out.assign((size_t)kBannerW * kBannerH * 4, 0);
+    for (int y = 0; y < kBannerH; y++) {
+        for (int x = 0; x < kBannerW; x++) {
+            u8* d = &out[((size_t)y * kBannerW + x) * 4];
+            d[3] = 255;
+            double sx = (x - dx) / scale, sy = y0 + y / scale;
+            if (sx < 0 || sx >= fw - 1 || sy >= fh - 1) continue;
+            double a = std::min(1.0, std::min(x - dx, dx + dw - x) / fade);
+            int ix = (int)sx, iy = (int)sy;
+            double tx = sx - ix, ty = sy - iy;
+            for (int c = 0; c < 3; c++) {
+                auto px = [&](int xx, int yy) { return (double)frame[((size_t)yy * fw + xx) * 4 + c]; };
+                double v = (px(ix, iy) * (1 - tx) + px(ix + 1, iy) * tx) * (1 - ty) +
+                           (px(ix, iy + 1) * (1 - tx) + px(ix + 1, iy + 1) * tx) * ty;
+                d[c] = (u8)(v * a);
+            }
+        }
+    }
+    return true;
+}
+
+// Background thread: loads (or first makes) the banner and posts it to the window.
+void load_header_art() {
+    std::thread([] {
+        auto* rgba = new std::vector<u8>;
+        std::wstring cache = game_root() + L"launcher-banner.png";
+        int w = 0, h = 0;
+        bool ok = win::load_image_rgba(cache, *rgba, w, h) && w == kBannerW && h == kBannerH;
+        if (!ok && compose_banner(*rgba)) {
+            gles::write_png(narrow(cache).c_str(), rgba->data(), kBannerW, kBannerH);
+            ok = true;
+        }
+        if (!ok || !PostMessageW(g_wnd, WM_BANNER_READY, 0, (LPARAM)rgba)) delete rgba;
+    }).detach();
+    if (!g_game_icon_big) {
+        std::wstring icon = app_dir() + L"Icon-76@2x.png";
+        g_game_icon_big = win::load_icon(icon);
+        g_game_icon_small = win::load_icon(icon);
+        if (g_game_icon_big) {
+            SendMessageW(g_wnd, WM_SETICON, ICON_BIG, (LPARAM)g_game_icon_big);
+            SendMessageW(g_wnd, WM_SETICON, ICON_SMALL, (LPARAM)g_game_icon_small);
+        }
+    }
+}
+
+HBITMAP make_bitmap(const std::vector<u8>& rgba, int w, int h) {
+    BITMAPINFO bi{};
+    bi.bmiHeader = {sizeof(BITMAPINFOHEADER), w, -h, 1, 32, BI_RGB};
+    void* bits = nullptr;
+    HBITMAP bmp = CreateDIBSection(nullptr, &bi, DIB_RGB_COLORS, &bits, nullptr, 0);
+    if (!bmp) return nullptr;
+    auto* dst = static_cast<u8*>(bits);
+    for (size_t i = 0; i < rgba.size(); i += 4) {
+        dst[i] = rgba[i + 2];
+        dst[i + 1] = rgba[i + 1];
+        dst[i + 2] = rgba[i];
+        dst[i + 3] = 255;
+    }
+    return bmp;
+}
+
+void paint_header(HDC dc, const RECT& header) {
+    SetBkMode(dc, TRANSPARENT);
+    if (g_banner) {
+        HDC mem = CreateCompatibleDC(dc);
+        HGDIOBJ old = SelectObject(mem, g_banner);
+        SetStretchBltMode(dc, HALFTONE);
+        StretchBlt(dc, 0, 0, header.right, header.bottom, mem, 0, 0, kBannerW, kBannerH, SRCCOPY);
+        SelectObject(mem, old);
+        DeleteDC(mem);
+        HGDIOBJ oldf = SelectObject(dc, g_sub_font);
+        SetTextColor(dc, kHeaderSub);
+        RECT tag{0, 0, header.right - S(16), header.bottom - S(10)};
+        DrawTextW(dc, L"PC PORT", -1, &tag, DT_RIGHT | DT_BOTTOM | DT_SINGLELINE);
+        SelectObject(dc, oldf);
+        return;
+    }
+    FillRect(dc, &header, g_header_brush);
+    int top = (header.bottom - S(56)) / 2;
+    DrawIconEx(dc, S(18), top, g_icon, S(56), S(56), 0, nullptr, DI_NORMAL);
+    SetTextColor(dc, kHeaderText);
+    HGDIOBJ old = SelectObject(dc, g_title_font);
+    TextOutW(dc, S(88), top, L"Infinity Blade III", 18);
+    SelectObject(dc, g_sub_font);
+    SetTextColor(dc, kHeaderSub);
+    const wchar_t* sub = L"PC Port";
+    TextOutW(dc, S(90), top + S(36), sub, (int)wcslen(sub));
+    SelectObject(dc, old);
+}
 
 void create_controls() {
     const auto& s = settings::get();
@@ -461,6 +571,7 @@ LRESULT CALLBACK wnd_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         set_busy(false);
         if (wp) {
             refresh_install_state();
+            load_header_art();
             MessageBoxW(h, L"Infinity Blade III is installed. Click Play to start.", L"Infinity Blade III",
                         MB_ICONINFORMATION);
         } else {
@@ -479,18 +590,17 @@ LRESULT CALLBACK wnd_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         RECT rc;
         GetClientRect(h, &rc);
         RECT header{0, 0, rc.right, S(kHeaderH)};
-        FillRect(dc, &header, g_header_brush);
-        DrawIconEx(dc, S(18), S(14), g_icon, S(56), S(56), 0, nullptr, DI_NORMAL);
-        SetBkMode(dc, TRANSPARENT);
-        SetTextColor(dc, kHeaderText);
-        HGDIOBJ old = SelectObject(dc, g_title_font);
-        TextOutW(dc, S(88), S(14), L"Infinity Blade III", 18);
-        SelectObject(dc, g_sub_font);
-        SetTextColor(dc, kHeaderSub);
-        const wchar_t* sub = L"PC Port";
-        TextOutW(dc, S(90), S(50), sub, (int)wcslen(sub));
-        SelectObject(dc, old);
+        paint_header(dc, header);
         EndPaint(h, &ps);
+        return 0;
+    }
+    case WM_BANNER_READY: {
+        auto* rgba = reinterpret_cast<std::vector<u8>*>(lp);
+        if (g_banner) DeleteObject(g_banner);
+        g_banner = make_bitmap(*rgba, kBannerW, kBannerH);
+        delete rgba;
+        RECT header{0, 0, S(kWidth), S(kHeaderH)};
+        InvalidateRect(h, &header, FALSE);
         return 0;
     }
     case WM_CLOSE:
@@ -569,6 +679,7 @@ void capture(HWND h, const char* png) {
 int screenshot(const char* main_png, const char* keys_png) {
     create_main_window(-4000, -4000, true);
     ShowWindow(g_wnd, SW_SHOWNOACTIVATE);
+    for (int i = 0; i < 10 && game_installed() && !g_banner; i++) pump();  // the banner loads in the background
     pump();
     capture(g_wnd, main_png);
     open_key_bindings();
@@ -605,6 +716,7 @@ void create_main_window(int x, int y, bool offscreen) {
     g_wnd = CreateWindowExW(offscreen ? WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE : 0, L"IB3Launcher", L"Infinity Blade III",
                             style, x, y, w, h, nullptr, nullptr, wc.hInstance, nullptr);
     create_controls();
+    if (game_installed()) load_header_art();
 }
 
 }  // namespace launcher

@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Builds a release zip in dist/: the launcher/runtime executable, ANGLE, and the documents.
-#   scripts/package.sh 1.0.0
+# Builds the release zip in dist/: the launcher/runtime executable, ANGLE, and the documents.
+# The version comes from src/app.rc. The zip name is fixed because the README links to
+# releases/latest/download/InfinityBladeIII-PCPort-win64.zip.
 set -e
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-VERSION="${1:?usage: scripts/package.sh <version>}"
-NAME="InfinityBladeIII-PCPort-v$VERSION-win64"
+NAME="InfinityBladeIII-PCPort-win64"
 cd "$ROOT"
 ./build.sh
 STAGE="dist/$NAME"

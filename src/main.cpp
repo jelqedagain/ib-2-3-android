@@ -10,6 +10,7 @@
 #include "launcher/launcher.h"
 #include "uikit/labels.h"
 #include "audio/mixer.h"
+#include "audio/video.h"
 namespace audio { void install(); }
 #include "hle.h"
 #include "libc/vfs.h"
@@ -77,6 +78,13 @@ int main(int argc, char** argv) {
         return launcher::run();
     }
     if (argc == 4 && std::string(argv[1]) == "-launcher-shot") return launcher::screenshot(argv[2], argv[3]);
+    if (argc == 5 && std::string(argv[1]) == "-movie-frame") {  // tool: -movie-frame <movie> <seconds> <png>
+        std::vector<u8> rgba;
+        int w = 0, h = 0;
+        if (!video::grab_frame(launcher::widen(argv[2]), atof(argv[3]), rgba, w, h)) return 1;
+        gles::write_png(argv[4], rgba.data(), w, h);
+        return 0;
+    }
     if (argc == 3 && std::string(argv[1]) == "-install") {  // headless install: -install <path to .ipa>
         std::wstring error;
         int last = -1;

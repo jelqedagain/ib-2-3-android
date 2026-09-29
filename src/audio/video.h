@@ -25,4 +25,7 @@ void set_on_finished(const std::shared_ptr<Movie>& m, std::function<void()> fn);
 bool current_frame(const u8*& rgba, int& w, int& h, u64& serial);
 void release_frame();  // must follow a successful current_frame()
 
+// Decodes the frame shown at `seconds` into RGBA (top row first); used for launcher art.
+bool grab_frame(const std::wstring& path, double seconds, std::vector<u8>& rgba, int& w, int& h);
+
 }  // namespace video

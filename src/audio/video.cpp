@@ -346,4 +346,60 @@ bool current_frame(const u8*& rgba, int& w, int& h, u64& serial) {
 
 void release_frame() { g_frame_mutex.unlock(); }
 
+bool grab_frame(const std::wstring& path, double seconds, std::vector<u8>& rgba, int& w, int& h) {
+    IMFSourceReader* r = make_reader(path, true);
+    if (!r) return false;
+    UINT32 uw = 0, uh = 0;
+    IMFMediaType* type = nullptr;
+    if (SUCCEEDED(r->GetCurrentMediaType((DWORD)MF_SOURCE_READER_FIRST_VIDEO_STREAM, &type))) {
+        MFGetAttributeSize(type, MF_MT_FRAME_SIZE, &uw, &uh);
+        type->Release();
+    }
+    LONGLONG target = (LONGLONG)(seconds * 1e7);
+    PROPVARIANT pos;
+    PropVariantInit(&pos);
+    pos.vt = VT_I8;
+    pos.hVal.QuadPart = target;
+    r->SetCurrentPosition(GUID_NULL, pos);  // lands on the key frame before `target`
+    bool ok = false;
+    for (int i = 0; i < 1000 && !ok && uw && uh; i++) {
+        DWORD flags = 0;
+        LONGLONG ts = 0;
+        IMFSample* sample = nullptr;
+        HRESULT hr = r->ReadSample((DWORD)MF_SOURCE_READER_FIRST_VIDEO_STREAM, 0, nullptr, &flags, &ts, &sample);
+        if (FAILED(hr) || (flags & MF_SOURCE_READERF_ENDOFSTREAM)) {
+            if (sample) sample->Release();
+            break;
+        }
+        if (!sample) continue;
+        if (ts + 400000 >= target) {  // within 40 ms
+            IMFMediaBuffer* buf = nullptr;
+            sample->ConvertToContiguousBuffer(&buf);
+            BYTE* data = nullptr;
+            DWORD len = 0;
+            buf->Lock(&data, nullptr, &len);
+            size_t stride = len / uh;
+            w = (int)uw;
+            h = (int)uh;
+            rgba.resize((size_t)w * h * 4);
+            for (int y = 0; y < h; y++) {
+                const u8* src = data + y * stride;  // BGRX, top-down
+                u8* dst = &rgba[(size_t)y * w * 4];
+                for (int x = 0; x < w; x++) {
+                    dst[4 * x + 0] = src[4 * x + 2];
+                    dst[4 * x + 1] = src[4 * x + 1];
+                    dst[4 * x + 2] = src[4 * x + 0];
+                    dst[4 * x + 3] = 255;
+                }
+            }
+            buf->Unlock();
+            buf->Release();
+            ok = true;
+        }
+        sample->Release();
+    }
+    r->Release();
+    return ok;
+}
+
 }  // namespace video

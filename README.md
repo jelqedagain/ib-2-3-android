@@ -6,11 +6,13 @@
 
 Infinity Blade III was pulled from the App Store in 2018 and can no longer be bought or downloaded. This project exists so the game can still be played.
 
+### [⬇ Download the latest version (Windows 10/11, 64-bit)](https://github.com/jelqscape/Infinity-Blade-III-PC-Port/releases/latest/download/InfinityBladeIII-PCPort-win64.zip)
+
 ![The launcher](docs/launcher.png)
 
 ## Download and play
 
-1. Download `InfinityBladeIII-PCPort-…-win64.zip` from the [Releases](../../releases) page.
+1. [Download `InfinityBladeIII-PCPort-win64.zip`](https://github.com/jelqscape/Infinity-Blade-III-PC-Port/releases/latest/download/InfinityBladeIII-PCPort-win64.zip). All versions are on the [Releases](../../releases) page.
 2. Extract it into its own folder. The installed game needs about 3.5 GB of disk space.
 3. Double-click **Infinity Blade III.exe**. This opens the launcher.
 4. The first time, click **Install game...** and choose your Infinity Blade III `.ipa` (version 1.4.4, 64-bit). An `.ipa` placed in the same folder is found automatically.
@@ -110,7 +112,7 @@ scripts/fetch-deps.sh      # dynarmic submodule and Boost headers
 
 `build.sh` uses a portable toolchain from `tools/` (`tools/llvm-mingw`, `tools/cmake`, `tools/ninja.exe`) if one is there, otherwise the tools on your `PATH`.
 
-`scripts/package.sh <version>` builds the release zip in `dist/`.
+`scripts/package.sh` builds the release zip in `dist/` (the version number lives in `src/app.rc`).
 
 For development, `./test.sh <seconds> [options]` runs the game hidden, with its own save folder, and writes `build/testrun/ib3rt.log`. Useful options:
 
