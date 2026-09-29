@@ -31,7 +31,13 @@ void apply(cpu::Thread& t, GuestAddr config) {
     };
     auto flag = [](bool b) { return std::string(b ? "True" : "False"); };
 
-    if (s.max_fps >= 60) set("Engine.Engine", "MaxSmoothedFrameRate", "60", g_engine_ini);
+    // UE3's frame smoothing caps each frame at a slow running average of recent frame times,
+    // clamped to [Min, Max]SmoothedFrameRate. Loading hitches drag the average down and the cap
+    // cannot climb back (the limiter sleeps to hold it), so the game stayed at ~40 in 60 FPS mode.
+    // Pin the range to the chosen rate.
+    std::string fps = s.max_fps >= 60 ? "60" : "30";
+    set("Engine.Engine", "MinSmoothedFrameRate", fps, g_engine_ini);
+    set("Engine.Engine", "MaxSmoothedFrameRate", fps, g_engine_ini);
 
     char scale[32];
     snprintf(scale, sizeof scale, "%.4f", s.render_height / 414.0);  // 414 points tall

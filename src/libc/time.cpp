@@ -41,11 +41,30 @@ u64 ticks24() {
     return (u64)((unsigned __int128)now.QuadPart * 24000000 / g_freq.QuadPart);
 }
 
-// Precise sleep: coarse Sleep() then spin the remainder.
+// Precise sleep: a high-resolution waitable timer (accurate whatever the system timer resolution)
+// for all but the last half millisecond, then spin the remainder.
 void precise_sleep_us(u64 us) {
     u64 end = ticks24() + us * 24;
-    if (us > 2000) Sleep((DWORD)(us / 1000 - 1));
+    if (us > 1000) {
+        constexpr DWORD kHighResolution = 0x2;  // CREATE_WAITABLE_TIMER_HIGH_RESOLUTION (Windows 10 1803+)
+        thread_local HANDLE timer = CreateWaitableTimerExW(nullptr, nullptr, kHighResolution, TIMER_ALL_ACCESS);
+        LARGE_INTEGER due;
+        due.QuadPart = -(LONGLONG)((us - 500) * 10);  // relative, in 100 ns units
+        if (timer && SetWaitableTimer(timer, &due, 0, nullptr, nullptr, FALSE)) WaitForSingleObject(timer, INFINITE);
+        else Sleep((DWORD)(us / 1000 - 1));
+    }
     while (ticks24() < end) std::this_thread::yield();
+}
+
+// Windows 11 stops honouring timeBeginPeriod for processes whose window is hidden, minimized or
+// occluded, which stretches the engine's 1 ms waits (and the frame limiter's sleeps) to ~15.6 ms.
+void keep_timer_resolution() {
+    struct ThrottlingState {
+        ULONG version, control_mask, state_mask;
+    } state{1 /* PROCESS_POWER_THROTTLING_CURRENT_VERSION */, 0x4 /* ..._IGNORE_TIMER_RESOLUTION */, 0};
+    using SetInfo = BOOL(WINAPI*)(HANDLE, int, LPVOID, DWORD);
+    auto set = reinterpret_cast<SetInfo>(GetProcAddress(GetModuleHandleW(L"kernel32.dll"), "SetProcessInformation"));
+    if (set) set(GetCurrentProcess(), 4 /* ProcessPowerThrottling */, &state, sizeof state);
 }
 
 }  // namespace
@@ -56,6 +75,7 @@ void install_time() {
     using hle::fn;
     QueryPerformanceFrequency(&g_freq);
     timeBeginPeriod(1);
+    keep_timer_resolution();
 
     fn("_time", [](s64* out) -> s64 {
         s64 t = std::time(nullptr);
