@@ -123,7 +123,7 @@ For development, `./test.sh <seconds> [options]` runs the game hidden, with its 
 
 ## Credits and legal
 
-- Infinity Blade III is © Chair Entertainment Group / Epic Games. This project is not affiliated with or endorsed by Chair or Epic Games, and it does not distribute any of their files.
+- Infinity Blade III is © Chair Entertainment Group / Epic Games. This project is not affiliated with or endorsed by Chair or Epic Games. Apart from the game's icon, used as the program icon, it does not distribute any of their files. The launcher banner is made at run time from your own installed copy of the game.
 - Keyboard layout inspired by the community [Infinity Blade II PC port](https://archive.org/details/infinity-blade-ii-pc).
 - Third-party components and their licenses are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 - The source code of this port is released under the [MIT License](LICENSE).

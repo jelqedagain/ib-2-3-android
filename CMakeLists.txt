@@ -33,7 +33,8 @@ target_link_libraries(ib3rt PRIVATE dynarmic ib3_thirdparty bcrypt winmm ole32 u
 target_compile_options(ib3rt PRIVATE -Wno-unused-parameter -Wno-invalid-offsetof)
 # Keep our own image well away from the guest's preferred load address (0x100000000);
 # the main thread needs a deep host stack for nested guest <-> HLE calls.
-target_link_options(ib3rt PRIVATE -Wl,--image-base=0x7ff600000000 -Wl,--stack,16777216 -static)
+# A windowed program: no console window when started from Explorer or a shortcut.
+target_link_options(ib3rt PRIVATE -mwindows -Wl,--image-base=0x7ff600000000 -Wl,--stack,16777216 -static)
 
 # ANGLE (OpenGL ES on Direct3D 11) must sit next to the executable.
 add_custom_command(TARGET ib3rt POST_BUILD

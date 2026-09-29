@@ -435,4 +435,4 @@ The author disclaims copyright to this source code. In place of a legal notice, 
     May you share freely, never taking more than you give.
 ```
 
-Infinity Blade III is (c) Chair Entertainment Group / Epic Games. No part of the game is included.
+Infinity Blade III is (c) Chair Entertainment Group / Epic Games. Its app icon is used as the program icon; no other part of the game is included.

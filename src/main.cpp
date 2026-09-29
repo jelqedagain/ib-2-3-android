@@ -73,10 +73,7 @@ static void claim_guest_image_range() {
 int main(int argc, char** argv) {
     claim_guest_image_range();
     // Started on its own (double-clicked): show the launcher, which starts the game with -play.
-    if (argc == 1) {
-        FreeConsole();
-        return launcher::run();
-    }
+    if (argc == 1) return launcher::run();
     if (argc == 4 && std::string(argv[1]) == "-launcher-shot") return launcher::screenshot(argv[2], argv[3]);
     if (argc == 5 && std::string(argv[1]) == "-movie-frame") {  // tool: -movie-frame <movie> <seconds> <png>
         std::vector<u8> rgba;
@@ -154,7 +151,12 @@ int main(int argc, char** argv) {
         }
     }
     if (!uikit::g_test_mode) logging::g_error_dialogs = true;
-    if (!keep_console && !uikit::g_test_mode) FreeConsole();  // logs still go to ib3rt.log
+    // A windowed (GUI) program has no console; logs go to ib3rt.log (and to stderr when the
+    // parent redirected it, as test.sh does). -console opens one for live logs.
+    if (keep_console && AllocConsole()) {
+        freopen("CONOUT$", "w", stdout);
+        freopen("CONOUT$", "w", stderr);
+    }
     CoInitializeEx(nullptr, COINIT_MULTITHREADED);
     logging::set_thread_name("main");
 
