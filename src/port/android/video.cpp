@@ -15,6 +15,7 @@ namespace video {
 namespace {
 
 constexpr int64_t kTimeoutUs = 10000;
+constexpr int kMaxWidth = 2560;  // wider movies are converted at half size (no phone screen shows more)
 constexpr int32_t kColorFormatYUV420Flexible = 0x7F420888, kColorFormatYUV420Planar = 19, kColorFormatYUV420SemiPlanar = 21;
 
 // An extractor over a file, with one track selected (the first whose MIME type starts with `kind`).
@@ -175,20 +176,21 @@ bool read_layout(AMediaFormat* f, int w, int h, Layout& l) {
 
 u8 clamp8(int v) { return (u8)(v < 0 ? 0 : v > 255 ? 255 : v); }
 
-// YUV 4:2:0 to RGBA with BT.709 (HD) or BT.601 coefficients, video range.
-void to_rgba(const u8* data, size_t size, const Layout& l, int w, int h, u8* rgba) {
-    const bool hd = h >= 720;
+// YUV 4:2:0 to RGBA with BT.709 (HD) or BT.601 coefficients, video range. `step` 2 takes every
+// other pixel of every other row (a half-size image).
+void to_rgba(const u8* data, size_t size, const Layout& l, int w, int h, int step, u8* rgba) {
+    const bool hd = h * step >= 720;
     const int kr = hd ? 459 : 409, kgu = hd ? 55 : 100, kgv = hd ? 136 : 208, kb = hd ? 541 : 516;
     for (int y = 0; y < h; y++) {
-        int sy = y + l.top;
+        int sy = y * step + l.top;
         const u8* row_y = data + l.y + (size_t)sy * l.y_row;
         const u8* row_u = data + l.u + (size_t)(sy / 2) * l.u_row;
         const u8* row_v = data + l.v + (size_t)(sy / 2) * l.v_row;
-        size_t end = (size_t)((l.left + w + 1) / 2) * std::max(l.u_col, l.v_col);
-        if (row_y + l.left + w > data + size || row_u + end > data + size || row_v + end > data + size) break;  // short buffer
+        size_t end = (size_t)((l.left + w * step + 1) / 2) * std::max(l.u_col, l.v_col);
+        if (row_y + l.left + w * step > data + size || row_u + end > data + size || row_v + end > data + size) break;  // short buffer
         u8* d = rgba + (size_t)y * w * 4;
         for (int x = 0; x < w; x++) {
-            int sx = x + l.left, cx = sx / 2;
+            int sx = x * step + l.left, cx = sx / 2;
             int c = (row_y[sx] - 16) * 298, u = row_u[cx * l.u_col] - 128, v = row_v[cx * l.v_col] - 128;
             d[0] = clamp8((c + kr * v + 128) >> 8);
             d[1] = clamp8((c - kgu * u - kgv * v + 128) >> 8);
@@ -204,7 +206,7 @@ struct CodecDecoder : Decoder {
     AMediaCodec* codec = nullptr;
     Layout layout;
     bool have_layout = false;
-    int w = 0, h = 0;
+    int w = 0, h = 0, step = 1;  // output size; source pixels per output pixel
     bool input = true, ended = false;
     ssize_t held = -1;
     AMediaCodecBufferInfo held_info{};
@@ -220,6 +222,9 @@ struct CodecDecoder : Decoder {
         w = info.width;
         h = info.height;
         if (!src.open(path, "video/")) return false;
+        int32_t source_w = w;
+        AMediaFormat_getInt32(src.format, AMEDIAFORMAT_KEY_WIDTH, &source_w);
+        step = source_w > w ? 2 : 1;
         AMediaFormat_setInt32(src.format, AMEDIAFORMAT_KEY_COLOR_FORMAT, kColorFormatYUV420Flexible);
         codec = AMediaCodec_createDecoderByType(src.mime.c_str());
         return codec && AMediaCodec_configure(codec, src.format, nullptr, nullptr, 0) == AMEDIA_OK &&
@@ -234,7 +239,7 @@ struct CodecDecoder : Decoder {
             ssize_t out = AMediaCodec_dequeueOutputBuffer(codec, &info, kTimeoutUs);
             if (out == AMEDIACODEC_INFO_OUTPUT_FORMAT_CHANGED) {
                 AMediaFormat* f = AMediaCodec_getOutputFormat(codec);
-                have_layout = read_layout(f, w, h, layout);
+                have_layout = read_layout(f, w * step, h * step, layout);
                 AMediaFormat_delete(f);
                 continue;
             }
@@ -260,7 +265,7 @@ struct CodecDecoder : Decoder {
         if (rgba && have_layout) {
             size_t size = 0;
             const u8* data = AMediaCodec_getOutputBuffer(codec, held, &size);
-            if (data) to_rgba(data + held_info.offset, (size_t)held_info.size, layout, w, h, rgba);
+            if (data) to_rgba(data + held_info.offset, (size_t)held_info.size, layout, w, h, step, rgba);
         }
         AMediaCodec_releaseOutputBuffer(codec, held, false);
         held = -1;
@@ -285,8 +290,8 @@ bool probe(const std::string& path, MovieInfo& info) {
     AMediaFormat_getInt32(src.format, AMEDIAFORMAT_KEY_WIDTH, &w);
     AMediaFormat_getInt32(src.format, AMEDIAFORMAT_KEY_HEIGHT, &h);
     if (AMediaFormat_getInt64(src.format, AMEDIAFORMAT_KEY_DURATION, &us)) info.duration = us / 1e6;
-    info.width = w;
-    info.height = h;
+    info.width = w > kMaxWidth ? w / 2 : w;  // the size of the frames we produce
+    info.height = w > kMaxWidth ? h / 2 : h;
     info.sound = decode_audio(path);
     return true;
 }
