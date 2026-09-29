@@ -175,7 +175,8 @@ void init(HWND hwnd) {
 
 void set_window(HWND hwnd) {
     std::lock_guard lock(g.surface_mutex);  // waits for a frame being presented
-    if (g.surf) g.DestroySurface(g.dpy, g.surf);  // EGL frees it once no thread has it current
+    // Presenting holds the window current only while it holds this lock (see presentRenderbuffer).
+    if (g.surf) g.DestroySurface(g.dpy, g.surf);
     g.surf = hwnd ? g.CreateWindowSurface(g.dpy, g.cfg, hwnd, nullptr) : nullptr;
     if (hwnd && !g.surf) LOG_ERROR("eglCreateWindowSurface failed (0x%x)", g.GetError());
     g.surface_generation++;
@@ -306,7 +307,11 @@ void install_eagl() {
                 LOG_ERROR("eglMakeCurrent(window) failed (0x%x)", g.GetError());
                 return false;
             }
-            g.SwapInterval(g.dpy, 0);  // the game paces itself (30 fps cap); vsync would stack another wait
+            static u64 interval_set_for = ~0ull;  // the swap interval belongs to the surface
+            if (interval_set_for != g.surface_generation) {
+                interval_set_for = g.surface_generation;
+                g.SwapInterval(g.dpy, 0);  // the game paces itself (30 fps cap); vsync would stack another wait
+            }
             t_surface_bound = true;
         }
         s32 rb = 0;
@@ -332,6 +337,14 @@ void install_eagl() {
             }
         }
         g.SwapBuffers(g.dpy, g.surf);
+#ifdef __ANDROID__
+        // Let go of the window until the next frame. Android destroys it whenever the app leaves the
+        // screen, and the game stops presenting then: a window left current on its thread was still
+        // attached when that happened, and on some drivers (Mali) the game's graphics came back
+        // black or with garbled textures.
+        g.MakeCurrent(g.dpy, nullptr, nullptr, d.ctx);
+        t_surface_bound = false;
+#endif
         g_presented = true;
         uikit::on_frame_presented();
         return true;
