@@ -22,7 +22,10 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <algorithm>
+#include <cctype>
 #include <cmath>
+#include <fstream>
+#include <iterator>
 #include <string>
 
 int ib3_main(int argc, char** argv);
@@ -94,6 +97,15 @@ void hide_system_bars(ANativeActivity* a) {
                             2 /* BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE */);
     }
     if (env->ExceptionCheck()) env->ExceptionClear();
+}
+
+// Whether the installed game is Infinity Blade II: its bundle id, which is plain text in Info.plist.
+bool is_infinity_blade_2() {
+    std::ifstream f("game/Payload/SwordGame.app/Info.plist", std::ios::binary);
+    std::string plist((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+    static const std::string id = "com.chairentertainment.IB2";
+    size_t at = plist.find(id);
+    return at != std::string::npos && (at + id.size() == plist.size() || !std::isalnum((unsigned char)plist[at + id.size()]));
 }
 
 // The app's name from its manifest (UI thread).
@@ -228,9 +240,12 @@ void on_cmd(android_app* app, int32_t cmd) {
         uikit::set_native_window(app->window);
         if (!g_started) {
             // Fill the screen: keep iOS's 414-point height and widen the emulated screen to the
-            // phone's shape (the game lays itself out for any width, as on iPads and iPhones).
+            // phone's shape (Infinity Blade III lays itself out for any width). Infinity Blade II
+            // only knows the iPhone screens of its time: on a wider screen its menus come out zoomed
+            // in and run off the edges, so it keeps the 16:9 iPhone screen, with black bars at the
+            // sides of longer phones.
             int w = ANativeWindow_getWidth(app->window), h = ANativeWindow_getHeight(app->window);
-            if (w > 0 && h > 0)
+            if (w > 0 && h > 0 && !is_infinity_blade_2())
                 uikit::g_device.width_pt = std::round(uikit::g_device.height_pt * std::max(w, h) / std::min(w, h));
             __android_log_print(ANDROID_LOG_INFO, "ib3", "window %dx%d: screen %.0fx%.0f points", w, h,
                                 uikit::g_device.width_pt, uikit::g_device.height_pt);
