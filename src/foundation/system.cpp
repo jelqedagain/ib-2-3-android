@@ -180,7 +180,8 @@ void install_system() {
         static const char* suffixes[] = {"Key", "Notification", "NotificationName", "Domain", "Exception", "Scope",
                                          "AttributeName", "Code", "Mode", "Twitter"};
         static const char* prefixes[] = {"_kSec", "_AVAudioSessionCategory", "_AVLayerVideoGravity", "_kEAGL",
-                                         "_NSGregorianCalendar", "_kCFBundle", "_NSFile", "_NSMetadataItem"};
+                                         "_NSGregorianCalendar", "_kCFBundle", "_NSFile", "_NSMetadataItem",
+                                         "_ADBannerContentSize", "_NSURLAuthenticationMethod"};
         bool match = false;
         for (const char* s : suffixes) {
             size_t n = std::strlen(s);

@@ -44,15 +44,16 @@ void write(Level lvl, const char* fmt, ...) {
     }
 }
 bool g_error_dialogs = false;
+std::string g_app_name = "Infinity Blade III";
 
 void show_error_dialog(const char* what) {
     if (!g_error_dialogs) return;
     static std::atomic<bool> shown{false};
     if (shown.exchange(true)) return;  // one dialog, even if several threads fail
-    std::string text = std::string("Infinity Blade III stopped because of an error:\n\n") + what +
+    std::string text = g_app_name + " stopped because of an error:\n\n" + what +
                        "\n\nDetails were saved to ib3rt.log next to the game. If you report the problem, please "
                        "include that file.";
-    MessageBoxA(nullptr, text.c_str(), "Infinity Blade III", MB_ICONERROR | MB_TOPMOST);
+    MessageBoxA(nullptr, text.c_str(), g_app_name.c_str(), MB_ICONERROR | MB_TOPMOST);
 }
 }  // namespace logging
 

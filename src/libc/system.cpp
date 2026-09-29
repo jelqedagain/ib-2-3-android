@@ -438,6 +438,17 @@ void install_system() {
         if (sscanf(s, "%u.%u.%u.%u", &a, &b, &c, &d) != 4) return 0xffffffff;
         return a | (b << 8) | (c << 16) | (d << 24);
     });
+    fn("_inet_ntoa", [](u32 a) {
+        static thread_local char* buf = static_cast<char*>(std::calloc(1, 16));
+        snprintf(buf, 16, "%u.%u.%u.%u", a & 0xff, (a >> 8) & 0xff, (a >> 16) & 0xff, a >> 24);
+        return buf;
+    });
+    // Server certificate checks (the game runs offline, so these never see a real connection).
+    fn("_SecTrustEvaluate", [](u64, u32* result) {
+        if (result) *result = 0;  // kSecTrustResultInvalid
+        return 0;
+    });
+    fn("_SecTrustCopyInfo", [](u64) -> u64 { return 0; });
     fn("_if_nametoindex", [](const char*) -> u32 { return 0; });
     fn("_link_ntoa", [](void*) { return hle::static_cstr(""); });
     fn("_select", [](int, void*, void*, void*, s64* timeout) {

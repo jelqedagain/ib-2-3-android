@@ -96,6 +96,29 @@ void hide_system_bars(ANativeActivity* a) {
     if (env->ExceptionCheck()) env->ExceptionClear();
 }
 
+// The app's name from its manifest (UI thread).
+std::string app_label(ANativeActivity* a) {
+    JNIEnv* env = a->env;
+    jclass activity_cls = env->GetObjectClass(a->clazz);
+    jobject info = env->CallObjectMethod(a->clazz, env->GetMethodID(activity_cls, "getApplicationInfo", "()Landroid/content/pm/ApplicationInfo;"));
+    jobject pm = env->CallObjectMethod(a->clazz, env->GetMethodID(activity_cls, "getPackageManager", "()Landroid/content/pm/PackageManager;"));
+    std::string name;
+    if (info && pm && !env->ExceptionCheck()) {
+        jobject label = env->CallObjectMethod(info, env->GetMethodID(env->GetObjectClass(info), "loadLabel",
+                                                                     "(Landroid/content/pm/PackageManager;)Ljava/lang/CharSequence;"), pm);
+        if (label && !env->ExceptionCheck()) {
+            auto str = static_cast<jstring>(env->CallObjectMethod(label, env->GetMethodID(env->GetObjectClass(label), "toString", "()Ljava/lang/String;")));
+            if (str && !env->ExceptionCheck()) {
+                const char* utf = env->GetStringUTFChars(str, nullptr);
+                name = utf;
+                env->ReleaseStringUTFChars(str, utf);
+            }
+        }
+    }
+    if (env->ExceptionCheck()) env->ExceptionClear();
+    return name.empty() ? logging::g_app_name : name;
+}
+
 void (*g_glue_focus_changed)(ANativeActivity*, int) = nullptr;
 
 void on_focus_changed(ANativeActivity* a, int focused) {
@@ -239,6 +262,7 @@ extern "C" JNIEXPORT void ANativeActivity_onCreate(ANativeActivity* activity, vo
     jclass cls = activity->env->GetObjectClass(activity->clazz);
     android::register_dialog_natives(activity->env, cls);
     activity->env->DeleteLocalRef(cls);
+    logging::g_app_name = app_label(activity);  // "Infinity Blade III" or "Infinity Blade II"
     g_glue_focus_changed = activity->callbacks->onWindowFocusChanged;
     activity->callbacks->onWindowFocusChanged = on_focus_changed;
     hide_system_bars(activity);

@@ -2,6 +2,7 @@ package com.ib3port.game;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
@@ -29,14 +30,17 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 /**
- * Starts the game, or first installs it from the player's own Infinity Blade III .ipa: the
- * Payload/SwordGame.app folder is extracted into the app's files folder (game/).
- * For testing: am start -n com.ib3port.game/.LauncherActivity --es ipa /path/to/file.ipa
+ * Starts the game, or first installs it from the player's own .ipa: the Payload/SwordGame.app
+ * folder is extracted into the app's files folder (game/). The same code serves Infinity Blade II
+ * and III: the app's label is the game's name, and the manifest's meta-data says which .ipa to
+ * accept (ib.bundleId), which version to ask for (ib.ipaVersion) and the space it needs (ib.size).
+ * For testing: am start -n <package>/com.ib3port.game.LauncherActivity --es ipa /path/to/file.ipa
  */
 public class LauncherActivity extends Activity {
     private static final int PICK_IPA = 1;
     private static final String APP_PREFIX = "Payload/SwordGame.app/";
 
+    private String gameName, ipaVersion, bundleId, size;
     private TextView status;
     private ProgressBar progress;
     private Button choose;
@@ -54,6 +58,15 @@ public class LauncherActivity extends Activity {
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
+        gameName = getApplicationInfo().loadLabel(getPackageManager()).toString();
+        try {
+            Bundle meta = getPackageManager().getApplicationInfo(getPackageName(), PackageManager.GET_META_DATA).metaData;
+            ipaVersion = meta.getString("ib.ipaVersion");
+            bundleId = meta.getString("ib.bundleId");
+            size = meta.getString("ib.size");
+        } catch (PackageManager.NameNotFoundException e) {
+            throw new IllegalStateException(e);
+        }
         String ipa = getIntent().getStringExtra("ipa");
         if (ipa == null && installed(filesDir())) {
             startGame();
@@ -85,7 +98,7 @@ public class LauncherActivity extends Activity {
         column.addView(icon, new LinearLayout.LayoutParams(dp(72), dp(72)));
 
         TextView title = new TextView(this);
-        title.setText("Infinity Blade III");
+        title.setText(gameName);
         title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 26);
         title.setTextColor(Color.WHITE);
         title.setGravity(Gravity.CENTER);
@@ -93,8 +106,8 @@ public class LauncherActivity extends Activity {
         column.addView(title);
 
         TextView body = new TextView(this);
-        body.setText("Bring your own IPA.\n\nThis app runs the original iOS release of Infinity Blade III (version 1.4.4). "
-                + "Choose your .ipa file and the game is installed into this app, which needs about 3 GB of free space. "
+        body.setText("Bring your own IPA.\n\nThis app runs the original iOS release of " + gameName + " (version " + ipaVersion + "). "
+                + "Choose your .ipa file and the game is installed into this app, which needs about " + size + " of free space. "
                 + "Your .ipa is only read, never changed or sent anywhere.");
         body.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
         body.setTextColor(0xFFCCCCCC);
@@ -204,15 +217,16 @@ public class LauncherActivity extends Activity {
     private void extract(ZipFile zip) throws IOException {
         try {
             long total = 0;
-            boolean binary = false, engine = false;
+            boolean binary = false, engine = false, thisGame = false;
             for (Enumeration<? extends ZipEntry> e = zip.entries(); e.hasMoreElements(); ) {
                 ZipEntry z = e.nextElement();
                 if (!z.getName().startsWith(APP_PREFIX)) continue;
                 total += Math.max(0, z.getSize());
                 binary |= z.getName().equals(APP_PREFIX + "SwordGame");
                 engine |= z.getName().equals(APP_PREFIX + "CookedIPhone/Engine.xxx");
+                if (z.getName().equals(APP_PREFIX + "Info.plist")) thisGame = contains(zip.getInputStream(z), bundleId);
             }
-            if (!binary || !engine) throw new IOException("This .ipa does not contain Infinity Blade III (Payload/SwordGame.app).");
+            if (!binary || !engine || !thisGame) throw new IOException("This .ipa does not contain " + gameName + ".");
             File files = filesDir();
             if (files.getUsableSpace() < total + (256L << 20))
                 throw new IOException("Not enough free space: installing needs about " + (total / (1L << 30) + 1) + " GB.");
@@ -256,6 +270,16 @@ public class LauncherActivity extends Activity {
             if (!installed(files)) throw new IOException("The installed files are incomplete.");
         } finally {
             zip.close();
+        }
+    }
+
+    // Whether the stream contains `text`. A bundle id is stored as plain text, even in binary plists.
+    private static boolean contains(InputStream stream, String text) throws IOException {
+        try (InputStream in = stream) {
+            byte[] all = new byte[1 << 20];
+            int n = 0;
+            for (int r; n < all.length && (r = in.read(all, n, all.length - n)) > 0; ) n += r;
+            return new String(all, 0, n, "ISO-8859-1").contains(text);
         }
     }
 

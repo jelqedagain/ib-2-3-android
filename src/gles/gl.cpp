@@ -439,6 +439,45 @@ struct ErrorCheck {
     }
 };
 
+// GLSL ES 1.00 only allows constant initializers on global variables. Apple's compiler also took
+// uniforms (Infinity Blade II's light shafts: `float BloomScale = LightShaftParameters.y;`), which
+// stricter drivers reject. Such globals become plain declarations assigned at the start of main().
+std::string fix_global_initializers(const std::string& src) {
+    auto trim = [](std::string s) {
+        size_t a = s.find_first_not_of(" \t\r"), b = s.find_last_not_of(" \t\r");
+        return a == std::string::npos ? std::string() : s.substr(a, b - a + 1);
+    };
+    std::string out, assignments;
+    int depth = 0;
+    for (size_t pos = 0; pos < src.size();) {
+        size_t end = src.find('\n', pos);
+        if (end == std::string::npos) end = src.size();
+        std::string line = src.substr(pos, end - pos);
+        pos = end + 1;
+        std::string code = trim(line.substr(0, line.find("//")));
+        size_t eq = code.find('=');
+        bool movable = depth == 0 && eq != std::string::npos && code.back() == ';' && code[0] != '#' &&
+                       code.find_first_of("{}(") > eq && code.find(',') > eq && code.compare(0, 6, "const ") != 0 &&
+                       code.compare(0, 8, "uniform ") != 0 && code.compare(0, 10, "attribute ") != 0 &&
+                       code.compare(0, 8, "varying ") != 0 && code.compare(0, 10, "precision ") != 0;
+        std::string decl = movable ? trim(code.substr(0, eq)) : std::string();
+        size_t name_at = decl.find_last_of(" \t");
+        if (movable && name_at != std::string::npos) {
+            out += decl + ";\n";
+            assignments += decl.substr(name_at + 1) + " = " + trim(code.substr(eq + 1, code.size() - eq - 2)) + ";\n";
+        } else {
+            out += line + "\n";
+        }
+        for (char c : code) depth += c == '{' ? 1 : c == '}' ? -1 : 0;
+    }
+    if (assignments.empty()) return src;
+    size_t main_at = out.find("void main()");
+    size_t brace = main_at == std::string::npos ? std::string::npos : out.find('{', main_at);
+    if (brace == std::string::npos) return src;
+    out.insert(brace + 1, "\n" + assignments);
+    return out;
+}
+
 void install_gl() {
 #define REGISTER(name, ret, params, args)     hle::fn("_" #name, [] params -> ret { ErrorCheck check{#name}; return p_##name args; });
     GL_FUNCS(REGISTER)
@@ -522,6 +561,15 @@ void install_gl() {
         GLenum e = p_glGetError();
         if (e) g_stats.errors++;
         return e;
+    });
+    hle::fn("_glShaderSource", [](GLuint s, GLsizei count, const char* const* strings, const GLint* lengths) {
+        std::string src;
+        for (GLsizei i = 0; i < count; i++)
+            src += lengths && lengths[i] >= 0 ? std::string(strings[i], lengths[i]) : std::string(strings[i]);
+        std::string fixed = fix_global_initializers(src);
+        if (fixed == src) return p_glShaderSource(s, count, strings, lengths);
+        const char* one = fixed.c_str();
+        p_glShaderSource(s, 1, &one, nullptr);
     });
     hle::fn("_glCompileShader", [](GLuint s) {
         p_glCompileShader(s);

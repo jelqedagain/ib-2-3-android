@@ -26,6 +26,16 @@ void install_thirdparty() {
     });
 
     // sqlite3 (handles and strings are host pointers == guest pointers)
+    fn("_sqlite3_initialize", []() { return sqlite3_initialize(); });
+    fn("_sqlite3_shutdown", []() { return sqlite3_shutdown(); });
+    fn("_sqlite3_threadsafe", []() { return sqlite3_threadsafe(); });
+    fn("_sqlite3_config", [](int op) {
+        // Variadic; only the threading modes (no arguments) are passed on, others are accepted as-is.
+        if (op == SQLITE_CONFIG_SINGLETHREAD || op == SQLITE_CONFIG_MULTITHREAD || op == SQLITE_CONFIG_SERIALIZED)
+            return sqlite3_config(op);
+        LOG_DEBUG("sqlite3_config(%d) ignored", op);
+        return SQLITE_OK;
+    });
     fn("_sqlite3_open", [](const char* name, sqlite3** db) {
         std::string h = vfs::to_host(name);
         LOG_DEBUG("sqlite3_open(%s) -> %s", name, h.c_str());

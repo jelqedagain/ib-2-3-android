@@ -1,22 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Infinity Blade III PC Port, Android build: the game is libib3.so in a NativeActivity
-     (GameActivity); LauncherActivity installs it from the player's .ipa first. -->
+<!-- Template for both apps (scripts/build-apk.sh fills in the @...@ values): the game is libib3.so in
+     a NativeActivity (GameActivity); LauncherActivity installs it from the player's .ipa first. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.ib3port.game"
+    package="@PACKAGE@"
     android:versionCode="4"
     android:versionName="1.2.1">
 
     <uses-feature android:glEsVersion="0x00030000" android:required="true" />
 
     <application
-        android:label="Infinity Blade III"
+        android:label="@LABEL@"
         android:icon="@mipmap/ic_launcher"
         android:extractNativeLibs="true"
         android:isGame="true"
         android:appCategory="game"
         android:allowBackup="false">
+        <!-- The .ipa this app installs from: its bundle id, the version to ask for, the space it needs. -->
+        <meta-data android:name="ib.bundleId" android:value="@BUNDLE_ID@" />
+        <meta-data android:name="ib.ipaVersion" android:value="@IPA_VERSION@" />
+        <meta-data android:name="ib.size" android:value="@SIZE@" />
         <activity
-            android:name=".LauncherActivity"
+            android:name="com.ib3port.game.LauncherActivity"
             android:exported="true"
             android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
             android:screenOrientation="sensorLandscape"
@@ -27,7 +31,7 @@
             </intent-filter>
         </activity>
         <activity
-            android:name=".GameActivity"
+            android:name="com.ib3port.game.GameActivity"
             android:exported="false"
             android:theme="@style/GameTheme"
             android:screenOrientation="sensorLandscape"
