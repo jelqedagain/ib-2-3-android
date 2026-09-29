@@ -30,7 +30,7 @@ namespace {
 enum : int {
     IDC_MODE = 100, IDC_WINSIZE, IDC_RES, IDC_FPS, IDC_SHOWFPS, IDC_AA, IDC_ANISO, IDC_SHADOWS, IDC_HISHADOWS,
     IDC_SHAFTS, IDC_BLOOM, IDC_DOF, IDC_MUSIC, IDC_EFFECTS, IDC_MUSIC_VAL, IDC_EFFECTS_VAL, IDC_KEYS, IDC_STATUS,
-    IDC_PROGRESS, IDC_SAVES, IDC_PLAY,
+    IDC_PROGRESS, IDC_SAVES, IDC_PLAY, IDC_PAD,
 };
 constexpr UINT WM_INSTALL_PROGRESS = WM_APP + 1, WM_INSTALL_DONE = WM_APP + 2;
 
@@ -348,6 +348,26 @@ void play() {
     DestroyWindow(g_wnd);
 }
 
+void show_controller_help(HWND owner) {
+    MessageBoxW(owner,
+                L"Plug in an Xbox-style controller (XInput) and play. The mouse and keyboard keep working.\n\n"
+                L"Left stick\tcursor\n"
+                L"A\ttap at the cursor (hold to drag); also stab and clash\n"
+                L"Right stick\tcamera; swipe attacks in fights\n"
+                L"RT + right stick\tswipe attacks anywhere\n"
+                L"R3 + right stick\tscroll\n"
+                L"LB / RB\tleft / right fight button (dodge)\n"
+                L"LT or B\tcenter fight button (block, hold)\n"
+                L"X / Y\tmagic / super move\n"
+                L"D-pad\tspells 1-3; down: boss info / final strike\n"
+                L"Back\taccept prompt\n"
+                L"Start\tmenu / back\n"
+                L"L3\tfast-forward cutscenes (hold)\n"
+                L"L3 + R3\tshow / hide the controls in game\n\n"
+                L"Mouse: click to tap, drag to swipe.",
+                L"Controller", MB_ICONINFORMATION);
+}
+
 void open_saves() {
     std::wstring dir = settings::exe_dir() + L"userdata\\Documents\\SAVE";
     SHCreateDirectoryExW(nullptr, dir.c_str(), nullptr);
@@ -529,8 +549,8 @@ void create_controls() {
     // Controls
     int yc = y0 + 248;
     ctl(L"BUTTON", L"Controls", BS_GROUPBOX, R - 8, yc, 300, 60, -1);
-    ctl(L"BUTTON", L"Key bindings...", BS_PUSHBUTTON | WS_TABSTOP, R, yc + 22, 140, 28, IDC_KEYS);
-    label(L"Mouse = touch", R + 152, yc + 24, 130);
+    ctl(L"BUTTON", L"Key bindings...", BS_PUSHBUTTON | WS_TABSTOP, R, yc + 22, 136, 28, IDC_KEYS);
+    ctl(L"BUTTON", L"Controller...", BS_PUSHBUTTON | WS_TABSTOP, R + 144, yc + 22, 136, 28, IDC_PAD);
 
     // Bottom
     int yb = y0 + 324;
@@ -557,6 +577,9 @@ LRESULT CALLBACK wnd_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             return 0;
         case IDC_SAVES:
             open_saves();
+            return 0;
+        case IDC_PAD:
+            show_controller_help(h);
             return 0;
         }
         break;

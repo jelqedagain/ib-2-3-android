@@ -23,6 +23,9 @@ struct Settings {
     // Audio (percent)
     int music_volume = 100;
     int effects_volume = 100;
+    // Controller (percent multipliers of the defaults)
+    bool controller = true;
+    int cursor_speed = 100, camera_speed = 100, swipe_size = 100;
 };
 
 // Directory of the executable (with trailing backslash).

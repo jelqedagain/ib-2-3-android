@@ -23,6 +23,12 @@ bool window_presented();
 bool take_screenshot_request(std::string& name);
 void write_png(const char* path, const u8* rgba, int w, int h, bool bottom_up = false);
 void* current_egl_context();
+// Overlays drawn into framebuffer 0 after the game's frame (top-left origin, surface pixels);
+// GL state is restored afterwards.
+void fill_rect(int x, int y, int w, int h, int surface_h, float r, float g, float b);
+void draw_rgba_rect(const u8* rgba, int w, int h, u64 key, int x, int y, int dw, int dh, int surface_h);
+// Called on the presenting thread with the surface size, after the frame and before it is shown.
+extern void (*g_overlay)(int surface_w, int surface_h);
 // Draws RGBA8 pixels (first row = top) letterboxed into framebuffer 0; `key` identifies the pixels.
 void draw_rgba_fit(const u8* rgba, int w, int h, u64 key, int dst_w, int dst_h);
 

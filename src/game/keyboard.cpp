@@ -235,6 +235,7 @@ const std::unordered_map<std::string, const char*> kZoneForInput = {
 };
 
 std::set<std::string> g_sent_down;  // inputs whose press reached the game (their release must too)
+std::atomic<bool> g_track_hud{false}, g_hud_fight{false};
 bool g_space_paused = false;        // the pause toggle is on: its second press must get through
 
 bool zone_allows(const ZoneState& z, const std::string& input) {
@@ -287,18 +288,10 @@ void on_tick(cpu::Thread& t) {
         events.swap(g_queue);
     }
     GuestAddr viewport = client ? *gptr<u64>(client + kViewportOffset) : 0;
-    for (auto& [key, event] : events) {
-        if (!viewport) break;
-        if (key[0] == '@') {
-            if (event != IE_Pressed || !g_have_reflection) continue;
-            if (key == "@AcceptPrompt") press_menu_button(t, kAcceptTags, "Enter");  // IB2 PC's AcceptPrompt
-            else if (key == "@Escape" && !press_menu_button(t, kBackTags, "Escape")) ns::post_to_main(ask_quit_game);
-            else if (key == "@DumpMenus") dump_menus(t);
-            continue;
-        }
-        std::string input = key.substr(0, key.find('|'));
-        if (g_have_reflection) input = resolve(t, key, event);
-        if (input.empty()) continue;
+    auto send = [&](const std::string& binding, int event) {
+        std::string input = binding.substr(0, binding.find('|'));
+        if (g_have_reflection) input = resolve(t, binding, event);
+        if (input.empty()) return;
         u64 name = ue::fname(t, input);
         t.call_raw(g_input_key, [&](cpu::Thread& c) {
             c.set_x(0, client);
@@ -309,8 +302,29 @@ void on_tick(cpu::Thread& t) {
             c.set_x(5, 0);  // bGamepad
             c.set_s(0, 1.0f);
         });
-        LOG_DEBUG("key %s %s -> %s", key.c_str(), event == IE_Pressed ? "pressed" : "released",
+        LOG_DEBUG("key %s %s -> %s", binding.c_str(), event == IE_Pressed ? "pressed" : "released",
                   (t.last_x0() & 0xff) ? "handled" : "unhandled");
+    };
+    for (auto& [key, event] : events) {
+        if (!viewport) break;
+        if (key[0] == '@') {
+            if (event != IE_Pressed || !g_have_reflection) continue;
+            if (key == "@AcceptPrompt") press_menu_button(t, kAcceptTags, "Enter");  // IB2 PC's AcceptPrompt
+            else if (key == "@Escape" && !press_menu_button(t, kBackTags, "Escape")) ns::post_to_main(ask_quit_game);
+            else if (key == "@StartButton" && !press_menu_button(t, kBackTags, "Start")) {
+                send("Sword_PauseGame", IE_Pressed);  // controller Start: back out of a menu, else the menu
+                send("Sword_PauseGame", IE_Released);
+            } else if (key == "@DumpMenus") dump_menus(t);
+            continue;
+        }
+        send(key, event);
+    }
+    if (g_track_hud && g_have_reflection) {  // for the controller: fights use the right stick for swipes
+        ZoneState z = read_zones(t);
+        bool fight = false;
+        for (const char* zone : {"CenterSwipeHoldZone", "MagicZone", "SwordClashMashTap", "BossSwipeZone", "BossHudTap"})
+            fight |= z.zones.count(zone) > 0;
+        g_hud_fight = fight;
     }
     t.jump(g_tick_original);
 }
@@ -323,6 +337,16 @@ void on_exec_input_commands(cpu::Thread& t) {
         LOG_DEBUG("input command: %s", cmd.c_str());
     }
     t.jump(g_exec_original);
+}
+
+void queue_input(const std::string& held_key, const std::string& input, bool down) {
+    std::lock_guard lock(g_mutex);
+    if (down) {
+        if (!g_held.insert(held_key).second) return;
+    } else if (!g_held.erase(held_key)) {
+        return;
+    }
+    g_queue.push_back({input, down ? IE_Pressed : IE_Released});
 }
 
 void queue_event(const std::string& key, bool down) {
@@ -342,6 +366,16 @@ void queue_event(const std::string& key, bool down) {
 }  // namespace
 
 void press_key(const std::string& ue_name, bool down) { queue_event(ue_name, down); }
+
+void press_action(const char* id, bool down) {
+    std::string held = std::string("#") + id;  // separate from keyboard keys, so both can be held
+    if (!strcmp(id, "@StartButton")) return queue_input(held, id, down);
+    for (const Action& a : kActions)
+        if (!strcmp(a.id, id)) return queue_input(held, a.input, down);
+}
+
+void track_hud(bool on) { g_track_hud = on; }
+bool hud_is_fight() { return g_hud_fight; }
 
 void install_keyboard(const macho::Image& img) {
     GuestAddr tick = img.find("__ZN19UGameViewportClient4TickEf");

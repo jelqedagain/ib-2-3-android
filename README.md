@@ -48,6 +48,28 @@ Game keys work exactly when the matching on-screen control would. For example, t
 
 Every key except fullscreen can be changed in the launcher (**Key bindings...**).
 
+### Controller
+
+Plug in an Xbox-style controller (XInput; most modern pads, or any pad through Steam Input) and play. The mouse and keyboard keep working. The controller follows the same rules as the keyboard.
+
+| Button | Action |
+| --- | --- |
+| Left stick | Move the on-screen cursor |
+| A | Tap at the cursor (hold to drag); also stab and mash sword clashes |
+| Right stick | Camera; swipe attacks in fights |
+| RT + right stick | Swipe attacks anywhere |
+| R3 + right stick | Scroll lists |
+| LB / RB | Left / right fight button (dodge) |
+| LT or B | Center fight button (block, hold) |
+| X / Y | Magic / super move |
+| D-pad | Spells 1-3; down: boss info / final strike |
+| Back | Accept the prompt |
+| Start | Menu / back |
+| L3 | Fast-forward cutscenes (hold) |
+| L3 + R3 | Show / hide the controls legend |
+
+The controller only acts while the game window is in front. Speeds can be tuned in `settings.ini` under `[Controller]` (`CursorSpeed`, `CameraSpeed`, `SwipeSize`, in percent; `Enabled=0` turns it off).
+
 ## Settings
 
 The launcher changes:
@@ -74,7 +96,6 @@ Progress is saved in `userdata\Documents\SAVE` next to the executable. Click **O
 - Online features are unavailable: Game Center, Facebook, cloud saves, Clash Mobs and the in-game store.
 - Loading takes longer than on an iPhone.
 - 60 FPS mode is experimental.
-- Controller support is not implemented yet.
 - On Windows "N" editions without the Media Feature Pack, the movies are skipped.
 - This is a new project. Not every part of the game has been played through on it yet.
 

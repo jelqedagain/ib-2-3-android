@@ -300,6 +300,79 @@ void draw_rgba_fit(const u8* rgba, int w, int h, u64 key, int dst_w, int dst_h) 
     p_glActiveTexture(prev_active);
 }
 
+// --- Overlay drawing (after the game's frame is in framebuffer 0) --------------------------
+// Both helpers restore every piece of state they touch: UE3's renderer caches GL state.
+
+struct SavedState {
+    GLint draw_fb = 0, read_fb = 0, box[4] = {};
+    GLboolean scissor = 0;
+    float clear[4] = {};
+    SavedState() {
+        static auto get_floats = reinterpret_cast<void(__stdcall*)(GLenum, float*)>(GetProcAddress(g_gles, "glGetFloatv"));
+        p_glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &draw_fb);
+        p_glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &read_fb);
+        p_glGetIntegerv(0x0C10 /*GL_SCISSOR_BOX*/, box);
+        scissor = p_glIsEnabled(GL_SCISSOR_TEST);
+        if (get_floats) get_floats(0x0C22 /*GL_COLOR_CLEAR_VALUE*/, clear);
+    }
+    ~SavedState() {
+        p_glClearColor(clear[0], clear[1], clear[2], clear[3]);
+        p_glScissor(box[0], box[1], box[2], box[3]);
+        if (scissor) p_glEnable(GL_SCISSOR_TEST);
+        else p_glDisable(GL_SCISSOR_TEST);
+        p_glBindFramebuffer(GL_READ_FRAMEBUFFER, read_fb);
+        p_glBindFramebuffer(GL_DRAW_FRAMEBUFFER, draw_fb);
+    }
+};
+
+void fill_rect(int x, int y, int w, int h, int surface_h, float r, float g, float b) {
+    if (w <= 0 || h <= 0) return;
+    SavedState saved;
+    p_glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+    p_glEnable(GL_SCISSOR_TEST);
+    p_glScissor(x, surface_h - y - h, w, h);  // top-left origin -> GL's bottom-left
+    p_glClearColor(r, g, b, 1);
+    p_glClear(GL_COLOR_BUFFER_BIT);
+}
+
+void draw_rgba_rect(const u8* rgba, int w, int h, u64 key, int x, int y, int dw, int dh, int surface_h) {
+    static thread_local void* ctx = nullptr;
+    static thread_local GLuint tex = 0, fbo = 0;
+    static thread_local u64 uploaded = ~0ull;
+    if (ctx != current_egl_context()) {
+        ctx = current_egl_context();
+        tex = fbo = 0;
+        uploaded = ~0ull;
+    }
+    SavedState saved;
+    GLint prev_tex = 0, prev_active = 0, prev_unpack = 0;
+    p_glGetIntegerv(0x84E0, &prev_active);
+    p_glActiveTexture(0x84C0);
+    p_glGetIntegerv(0x8069, &prev_tex);
+    p_glGetIntegerv(0x0CF5, &prev_unpack);
+    if (!tex) {
+        p_glGenTextures(1, &tex);
+        p_glGenFramebuffers(1, &fbo);
+    }
+    p_glBindTexture(GL_TEXTURE_2D, tex);
+    if (key != uploaded) {
+        p_glPixelStorei(0x0CF5, 4);
+        p_glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, rgba);
+        p_glTexParameteri(GL_TEXTURE_2D, 0x2801, 0x2601);
+        p_glTexParameteri(GL_TEXTURE_2D, 0x2800, 0x2601);
+        uploaded = key;
+    }
+    p_glBindFramebuffer(GL_READ_FRAMEBUFFER, fbo);
+    p_glFramebufferTexture2D(GL_READ_FRAMEBUFFER, 0x8CE0, GL_TEXTURE_2D, tex, 0);
+    p_glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+    p_glDisable(GL_SCISSOR_TEST);
+    int gy = surface_h - y - dh;  // first image row is the top
+    p_glBlitFramebuffer(0, 0, w, h, x, gy + dh, x + dw, gy, GL_COLOR_BUFFER_BIT, 0x2601);
+    p_glBindTexture(GL_TEXTURE_2D, prev_tex);
+    p_glPixelStorei(0x0CF5, prev_unpack);
+    p_glActiveTexture(prev_active);
+}
+
 // Draws the current movie frame (if any) letterboxed into the window. Returns false if no movie.
 bool draw_movie(int dst_w, int dst_h) {
     const u8* rgba;

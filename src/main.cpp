@@ -194,6 +194,7 @@ int main(int argc, char** argv) {
 
     hle::bind_image(img);
     game::install_keyboard(img);
+    game::start_controller();
     game::install_config(img);
     {
         const auto& st = settings::get();

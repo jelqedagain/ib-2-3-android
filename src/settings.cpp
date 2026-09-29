@@ -54,6 +54,10 @@ void load() {
     s.anisotropy = clamp(read_int(L"Graphics", L"Anisotropy", d.anisotropy), 1, 16);
     s.music_volume = clamp(read_int(L"Audio", L"MusicVolume", d.music_volume), 0, 100);
     s.effects_volume = clamp(read_int(L"Audio", L"EffectsVolume", d.effects_volume), 0, 100);
+    s.controller = read_int(L"Controller", L"Enabled", d.controller) != 0;
+    s.cursor_speed = clamp(read_int(L"Controller", L"CursorSpeed", d.cursor_speed), 20, 400);
+    s.camera_speed = clamp(read_int(L"Controller", L"CameraSpeed", d.camera_speed), 20, 400);
+    s.swipe_size = clamp(read_int(L"Controller", L"SwipeSize", d.swipe_size), 30, 300);
     g_loaded = true;
 }
 
@@ -74,6 +78,10 @@ void save() {
     write_int(L"Graphics", L"Anisotropy", s.anisotropy);
     write_int(L"Audio", L"MusicVolume", s.music_volume);
     write_int(L"Audio", L"EffectsVolume", s.effects_volume);
+    write_int(L"Controller", L"Enabled", s.controller);
+    write_int(L"Controller", L"CursorSpeed", s.cursor_speed);
+    write_int(L"Controller", L"CameraSpeed", s.camera_speed);
+    write_int(L"Controller", L"SwipeSize", s.swipe_size);
 }
 
 Settings& get() {

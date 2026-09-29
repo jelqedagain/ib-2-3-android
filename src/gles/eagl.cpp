@@ -14,6 +14,7 @@ void save_screenshot(u32 rb, int w, int h, const char* path);
 void log_frame_stats(u64 frame);
 bool draw_movie(int dst_w, int dst_h);
 int g_screenshot_every = 0;
+void (*g_overlay)(int, int) = nullptr;
 std::mutex g_shot_mutex;
 std::string g_shot_request;
 void request_screenshot(const std::string& name) {
@@ -248,6 +249,7 @@ void install_eagl() {
         u64 n = ++frames;
         if (n <= 5 || n % 120 == 0) log_frame_stats(n);
         if (!draw_movie(sw, sh)) blit_to_window(rb, d.rb_w, d.rb_h, sw, sh);
+        if (g_overlay) g_overlay(sw, sh);
         if (g_screenshot_every && n % g_screenshot_every == 0) {
             char path[64];
             snprintf(path, sizeof path, "shot_%05llu.png", (unsigned long long)n);

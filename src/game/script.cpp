@@ -4,6 +4,8 @@
 //   hold <x> <y> <seconds>
 //   swipe <x1> <y1> <x2> <y2> [seconds]
 //   shot [name]                           save a screenshot of the next presented frame
+//   pad <control> <value>                 fake controller: A B X Y LB RB BACK START L3 R3 UP DOWN LEFT
+//                                         RIGHT (0/1), LX LY RX RY (-1..1), LT RT (0..1); "pad off"
 //   waitframes <n>                        wait until the game has presented n more frames (loading
 //                                         takes a varying time); later times shift by the wait
 #include "foundation/foundation.h"
@@ -89,6 +91,11 @@ void run_script(const std::string& path) {
                 in >> x1 >> y1 >> x2 >> y2;
                 in >> secs;
                 do_swipe(x1, y1, x2, y2, secs);
+            } else if (action == "pad") {
+                std::string control;
+                float value = 0;
+                in >> control >> value;
+                set_fake_pad(control, value);
             } else if (action == "waitframes") {
                 u64 n = 0;
                 in >> n;
