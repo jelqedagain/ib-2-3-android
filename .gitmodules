@@ -1,0 +1,3 @@
+[submodule "external/dynarmic"]
+	path = external/dynarmic
+	url = https://github.com/azahar-emu/dynarmic.git

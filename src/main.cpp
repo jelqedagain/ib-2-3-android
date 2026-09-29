@@ -1,0 +1,224 @@
+#include "common.h"
+#include "cpu.h"
+#include "foundation/foundation.h"
+#include "foundation/runloop.h"
+#include "gles/gl.h"
+#include "uikit/uikit.h"
+#include "game/game.h"
+#include "settings.h"
+#include "launcher/install.h"
+#include "launcher/launcher.h"
+#include "uikit/labels.h"
+#include "audio/mixer.h"
+namespace audio { void install(); }
+#include "hle.h"
+#include "libc/vfs.h"
+#include "macho.h"
+#include "modules.h"
+#include "objc/internal.h"
+#include <thread>
+#include <vector>
+#include <windows.h>
+
+// Reports host crashes with enough context to find the HLE code responsible.
+static LONG WINAPI crash_filter(EXCEPTION_POINTERS* ep) {
+    auto* rec = ep->ExceptionRecord;
+    u64 addr = (u64)rec->ExceptionAddress;
+    char module[MAX_PATH] = "?";
+    HMODULE mod = nullptr;
+    if (GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                           reinterpret_cast<LPCSTR>(rec->ExceptionAddress), &mod))
+        GetModuleFileNameA(mod, module, sizeof module);
+    u64 access = rec->NumberParameters >= 2 ? rec->ExceptionInformation[1] : 0;
+    std::string guest;
+    if (cpu::Thread* t = cpu::current_or_null()) {
+        const char* hle = t->in_hle.load();
+        guest = std::string("inside HLE ") + (hle ? hle : "(none)") + "\n" + t->backtrace();
+    }
+    LOG_ERROR("HOST CRASH 0x%08lx at %s+0x%llx (access 0x%llx)\n%s", rec->ExceptionCode, module,
+              (unsigned long long)(addr - (u64)mod), (unsigned long long)access, guest.c_str());
+    std::fflush(nullptr);
+    char what[160];
+    const char* base = strrchr(module, '\\');
+    snprintf(what, sizeof what, "crash 0x%08lx in %s", rec->ExceptionCode, base ? base + 1 : module);
+    logging::show_error_dialog(what);
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+
+// The game's code must live at 0x100000000. Reserve that range before anything else can land
+// there; if something already has (Windows randomizes where DLLs and heaps go), run a fresh copy
+// of the process, which gets a different layout.
+static void claim_guest_image_range() {
+    constexpr u64 kLo = 0x100000000ull, kSize = 0x40000000ull;  // 1 GB, well over the image size
+    if (VirtualAlloc(gptr<void>(kLo), kSize, MEM_RESERVE, PAGE_NOACCESS)) return;
+    MEMORY_BASIC_INFORMATION mbi{};
+    VirtualQuery(gptr<void>(kLo), &mbi, sizeof mbi);
+    wchar_t buf[16] = {};
+    int attempt = GetEnvironmentVariableW(L"IB3RT_RELAUNCH", buf, 16) ? _wtoi(buf) : 0;
+    LOG_WARN("address 0x%llx is taken (allocation 0x%p, type 0x%lx); restarting (attempt %d)",
+             (unsigned long long)kLo, mbi.AllocationBase, mbi.Type, attempt + 1);
+    if (attempt >= 5) return;  // give up; loading the image reports the error
+    SetEnvironmentVariableW(L"IB3RT_RELAUNCH", std::to_wstring(attempt + 1).c_str());
+    STARTUPINFOW si{sizeof si};
+    PROCESS_INFORMATION pi{};
+    std::wstring cmd = GetCommandLineW();
+    if (!CreateProcessW(nullptr, cmd.data(), nullptr, nullptr, TRUE, 0, nullptr, nullptr, &si, &pi)) return;
+    WaitForSingleObject(pi.hProcess, INFINITE);
+    DWORD code = 1;
+    GetExitCodeProcess(pi.hProcess, &code);
+    ExitProcess(code);
+}
+
+int main(int argc, char** argv) {
+    claim_guest_image_range();
+    // Started on its own (double-clicked): show the launcher, which starts the game with -play.
+    if (argc == 1) {
+        FreeConsole();
+        return launcher::run();
+    }
+    if (argc == 4 && std::string(argv[1]) == "-launcher-shot") return launcher::screenshot(argv[2], argv[3]);
+    if (argc == 3 && std::string(argv[1]) == "-install") {  // headless install: -install <path to .ipa>
+        std::wstring error;
+        int last = -1;
+        bool ok = launcher::install_from_ipa(launcher::widen(argv[2]), [&](double f) {
+            if ((int)(f * 20) != last) LOG_INFO("installing: %d%%", (last = (int)(f * 20)) * 5);
+        }, error);
+        if (!ok) LOG_ERROR("install failed: %s", launcher::narrow(error).c_str());
+        else LOG_INFO("installed Infinity Blade III %s", launcher::installed_version().c_str());
+        return ok ? 0 : 1;
+    }
+    SetUnhandledExceptionFilter(crash_filter);
+    std::string app = "game/Payload/SwordGame.app";
+    std::string home = "userdata";
+    bool keep_console = false, play = false;
+    std::string script;
+    for (int i = 1; i < argc; i++) {
+        std::string a = argv[i];
+        if (a == "-v") logging::min_level = logging::Level::Debug;
+        else if (a == "-vv") logging::min_level = logging::Level::Trace;
+        else if (a == "-home" && i + 1 < argc) home = argv[++i];
+        else if (a == "-console") keep_console = true;
+        else if (a == "-play") play = true;
+        else if (a == "-script" && i + 1 < argc) script = argv[++i];
+        else if (a == "-test") {
+            uikit::g_test_mode = true;
+            if (audio::g_wav_path.empty()) audio::g_wav_path = "audio_test.wav";
+        }
+        else if (a == "-wav" && i + 1 < argc) audio::g_wav_path = argv[++i];
+        else if (a == "-glcheck") gles::g_glcheck = true;
+        else if (a == "-profile") {
+            cpu::enable_profiling();
+            std::thread([] {
+                logging::set_thread_name("profiler");
+                std::unordered_map<std::string, u64> samples;
+                u64 n = 0;
+                for (int tick = 1;; tick++) {
+                    Sleep(2);
+                    cpu::profile_sample(samples);
+                    n++;
+                    if (tick % 5000 == 0) {  // ~10 s
+                        cpu::profile_report(10.0, samples, n);
+                        samples.clear();
+                        n = 0;
+                    }
+                }
+            }).detach();
+        }
+        else if (a == "-shot" && i + 1 < argc) gles::g_screenshot_every = std::atoi(argv[++i]);
+        else if (a == "-dump" && i + 1 < argc) {
+            int secs = std::atoi(argv[++i]);
+            std::thread([secs] {
+                logging::set_thread_name("watchdog");
+                Sleep(secs * 1000);
+                cpu::dump_all_threads();
+            }).detach();
+        }
+        else app = a;
+    }
+    if (play) {  // installed layout: everything next to the executable
+        std::string dir = launcher::narrow(settings::exe_dir());
+        app = dir + "game/Payload/SwordGame.app";
+        home = dir + "userdata";
+        if (!launcher::game_installed()) {
+            MessageBoxW(nullptr, L"The game files are not installed. Start Vibefinity Blade 3 without -play to install them.",
+                        L"Vibefinity Blade 3", MB_ICONERROR);
+            return 1;
+        }
+    }
+    if (!uikit::g_test_mode) logging::g_error_dialogs = true;
+    if (!keep_console && !uikit::g_test_mode) FreeConsole();  // logs still go to ib3rt.log
+    CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+    logging::set_thread_name("main");
+
+    static macho::Image img = macho::load(app + "/SwordGame");
+    cpu::init(&img);
+    vfs::set_roots(app, home);
+
+    // The main thread's guest context must exist before anything can call guest code.
+    cpu::Thread* main_thread = new cpu::Thread(8 << 20);
+    ns::set_main_thread();
+
+    objc::init_runtime(img);
+    libc::install_string();
+    libc::install_stdio();
+    libc::install_fs();
+    libc::install_time();
+    libc::install_pthread();
+    libc::install_system();
+    libc::install_crypto();
+    libc::install_thirdparty();
+    objc::install_runtime_functions();
+    ns::install_string();
+    ns::install_collections();
+    ns::install_thread();
+    ns::install_system();
+    ns::install_cf();
+    ns::install_misc();
+    gles::install_gl();
+    gles::install_eagl();
+    uikit::install();
+    uikit::install_misc();
+    uikit::install_labels();
+    audio::install();
+
+    hle::bind_image(img);
+    game::install_keyboard(img);
+    game::install_config(img);
+    {
+        const auto& st = settings::get();
+        audio::set_volumes(st.music_volume / 100.0f, st.effects_volume / 100.0f);
+    }
+    objc::realize_image_classes(img);
+    game::install_startup_movie_fix();
+    ns::install_thread_late();
+
+    // Analytics / ad SDKs only matter online; keep them from starting threads and crash hooks.
+    for (const char* sdk : {"Flurry", "Apsalar", "FBAppEvents", "FBInsights", "FlurryPLCrashReporter"})
+        objc::stub_out_class_methods(sdk);
+
+    if (!script.empty()) game::run_script(script);
+
+    objc::run_load_methods();
+    if (auto* init = img.section("__DATA", "__mod_init_func")) {
+        size_t n = init->size / 8;
+        LOG_INFO("running %zu static initializers", n);
+        for (size_t i = 0; i < n; i++) {
+            GuestAddr fn = gptr<u64>(init->addr)[i];
+            LOG_DEBUG("init[%zu] 0x%llx %s", i, (unsigned long long)fn, cpu::symbolize(fn).c_str());
+            main_thread->call(fn);
+        }
+        LOG_INFO("static initializers done");
+    }
+
+    // int main(int argc, char** argv, char** envp, char** apple)
+    auto* args = static_cast<u64*>(hle::alloc_static(sizeof(u64) * 6));
+    args[0] = gaddr(hle::static_cstr(std::string(vfs::kBundlePath) + "/SwordGame"));
+    args[1] = 0;
+    args[2] = 0;  // envp
+    args[3] = gaddr(hle::static_cstr("executable_path=SwordGame"));
+    args[4] = 0;
+    LOG_INFO("calling main at 0x%llx", (unsigned long long)img.entry);
+    u64 rc = main_thread->call(img.entry, {1, gaddr(&args[0]), gaddr(&args[2]), gaddr(&args[3])});
+    LOG_INFO("main returned %d", (int)rc);
+    return (int)rc;
+}

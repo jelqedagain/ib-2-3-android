@@ -1,0 +1,24 @@
+# Build output and local tools
+/build/
+/tools/
+/dist/
+
+# Game files, saves and settings: never commit these (the game is copyrighted; saves are personal)
+/game/
+/game.partial/
+/userdata/
+/play/
+*.ipa
+settings.ini
+*.log
+
+# Local reverse-engineering workspace (contains the game binary)
+/re/
+
+# Dependencies fetched by scripts/fetch-deps.sh
+/external/boost-*/
+
+# Launcher copies made by "Play Infinity Blade III.bat"
+/Vibefinity Blade 3.exe
+/libEGL.dll
+/libGLESv2.dll
