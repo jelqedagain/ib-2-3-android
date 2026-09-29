@@ -28,11 +28,12 @@ The keyboard layout follows the Infinity Blade II PC port:
 
 | Key | Action |
 | --- | --- |
-| A / D | Dodge left / right |
-| S | Block (hold) |
+| A / D | Left / right fight button: dodge (block left / right with heavy weapons) |
+| S | Center fight button: block, hold it (dodge down with dual blades) |
 | F | Stab |
 | Q | Super move |
-| E | Magic |
+| E | Magic (special attack in boss battles) |
+| R | Final strike |
 | 1 / 2 / 3 | Magic slots |
 | Left Alt | Clash (mash) |
 | Tab | Boss info |
@@ -120,6 +121,7 @@ For development, `./test.sh <seconds> [options]` runs the game hidden, with its 
 - `-shot N`: save a screenshot every N frames
 - `-profile`: per-thread sampling profiler
 - `-script file`: timed key presses, taps, swipes and screenshots (see `src/game/script.cpp`)
+- `-audit-selectors`: list the Objective-C methods the game can call that nothing implements
 
 ## Credits and legal
 

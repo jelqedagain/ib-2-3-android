@@ -493,6 +493,11 @@ void install_string() {
         u64 loc = t.x(2), len = t.x(3);
         t.set_x(0, objc::autorelease(new_string(g_string, loc <= s.size() ? s.substr(loc, len) : std::u16string())));
     });
+    objc::add_method(S, "stringByReplacingCharactersInRange:withString:", [](cpu::Thread& t) {
+        auto s = utf16(t.x(0));
+        u64 loc = std::min<u64>(t.x(2), s.size()), len = std::min<u64>(t.x(3), s.size() - loc);
+        t.set_x(0, objc::autorelease(new_string(g_string, s.substr(0, loc) + utf16(t.x(4)) + s.substr(loc + len))));
+    });
     method(S, "stringByAppendingString:", [](id self, SEL, id o) { return objc::autorelease(new_string(g_string, utf16(self) + utf16(o))); });
     objc::add_method(S, "stringByAppendingFormat:", [](cpu::Thread& t) {
         std::string fmt = utf8(t.x(2));

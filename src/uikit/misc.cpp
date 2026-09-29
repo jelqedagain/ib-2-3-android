@@ -259,6 +259,8 @@ void install_misc() {
     for (const char* s : {"setKeyboardType:", "setReturnKeyType:", "setAutocorrectionType:", "setAutocapitalizationType:",
                           "setBorderStyle:", "setTextAlignment:", "setClearButtonMode:", "setKeyboardAppearance:"})
         method(TF, s, [](id, SEL, s64) {});
+    for (const char* s : {"setClearsOnBeginEditing:", "setSecureTextEntry:", "setEnablesReturnKeyAutomatically:"})
+        method(TF, s, [](id, SEL, bool) {});
     Class AIV = objc::class_named("UIActivityIndicatorView");
     method(AIV, "initWithActivityIndicatorStyle:", [](id self, SEL, s64) { return objc::send(self, "init"); });
     for (const char* s : {"startAnimating", "stopAnimating"}) method(AIV, s, [](id, SEL) {});

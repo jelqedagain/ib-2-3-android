@@ -27,7 +27,8 @@ struct HostData {
 
 // --- setup ---
 void init_runtime(const macho::Image& img);  // selectors, classes, categories (before binds)
-void run_load_methods();                      // +load (before C++ static initializers)
+void run_load_methods();
+void audit_selectors(const macho::Image& img);  // development aid (-audit-selectors)                      // +load (before C++ static initializers)
 void install_runtime_functions();             // objc_* / sel_* / Block_* HLE exports
 
 // --- selectors ---

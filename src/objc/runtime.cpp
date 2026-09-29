@@ -5,6 +5,7 @@
 #include <mutex>
 #include <shared_mutex>
 #include <unordered_map>
+#include <set>
 #include <unordered_set>
 #include <typeinfo>
 #include <vector>
@@ -711,6 +712,26 @@ void realize_image_classes(const macho::Image& img) {
         }
     }
     LOG_INFO("objc: %zu classes, %zu selectors", g_by_name.size(), g_sels.size());
+}
+
+// Development aid: logs every selector the image's code sends (its __objc_selrefs) that no
+// class, host or guest, implements. Those are calls a code path might make that would end as
+// "unrecognized selector".
+void audit_selectors(const macho::Image& img) {
+    std::unordered_set<SEL> implemented;
+    {
+        std::shared_lock lock(g_lock);
+        for (auto& [cls, ci] : g_classes)
+            for (auto& [sel, imp] : ci->methods) implemented.insert(sel);
+    }
+    std::set<std::string> missing;
+    if (auto* s = img.section("__DATA", "__objc_selrefs"))
+        for (u64 i = 0; i < s->size / 8; i++) {
+            SEL sel = gptr<u64>(s->addr)[i];
+            if (!implemented.count(sel)) missing.insert(sel_name(sel));
+        }
+    LOG_INFO("selector audit: %zu selectors sent by the game are implemented nowhere:", missing.size());
+    for (auto& m : missing) LOG_INFO("  %s", m.c_str());
 }
 
 void run_load_methods() {

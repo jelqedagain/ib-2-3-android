@@ -95,7 +95,7 @@ int main(int argc, char** argv) {
     SetUnhandledExceptionFilter(crash_filter);
     std::string app = "game/Payload/SwordGame.app";
     std::string home = "userdata";
-    bool keep_console = false, play = false;
+    bool keep_console = false, play = false, audit = false;
     std::string script;
     for (int i = 1; i < argc; i++) {
         std::string a = argv[i];
@@ -104,6 +104,7 @@ int main(int argc, char** argv) {
         else if (a == "-home" && i + 1 < argc) home = argv[++i];
         else if (a == "-console") keep_console = true;
         else if (a == "-play") play = true;
+        else if (a == "-audit-selectors") audit = true;
         else if (a == "-script" && i + 1 < argc) script = argv[++i];
         else if (a == "-test") {
             uikit::g_test_mode = true;
@@ -200,6 +201,10 @@ int main(int argc, char** argv) {
     }
     objc::realize_image_classes(img);
     game::install_startup_movie_fix();
+    if (audit) {
+        objc::audit_selectors(img);
+        return 0;
+    }
     ns::install_thread_late();
 
     // Analytics / ad SDKs only matter online; keep them from starting threads and crash hooks.

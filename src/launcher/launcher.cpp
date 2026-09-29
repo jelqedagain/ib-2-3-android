@@ -252,10 +252,10 @@ void open_key_bindings() {
     ListView_SetExtendedListViewStyle(g_keys.list, LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES | LVS_EX_DOUBLEBUFFER);
     LVCOLUMNW col{};
     col.mask = LVCF_TEXT | LVCF_WIDTH;
-    col.cx = S(270);
+    col.cx = S(310);
     col.pszText = (LPWSTR)L"Action";
     ListView_InsertColumn(g_keys.list, 0, &col);
-    col.cx = S(140);
+    col.cx = S(105);
     col.pszText = (LPWSTR)L"Key";
     ListView_InsertColumn(g_keys.list, 1, &col);
     for (size_t i = 0; i < std::size(game::kActions); i++) {

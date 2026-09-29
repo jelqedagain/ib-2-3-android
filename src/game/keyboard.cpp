@@ -53,11 +53,13 @@ constexpr const char* kDumpMenusKey = "F8";  // debug: log the open menu scenes 
 // in IB3's tags is followed by an index).
 const char* const kAcceptTags[] = {
     "OkBttn", "YesBttn", "ContinueBttn", "SimpleContinueBttn", "ProceedBttn", "FinishBttn", "CollectBttn",
-    "NextBttn", "ToGameBttn", "StartBttn", "PlayBttn", "CloseDialogBttn", "CloseBttn",
+    "NextBttn", "ToGameBttn", "StartGameBttn", "StartBttn", "PlayBttn", "ReadyBttn", "CloseDialogBttn", "CloseBttn",
+    "WholeScreenBttn",  // invisible full-screen "tap anywhere to continue"
 };
 // Buttons Escape presses to leave a menu, most preferred first.
 const char* const kBackTags[] = {
-    "CancelBttn", "CxlBttn", "NoBttn", "LaterBttn", "CloseDialogBttn", "CloseBttn", "ExitPageBttn", "GlobalBackBttn",
+    "CancelBttn", "CxlBttn", "NoBttn", "LaterBttn", "CloseDialogBttn", "CloseBttn", "CloseCompareBttn", "ExitPageBttn",
+    "ProgressBackBttn", "GlobalBackBttn",
 };
 
 // --- Menus (UE3 MobileMenuScene / MobileMenuObject) ---------------------------------------
@@ -235,24 +237,42 @@ const std::unordered_map<std::string, const char*> kZoneForInput = {
 std::set<std::string> g_sent_down;  // inputs whose press reached the game (their release must too)
 bool g_space_paused = false;        // the pause toggle is on: its second press must get through
 
-bool allowed(cpu::Thread& t, const std::string& input, int event) {
-    if (event != IE_Pressed) return g_sent_down.erase(input) > 0;
-    if (input == "SpaceBar" && g_space_paused) {
+bool zone_allows(const ZoneState& z, const std::string& input) {
+    if (!z.known) return true;
+    auto it = kZoneForInput.find(input);
+    return it != kZoneForInput.end() ? z.zones.count(it->second) > 0 : z.inputs.count(input) > 0;
+}
+
+// Picks the input to send for a key event. A binding can list alternatives ("a|b"): the first
+// one the current HUD has a touch zone for is used, so a key follows the on-screen button in the
+// same place (the centre button blocks with a sword and shield but dodges down with dual
+// blades). A release goes to whichever input the press went to. Returns "" to send nothing.
+std::string resolve(cpu::Thread& t, const std::string& binding, int event) {
+    std::vector<std::string> inputs;
+    for (size_t a = 0, b; a <= binding.size(); a = b + 1) {
+        b = binding.find('|', a);
+        if (b == std::string::npos) b = binding.size();
+        inputs.push_back(binding.substr(a, b - a));
+    }
+    if (event != IE_Pressed) {
+        for (auto& in : inputs)
+            if (g_sent_down.erase(in)) return in;
+        return {};
+    }
+    if (inputs[0] == "SpaceBar" && g_space_paused) {
         g_space_paused = false;
-        return true;
+        return inputs[0];
     }
     ZoneState z = read_zones(t);
-    bool ok = !z.known;
-    if (!ok) {
-        auto it = kZoneForInput.find(input);
-        ok = it != kZoneForInput.end() ? z.zones.count(it->second) > 0 : z.inputs.count(input) > 0;
+    for (auto& in : inputs) {
+        if (!zone_allows(z, in)) continue;
+        LOG_DEBUG("key %s sent as %s (HUD group \"%s\")", binding.c_str(), in.c_str(), z.group.c_str());
+        g_sent_down.insert(in);
+        if (in == "SpaceBar") g_space_paused = true;
+        return in;
     }
-    LOG_DEBUG("key %s %s (HUD group \"%s\")", input.c_str(), ok ? "allowed" : "ignored", z.group.c_str());
-    if (ok) {
-        g_sent_down.insert(input);
-        if (input == "SpaceBar") g_space_paused = true;
-    }
-    return ok;
+    LOG_DEBUG("key %s ignored (HUD group \"%s\")", binding.c_str(), z.group.c_str());
+    return {};
 }
 
 // --- Game-thread hooks ---------------------------------------------------------------------
@@ -276,8 +296,10 @@ void on_tick(cpu::Thread& t) {
             else if (key == "@DumpMenus") dump_menus(t);
             continue;
         }
-        if (g_have_reflection && !allowed(t, key, event)) continue;
-        u64 name = ue::fname(t, key);
+        std::string input = key.substr(0, key.find('|'));
+        if (g_have_reflection) input = resolve(t, key, event);
+        if (input.empty()) continue;
+        u64 name = ue::fname(t, input);
         t.call_raw(g_input_key, [&](cpu::Thread& c) {
             c.set_x(0, client);
             c.set_x(1, viewport);
