@@ -222,7 +222,7 @@ void open_key_bindings() {
         wc.hInstance = GetModuleHandleW(nullptr);
         wc.hCursor = LoadCursorW(nullptr, MAKEINTRESOURCEW(32512));
         wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-        wc.lpszClassName = L"VB3Keys";
+        wc.lpszClassName = L"IB3Keys";
         wc.hIcon = g_icon;
         RegisterClassW(&wc);
         registered = true;
@@ -234,7 +234,7 @@ void open_key_bindings() {
     AdjustWindowRectExForDpi(&r, WS_CAPTION | WS_SYSMENU, FALSE, 0, g_dpi);
     RECT pr;
     GetWindowRect(g_wnd, &pr);
-    g_keys.wnd = CreateWindowExW(0, L"VB3Keys", L"Key bindings", WS_CAPTION | WS_SYSMENU | WS_VISIBLE,
+    g_keys.wnd = CreateWindowExW(0, L"IB3Keys", L"Key bindings", WS_CAPTION | WS_SYSMENU | WS_VISIBLE,
                                  pr.left + S(40), pr.top + S(40), r.right - r.left, r.bottom - r.top, g_wnd, nullptr,
                                  GetModuleHandleW(nullptr), nullptr);
     auto mk = [](const wchar_t* cls, const wchar_t* text, DWORD style, int x, int y, int w, int h, int id) {
@@ -338,7 +338,7 @@ void play() {
     STARTUPINFOW si{sizeof si};
     PROCESS_INFORMATION pi{};
     if (!CreateProcessW(exe, cmd.data(), nullptr, nullptr, FALSE, 0, nullptr, dir.c_str(), &si, &pi)) {
-        MessageBoxW(g_wnd, L"Could not start the game.", L"Vibefinity Blade 3", MB_ICONERROR);
+        MessageBoxW(g_wnd, L"Could not start the game.", L"Infinity Blade III", MB_ICONERROR);
         return;
     }
     CloseHandle(pi.hThread);
@@ -461,11 +461,11 @@ LRESULT CALLBACK wnd_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         set_busy(false);
         if (wp) {
             refresh_install_state();
-            MessageBoxW(h, L"Infinity Blade III is installed. Click Play to start.", L"Vibefinity Blade 3",
+            MessageBoxW(h, L"Infinity Blade III is installed. Click Play to start.", L"Infinity Blade III",
                         MB_ICONINFORMATION);
         } else {
             refresh_install_state();
-            MessageBoxW(h, (L"Installing failed:\n" + g_install_error).c_str(), L"Vibefinity Blade 3", MB_ICONERROR);
+            MessageBoxW(h, (L"Installing failed:\n" + g_install_error).c_str(), L"Infinity Blade III", MB_ICONERROR);
         }
         return 0;
     case WM_CTLCOLORSTATIC: {
@@ -484,10 +484,10 @@ LRESULT CALLBACK wnd_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         SetBkMode(dc, TRANSPARENT);
         SetTextColor(dc, kHeaderText);
         HGDIOBJ old = SelectObject(dc, g_title_font);
-        TextOutW(dc, S(88), S(14), L"Vibefinity Blade 3", 18);
+        TextOutW(dc, S(88), S(14), L"Infinity Blade III", 18);
         SelectObject(dc, g_sub_font);
         SetTextColor(dc, kHeaderSub);
-        const wchar_t* sub = L"Infinity Blade III for PC";
+        const wchar_t* sub = L"PC Port";
         TextOutW(dc, S(90), S(50), sub, (int)wcslen(sub));
         SelectObject(dc, old);
         EndPaint(h, &ps);
@@ -495,7 +495,7 @@ LRESULT CALLBACK wnd_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
     }
     case WM_CLOSE:
         if (g_installing) {
-            MessageBoxW(h, L"Please wait until the game files are installed.", L"Vibefinity Blade 3", MB_ICONINFORMATION);
+            MessageBoxW(h, L"Please wait until the game files are installed.", L"Infinity Blade III", MB_ICONINFORMATION);
             return 0;
         }
         read_controls();
@@ -594,7 +594,7 @@ void create_main_window(int x, int y, bool offscreen) {
     wc.hInstance = GetModuleHandleW(nullptr);
     wc.hCursor = LoadCursorW(nullptr, MAKEINTRESOURCEW(32512));
     wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-    wc.lpszClassName = L"VB3Launcher";
+    wc.lpszClassName = L"IB3Launcher";
     wc.hIcon = LoadIconW(GetModuleHandleW(nullptr), MAKEINTRESOURCEW(1));
     RegisterClassW(&wc);
     DWORD style = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX;
@@ -602,7 +602,7 @@ void create_main_window(int x, int y, bool offscreen) {
     AdjustWindowRectExForDpi(&r, style, FALSE, 0, g_dpi);
     int w = r.right - r.left, h = r.bottom - r.top;
     if (x == -1) x = (GetSystemMetrics(SM_CXSCREEN) - w) / 2, y = (GetSystemMetrics(SM_CYSCREEN) - h) / 2;
-    g_wnd = CreateWindowExW(offscreen ? WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE : 0, L"VB3Launcher", L"Vibefinity Blade 3",
+    g_wnd = CreateWindowExW(offscreen ? WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE : 0, L"IB3Launcher", L"Infinity Blade III",
                             style, x, y, w, h, nullptr, nullptr, wc.hInstance, nullptr);
     create_controls();
 }

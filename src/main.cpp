@@ -140,8 +140,8 @@ int main(int argc, char** argv) {
         app = dir + "game/Payload/SwordGame.app";
         home = dir + "userdata";
         if (!launcher::game_installed()) {
-            MessageBoxW(nullptr, L"The game files are not installed. Start Vibefinity Blade 3 without -play to install them.",
-                        L"Vibefinity Blade 3", MB_ICONERROR);
+            MessageBoxW(nullptr, L"The game files are not installed. Start Infinity Blade III.exe without -play to install them.",
+                        L"Infinity Blade III", MB_ICONERROR);
             return 1;
         }
     }

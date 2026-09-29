@@ -1,20 +1,22 @@
-# Vibefinity Blade 3
+# Infinity Blade III PC Port
 
-**Infinity Blade III on Windows PC.** Vibefinity Blade 3 runs the original iOS release of Infinity Blade III (version 1.4.4) on 64-bit Windows, with keyboard controls, a settings launcher, and higher resolutions.
+> **Bring your own IPA.** This download does not contain the game. To play, you need your own copy of **Infinity Blade III for iOS as an `.ipa` file (version 1.4.4)**. The launcher installs the game from it the first time you run it.
 
-Infinity Blade III was pulled from the App Store in 2018 and can no longer be bought or downloaded. This project exists so the game can still be played. It does **not** include the game itself: you need your own Infinity Blade III `.ipa` file.
+**Infinity Blade III on Windows PC.** This port runs the original iOS release of Infinity Blade III on 64-bit Windows, with keyboard controls, a settings launcher, and higher resolutions.
+
+Infinity Blade III was pulled from the App Store in 2018 and can no longer be bought or downloaded. This project exists so the game can still be played.
 
 ![The launcher](docs/launcher.png)
 
 ## Download and play
 
-1. Download `VibefinityBlade3-…-win64.zip` from the [Releases](../../releases) page.
+1. Download `InfinityBladeIII-PCPort-…-win64.zip` from the [Releases](../../releases) page.
 2. Extract it into its own folder. The installed game needs about 3.5 GB of disk space.
-3. Run **Vibefinity Blade 3.exe**.
-4. Click **Install game...** and choose your Infinity Blade III `.ipa` (version 1.4.4, 64-bit). An `.ipa` placed in the same folder is found automatically.
+3. Double-click **Infinity Blade III.exe**. This opens the launcher.
+4. The first time, click **Install game...** and choose your Infinity Blade III `.ipa` (version 1.4.4, 64-bit). An `.ipa` placed in the same folder is found automatically.
 5. Click **Play**.
 
-The first start takes about 30–60 seconds while the logos and the loading animation play.
+After that, just run **Infinity Blade III.exe** and click **Play**. The first start takes about 30–60 seconds while the logos and the loading animation play.
 
 ## Controls
 
@@ -38,6 +40,8 @@ The keyboard layout follows the Infinity Blade II PC port:
 | P | Menu |
 | Space | Pause |
 | F11 or Alt+Enter | Toggle fullscreen |
+
+Game keys work exactly when the matching on-screen control would. For example, the dodge keys only work in a fight, and the menu key doesn't work during movies. A key can't do anything a touch couldn't at that moment.
 
 Every key except fullscreen can be changed in the launcher (**Key bindings...**).
 
@@ -77,7 +81,7 @@ If the game stops with an error, it saves the details to `ib3rt.log` next to the
 
 ## How it works
 
-Vibefinity Blade 3 is not an iPhone emulator. It runs the game's ARM64 program and implements the parts of iOS the game uses, directly on Windows:
+This port is not an iPhone emulator. It runs the game's ARM64 program and implements the parts of iOS the game uses, directly on Windows:
 
 - **CPU:** the ARM64 code is translated to x86-64 on the fly by [dynarmic](https://github.com/azahar-emu/dynarmic).
 - **Loader and libraries:** a Mach-O loader binds the game's imports to Windows implementations of the C library, pthreads, the Objective-C runtime, Foundation, UIKit, and GameKit/StoreKit (stubbed, offline).
@@ -98,8 +102,8 @@ Requirements:
 Steps:
 
 ```sh
-git clone --recursive https://github.com/jelqscape/Vibefinity-Blade-3.git
-cd Vibefinity-Blade-3
+git clone --recursive https://github.com/jelqscape/Infinity-Blade-III-PC-Port.git
+cd Infinity-Blade-III-PC-Port
 scripts/fetch-deps.sh      # dynarmic submodule and Boost headers
 ./build.sh                 # builds build/ib3rt.exe
 ```
@@ -120,4 +124,4 @@ For development, `./test.sh <seconds> [options]` runs the game hidden, with its 
 - Infinity Blade III is © Chair Entertainment Group / Epic Games. This project is not affiliated with or endorsed by Chair or Epic Games, and it does not distribute any of their files.
 - Keyboard layout inspired by the community [Infinity Blade II PC port](https://archive.org/details/infinity-blade-ii-pc).
 - Third-party components and their licenses are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
-- The Vibefinity Blade 3 source code is released under the [MIT License](LICENSE).
+- The source code of this port is released under the [MIT License](LICENSE).

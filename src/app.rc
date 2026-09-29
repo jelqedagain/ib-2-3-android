@@ -14,13 +14,13 @@ BEGIN
     BEGIN
         BLOCK "040904b0"
         BEGIN
-            VALUE "CompanyName", "Vibefinity Blade 3 contributors"
-            VALUE "FileDescription", "Vibefinity Blade 3 - Infinity Blade III for PC"
+            VALUE "CompanyName", "Infinity Blade III PC Port contributors"
+            VALUE "FileDescription", "Infinity Blade III PC Port"
             VALUE "FileVersion", "1.0.0"
-            VALUE "InternalName", "VibefinityBlade3"
+            VALUE "InternalName", "InfinityBladeIII"
             VALUE "LegalCopyright", "MIT License. Infinity Blade III is (c) Chair Entertainment / Epic Games."
-            VALUE "OriginalFilename", "Vibefinity Blade 3.exe"
-            VALUE "ProductName", "Vibefinity Blade 3"
+            VALUE "OriginalFilename", "Infinity Blade III.exe"
+            VALUE "ProductName", "Infinity Blade III PC Port"
             VALUE "ProductVersion", "1.0.0"
         END
     END

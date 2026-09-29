@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0" xmlns:asmv3="urn:schemas-microsoft-com:asm.v3">
-  <assemblyIdentity type="win32" name="Vibefinity.Blade3" version="1.0.0.0" processorArchitecture="amd64"/>
-  <description>Vibefinity Blade 3</description>
+  <assemblyIdentity type="win32" name="InfinityBladeIII.PCPort" version="1.0.0.0" processorArchitecture="amd64"/>
+  <description>Infinity Blade III PC Port</description>
   <dependency>
     <dependentAssembly>
       <assemblyIdentity type="win32" name="Microsoft.Windows.Common-Controls" version="6.0.0.0"

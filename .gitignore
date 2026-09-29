@@ -19,6 +19,7 @@ settings.ini
 /external/boost-*/
 
 # Launcher copies made by "Play Infinity Blade III.bat"
-/Vibefinity Blade 3.exe
+/Infinity Blade III.exe
+/Play Infinity Blade III.bat
 /libEGL.dll
 /libGLESv2.dll

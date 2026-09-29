@@ -45,7 +45,7 @@ void show_error_dialog(const char* what) {
     std::string text = std::string("Infinity Blade III stopped because of an error:\n\n") + what +
                        "\n\nDetails were saved to ib3rt.log next to the game. If you report the problem, please "
                        "include that file.";
-    MessageBoxA(nullptr, text.c_str(), "Vibefinity Blade 3", MB_ICONERROR | MB_TOPMOST);
+    MessageBoxA(nullptr, text.c_str(), "Infinity Blade III", MB_ICONERROR | MB_TOPMOST);
 }
 }  // namespace logging
 

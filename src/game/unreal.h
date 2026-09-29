@@ -50,6 +50,9 @@ bool read_property(cpu::Thread& t, GuestAddr obj, const char* name, T& out) {
 // Calls script function `func` on `obj` with a parameter block (UObject::ProcessEvent).
 bool call_event(cpu::Thread& t, GuestAddr obj, const std::string& func, void* params);
 
+// Logs every script property of `obj`'s class (name, type, offset), for reverse engineering.
+void dump_properties(cpu::Thread& t, GuestAddr obj, const char* filter = nullptr);
+
 // GEngine->GamePlayers[0]->Actor->PlayerInput, or 0.
 GuestAddr player_input(cpu::Thread& t);
 

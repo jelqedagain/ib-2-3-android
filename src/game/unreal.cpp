@@ -144,6 +144,23 @@ bool call_event(cpu::Thread& t, GuestAddr obj, const std::string& func, void* pa
     return true;
 }
 
+void dump_properties(cpu::Thread& t, GuestAddr obj, const char* filter) {
+    if (!obj) return;
+    if (g_offset_field < 0 && !locate_offset_field(t, *gptr<u64>(obj + kObjClass))) return;
+    LOG_INFO("properties of %s (%s):", object_name(t, obj).c_str(), class_name(t, obj).c_str());
+    for (GuestAddr cls = *gptr<u64>(obj + kObjClass); cls; cls = super_class(t, cls)) {
+        std::string cname = object_name(t, cls);
+        if (cname == "Object") break;
+        for (GuestAddr f = *gptr<u64>(cls + kStructChildren); f; f = *gptr<u64>(f + kFieldNext)) {
+            std::string type = class_name(t, f);
+            if (type.find("Property") == std::string::npos) continue;  // functions, enums, consts...
+            std::string name = object_name(t, f);
+            if (filter && name.find(filter) == std::string::npos && type.find(filter) == std::string::npos) continue;
+            LOG_INFO("  %-18s +0x%-5x %-28s %s", cname.c_str(), *gptr<u32>(f + g_offset_field), name.c_str(), type.c_str());
+        }
+    }
+}
+
 GuestAddr player_input(cpu::Thread& t) {
     GuestAddr engine = *gptr<u64>(g_engine);
     TArray<u64> players{};

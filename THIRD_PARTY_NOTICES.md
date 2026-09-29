@@ -1,6 +1,6 @@
 # Third-party notices
 
-Vibefinity Blade 3 includes the following third-party software.
+Infinity Blade III PC Port includes the following third-party software.
 
 ## dynarmic
 

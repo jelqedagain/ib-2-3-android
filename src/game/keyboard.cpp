@@ -114,6 +114,11 @@ std::vector<MenuScene> read_menus(cpu::Thread& t) {
 }
 
 void dump_menus(cpu::Thread& t) {
+    static bool dumped_input = false;
+    if (!dumped_input) {
+        dumped_input = true;
+        ue::dump_properties(t, ue::player_input(t));
+    }
     auto menus = read_menus(t);
     LOG_INFO("menus: %zu scene(s) open", menus.size());
     for (auto& s : menus) {
@@ -178,6 +183,78 @@ void ask_quit_game() {
     if (answer == IDOK) PostMessageW(hwnd, WM_CLOSE, 0, 0);
 }
 
+// --- Touch-zone gating ----------------------------------------------------------------------
+// A key may only do what a finger could do at that moment: its input is sent only while the
+// current HUD group (IB3's RequiredMobileInputConfigs: CinematicMode, HeroBattleHud_SnS, NoHud...)
+// has a touch zone for it. Otherwise, for example, the menu key would pause the game in the middle
+// of a movie, where no pause menu can open, and the game would be stuck.
+
+struct ZoneState {
+    bool known = false;  // false: could not read the zones; everything is allowed
+    std::string group;
+    std::set<std::string> zones, inputs;  // zone names, and every input name they send
+};
+
+ZoneState read_zones(cpu::Thread& t) {
+    ZoneState z;
+    GuestAddr input = ue::player_input(t);
+    struct Group {  // MobileInputGroup { string GroupName; array<MobileInputZone> AssociatedZones; }
+        ue::FString name;
+        ue::TArray<u64> zones;
+    };
+    ue::TArray<Group> groups{};
+    s32 current = -1;
+    if (!input || !ue::read_property(t, input, "MobileInputGroups", groups) ||
+        !ue::read_property(t, input, "CurrentMobileGroup", current))
+        return z;
+    z.known = true;
+    if (current < 0 || current >= groups.num) return z;  // no group: no zones
+    Group g = groups.at(current);
+    z.group = ue::read_fstring(gaddr(&g.name));
+    for (int i = 0; i < g.zones.num && i < 64; i++) {
+        GuestAddr zone = g.zones.at(i);
+        if (!zone) continue;
+        z.zones.insert(ue::object_name(t, zone));
+        for (const char* prop : {"InputKey", "TapInputKey", "SwipeHoldInputKey"}) {
+            u64 name = 0;
+            if (ue::read_property(t, zone, prop, name) && name) z.inputs.insert(ue::name_string(t, name));
+        }
+    }
+    return z;
+}
+
+// Inputs that are not touch zones in IB3, and the zone that must be present instead.
+const std::unordered_map<std::string, const char*> kZoneForInput = {
+    {"Five", "CenterSwipeHoldZone"},  // stab: only in a sword fight
+    {"MagicSlot0", "MagicZone"},
+    {"MagicSlot1", "MagicZone"},
+    {"MagicSlot2", "MagicZone"},
+    {"SpaceBar", "PauseGameZone"},  // pause toggle: only where the game could be paused
+};
+
+std::set<std::string> g_sent_down;  // inputs whose press reached the game (their release must too)
+bool g_space_paused = false;        // the pause toggle is on: its second press must get through
+
+bool allowed(cpu::Thread& t, const std::string& input, int event) {
+    if (event != IE_Pressed) return g_sent_down.erase(input) > 0;
+    if (input == "SpaceBar" && g_space_paused) {
+        g_space_paused = false;
+        return true;
+    }
+    ZoneState z = read_zones(t);
+    bool ok = !z.known;
+    if (!ok) {
+        auto it = kZoneForInput.find(input);
+        ok = it != kZoneForInput.end() ? z.zones.count(it->second) > 0 : z.inputs.count(input) > 0;
+    }
+    LOG_DEBUG("key %s %s (HUD group \"%s\")", input.c_str(), ok ? "allowed" : "ignored", z.group.c_str());
+    if (ok) {
+        g_sent_down.insert(input);
+        if (input == "SpaceBar") g_space_paused = true;
+    }
+    return ok;
+}
+
 // --- Game-thread hooks ---------------------------------------------------------------------
 
 // Runs on the game thread at the start of every viewport-client tick.
@@ -199,6 +276,7 @@ void on_tick(cpu::Thread& t) {
             else if (key == "@DumpMenus") dump_menus(t);
             continue;
         }
+        if (g_have_reflection && !allowed(t, key, event)) continue;
         u64 name = ue::fname(t, key);
         t.call_raw(g_input_key, [&](cpu::Thread& c) {
             c.set_x(0, client);
