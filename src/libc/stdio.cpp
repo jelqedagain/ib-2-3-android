@@ -4,6 +4,7 @@
 #include "libc/vfs.h"
 #include "modules.h"
 #include <cerrno>
+#include <io.h>  // _wfopen on Android
 #include <mutex>
 
 namespace libc {

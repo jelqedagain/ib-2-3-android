@@ -1,4 +1,4 @@
-// UIKit / QuartzCore host implementation and the Win32 window that backs the screen.
+// UIKit / QuartzCore host implementation and the platform window that backs the screen.
 #pragma once
 #include "hle.h"
 #include "objc/runtime.h"
@@ -30,7 +30,12 @@ void touch_up(int finger, CGPoint p);
 bool touch_active(int finger);
 // Receives WM_KEYDOWN/WM_KEYUP virtual-key codes (vk -1 = focus lost: release everything).
 extern std::function<void(int vk, bool down)> g_key_handler;
-void* main_window();  // HWND
+// The platform window (uikit/window_win32.cpp, port/android/window_android.cpp).
+void create_window();         // on the main thread; installs ns::g_main_pump if it has messages to pump
+void* main_window();          // HWND / ANativeWindow* (nullptr: render off screen)
+void show_fps(unsigned fps);  // any thread (settings: ShowFPS)
+void app_will_terminate();    // tells the app delegate (uikit.cpp)
+void app_set_active(bool active);  // main thread: background / foreground, like iOS
 // Boot screen (launch image / startup movie) shown until the game's first frame (boot.cpp).
 void create_boot_window(void* parent_hwnd, const std::wstring& launch_image);
 void resize_boot_window(int w, int h);

@@ -7,7 +7,13 @@
 #include <mutex>
 #include <unordered_map>
 #include <windows.h>
+#ifdef _WIN32
 #include <psapi.h>
+#else
+#include <sys/mman.h>
+#include <sys/sysinfo.h>
+#include <unistd.h>
+#endif
 
 namespace libc {
 
@@ -74,10 +80,45 @@ void do_longjmp(cpu::Thread& t, GuestAddr buf, int val) {
     t.jump(b[11]);
 }
 
+#ifdef _WIN32
 struct Mapping {
     HANDLE mapping;
     void* view;
 };
+
+u64 host_available_memory() {
+    MEMORYSTATUSEX ms{sizeof(ms)};
+    GlobalMemoryStatusEx(&ms);
+    return ms.ullAvailPhys;
+}
+
+u64 host_resident_memory() {
+    PROCESS_MEMORY_COUNTERS pmc{};
+    pmc.cb = sizeof(pmc);
+    K32GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc));
+    return pmc.WorkingSetSize;
+}
+#else
+struct Mapping {
+    void* base;
+    u64 len;
+};
+
+u64 host_available_memory() {
+    struct sysinfo si {};
+    sysinfo(&si);
+    return (u64)si.freeram * si.mem_unit;
+}
+
+u64 host_resident_memory() {
+    u64 pages = 0, resident = 0;
+    if (FILE* f = std::fopen("/proc/self/statm", "r")) {
+        if (fscanf(f, "%llu %llu", (unsigned long long*)&pages, (unsigned long long*)&resident) != 2) resident = 0;
+        std::fclose(f);
+    }
+    return resident * 4096;
+}
+#endif
 std::mutex g_mmap_mutex;
 std::unordered_map<u64, Mapping> g_mappings;  // returned address -> view
 
@@ -243,9 +284,7 @@ void install_system() {
         if (flavor == 2 && *count >= 15) {  // HOST_VM_INFO: vm_statistics is 15 ints
             std::memset(info, 0, 15 * 4);
             *count = 15;
-            MEMORYSTATUSEX ms{sizeof(ms)};
-            GlobalMemoryStatusEx(&ms);
-            u64 free_pages = std::min<u64>(ms.ullAvailPhys, g_device_memory / 2) / 4096;
+            u64 free_pages = std::min<u64>(host_available_memory(), g_device_memory / 2) / 4096;
             info[0] = (u32)free_pages;                  // free_count
             info[1] = (u32)(g_device_memory / 4096 / 4); // active
             info[2] = (u32)(g_device_memory / 4096 / 8); // inactive
@@ -255,16 +294,13 @@ void install_system() {
         return KERN_FAILURE;
     });
     fn("_task_info", [](u32, u32 flavor, u32* info, u32* count) {
-        PROCESS_MEMORY_COUNTERS pmc{};
-        pmc.cb = sizeof(pmc);
-        K32GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc));
         if (flavor == 20 || flavor == 5) {  // MACH_TASK_BASIC_INFO / TASK_BASIC_INFO_64
             u32 n = flavor == 20 ? 12 : 10;  // struct sizes in natural_t units
             if (*count < n) return KERN_FAILURE;
             std::memset(info, 0, n * 4);
             *count = n;
             // mach_task_basic_info: virtual_size(8) resident_size(8) resident_size_max(8) ...
-            u64 resident = std::min<u64>(pmc.WorkingSetSize, g_device_memory / 2);
+            u64 resident = std::min<u64>(host_resident_memory(), g_device_memory / 2);
             if (flavor == 20) {
                 *reinterpret_cast<u64*>(info) = 1ull << 32;
                 *reinterpret_cast<u64*>(info + 2) = resident;
@@ -312,21 +348,35 @@ void install_system() {
 
     // mmap: anonymous memory, or read-only/private file views.
     fn("_mmap", [](u64 addr, u64 len, int prot, int flags, int fd, s64 off) -> u64 {
-        const u64 MAP_FAILED = ~0ull;
+        const u64 kMapFailed = ~0ull;
         if (flags & 0x1000) {  // MAP_ANON
             void* p = VirtualAlloc(nullptr, len, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
-            return p ? gaddr(p) : MAP_FAILED;
+            return p ? gaddr(p) : kMapFailed;
         }
+#ifndef _WIN32
+        // A private (copy-on-write) file view.
+        void* view = ::mmap(nullptr, len, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, off);
+        if (view == MAP_FAILED) {
+            LOG_WARN("mmap: failed (errno %d)", errno);
+            vfs::set_errno(errno == EBADF ? 9 : D_ENOMEM);
+            return kMapFailed;
+        }
+        std::lock_guard lock(g_mmap_mutex);
+        g_mappings[gaddr(view)] = {view, len};
+        (void)addr;
+        (void)prot;
+        return gaddr(view);
+#else
         HANDLE fh = (HANDLE)_get_osfhandle(fd);
         if (fh == INVALID_HANDLE_VALUE) {
             vfs::set_errno(9);
-            return MAP_FAILED;
+            return kMapFailed;
         }
         HANDLE m = CreateFileMappingW(fh, nullptr, PAGE_WRITECOPY, 0, 0, nullptr);
         if (!m) {
             LOG_WARN("mmap: CreateFileMapping failed (%lu)", GetLastError());
             vfs::set_errno(D_EACCES);
-            return MAP_FAILED;
+            return kMapFailed;
         }
         u64 aligned = off & ~0xffffull;
         u64 delta = off - aligned;
@@ -335,7 +385,7 @@ void install_system() {
             LOG_WARN("mmap: MapViewOfFile failed (%lu)", GetLastError());
             CloseHandle(m);
             vfs::set_errno(D_ENOMEM);
-            return MAP_FAILED;
+            return kMapFailed;
         }
         u64 result = gaddr(view) + delta;
         std::lock_guard lock(g_mmap_mutex);
@@ -345,13 +395,18 @@ void install_system() {
         (void)addr;
         (void)prot;
         return result;
+#endif
     });
     fn("_munmap", [](u64 addr, u64) {
         std::lock_guard lock(g_mmap_mutex);
         auto it = g_mappings.find(addr);
         if (it != g_mappings.end()) {
+#ifdef _WIN32
             UnmapViewOfFile(it->second.view);
             CloseHandle(it->second.mapping);
+#else
+            ::munmap(it->second.base, it->second.len);
+#endif
             g_mappings.erase(it);
             return 0;
         }

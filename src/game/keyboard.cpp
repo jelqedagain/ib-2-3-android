@@ -167,6 +167,7 @@ bool press_menu_button(cpu::Thread& t, const char* const (&tags)[N], const char*
 
 // IB2 PC's AskQuitGame. Runs on the window thread; the game waits until it is answered.
 void ask_quit_game() {
+#ifdef _WIN32
     static std::atomic<bool> asking{false};
     if (uikit::g_test_mode || asking.exchange(true)) return;
     {
@@ -183,6 +184,7 @@ void ask_quit_game() {
     g_resume.notify_all();
     asking = false;
     if (answer == IDOK) PostMessageW(hwnd, WM_CLOSE, 0, 0);
+#endif  // Android apps are left with the system's Home/Back instead
 }
 
 // --- Touch-zone gating ----------------------------------------------------------------------

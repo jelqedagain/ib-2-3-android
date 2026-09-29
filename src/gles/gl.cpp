@@ -184,8 +184,13 @@ void(__stdcall* TexImage2D)(GLenum, GLint, GLint, GLsizei, GLsizei, GLint, GLenu
 }  // namespace fn
 
 void load_gl_functions() {
+#ifdef _WIN32
     g_gles = LoadLibraryW(L"libGLESv2.dll");
     if (!g_gles) fatal("could not load libGLESv2.dll (ANGLE)");
+#else
+    g_gles = LoadLibraryW(L"libGLESv2.so");
+    if (!g_gles) fatal("could not load libGLESv2.so");
+#endif
 #define LOAD(name, ret, params, args)                                                   \
     p_##name = reinterpret_cast<decltype(p_##name)>(GetProcAddress(g_gles, #name));     \
     if (!p_##name) LOG_WARN("ANGLE is missing %s", #name);
@@ -195,6 +200,8 @@ void load_gl_functions() {
     fn::GetIntegerv = p_glGetIntegerv;
     fn::TexImage2D = p_glTexImage2D;
 }
+
+void* gl_proc(const char* name) { return reinterpret_cast<void*>(GetProcAddress(g_gles, name)); }
 
 FrameStats g_stats;
 

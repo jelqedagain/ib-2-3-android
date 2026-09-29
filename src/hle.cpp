@@ -47,8 +47,14 @@ void data(const std::string& sym, GuestAddr addr) {
 }
 
 GuestAddr native(const std::string& sym, std::initializer_list<u32> code) {
+#if IB3_NATIVE_CPU
+    auto* p = static_cast<u32*>(cpu::alloc_code(code.size() * 4));
+    std::copy(code.begin(), code.end(), p);
+    __builtin___clear_cache(reinterpret_cast<char*>(p), reinterpret_cast<char*>(p + code.size()));
+#else
     auto* p = static_cast<u32*>(alloc_static(code.size() * 4, 16));
     std::copy(code.begin(), code.end(), p);
+#endif
     data(sym, gaddr(p));
     return gaddr(p);
 }

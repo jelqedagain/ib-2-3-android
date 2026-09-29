@@ -6,8 +6,10 @@
 #include "uikit/uikit.h"
 #include "game/game.h"
 #include "settings.h"
+#ifdef _WIN32
 #include "launcher/install.h"
 #include "launcher/launcher.h"
+#endif
 #include "uikit/labels.h"
 #include "audio/mixer.h"
 #include "audio/video.h"
@@ -21,6 +23,7 @@ namespace audio { void install(); }
 #include <vector>
 #include <windows.h>
 
+#ifdef _WIN32
 // Reports host crashes with enough context to find the HLE code responsible.
 static LONG WINAPI crash_filter(EXCEPTION_POINTERS* ep) {
     auto* rec = ep->ExceptionRecord;
@@ -45,6 +48,7 @@ static LONG WINAPI crash_filter(EXCEPTION_POINTERS* ep) {
     logging::show_error_dialog(what);
     return EXCEPTION_EXECUTE_HANDLER;
 }
+#endif
 
 // The game's code must live at 0x100000000. Reserve that range before anything else can land
 // there; if something already has (Windows randomizes where DLLs and heaps go), run a fresh copy
@@ -52,6 +56,9 @@ static LONG WINAPI crash_filter(EXCEPTION_POINTERS* ep) {
 static void claim_guest_image_range() {
     constexpr u64 kLo = 0x100000000ull, kSize = 0x40000000ull;  // 1 GB, well over the image size
     if (VirtualAlloc(gptr<void>(kLo), kSize, MEM_RESERVE, PAGE_NOACCESS)) return;
+#ifndef _WIN32
+    LOG_WARN("address 0x%llx is taken", (unsigned long long)kLo);  // not seen on Android: mappings go high
+#else
     MEMORY_BASIC_INFORMATION mbi{};
     VirtualQuery(gptr<void>(kLo), &mbi, sizeof mbi);
     wchar_t buf[16] = {};
@@ -68,10 +75,16 @@ static void claim_guest_image_range() {
     DWORD code = 1;
     GetExitCodeProcess(pi.hProcess, &code);
     ExitProcess(code);
+#endif
 }
 
+#ifdef IB3_ANDROID_APP
+int ib3_main(int argc, char** argv) {  // started by the Android app (port/android/app.cpp)
+#else
 int main(int argc, char** argv) {
+#endif
     claim_guest_image_range();
+#ifdef _WIN32
     // Started on its own (double-clicked): show the launcher, which starts the game with -play.
     if (argc == 1) return launcher::run();
     if (argc == 4 && std::string(argv[1]) == "-launcher-shot") return launcher::screenshot(argv[2], argv[3]);
@@ -93,6 +106,7 @@ int main(int argc, char** argv) {
         return ok ? 0 : 1;
     }
     SetUnhandledExceptionFilter(crash_filter);
+#endif
     std::string app = "game/Payload/SwordGame.app";
     std::string home = "userdata";
     bool keep_console = false, play = false, audit = false;
@@ -141,6 +155,7 @@ int main(int argc, char** argv) {
         }
         else app = a;
     }
+#ifdef _WIN32
     if (play) {  // installed layout: everything next to the executable
         std::string dir = launcher::narrow(settings::exe_dir());
         app = dir + "game/Payload/SwordGame.app";
@@ -158,6 +173,7 @@ int main(int argc, char** argv) {
         freopen("CONOUT$", "w", stdout);
         freopen("CONOUT$", "w", stderr);
     }
+#endif
     CoInitializeEx(nullptr, COINIT_MULTITHREADED);
     logging::set_thread_name("main");
 

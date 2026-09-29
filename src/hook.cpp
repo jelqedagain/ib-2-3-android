@@ -30,7 +30,11 @@ GuestAddr install(GuestAddr func, const std::string& name, cpu::Handler handler)
         }
     }
     // Trampoline: the four displaced instructions, then a jump back to func + 16.
+#if IB3_NATIVE_CPU
+    auto* tramp = static_cast<u32*>(cpu::alloc_code(32));
+#else
     auto* tramp = static_cast<u32*>(hle::alloc_static(32, 16));
+#endif
     for (int i = 0; i < 4; i++) tramp[i] = code[i];
     tramp[4] = kLdrX16Plus8;
     tramp[5] = kBrX16;
@@ -40,6 +44,10 @@ GuestAddr install(GuestAddr func, const std::string& name, cpu::Handler handler)
     code[0] = kLdrX16Plus8;
     code[1] = kBrX16;
     *reinterpret_cast<u64*>(&code[2]) = stub;
+#if IB3_NATIVE_CPU  // the CPU runs this code directly: make it see the new instructions
+    __builtin___clear_cache(reinterpret_cast<char*>(tramp), reinterpret_cast<char*>(tramp + 8));
+    __builtin___clear_cache(reinterpret_cast<char*>(code), reinterpret_cast<char*>(code + 4));
+#endif
     LOG_DEBUG("hooked %s at 0x%llx", name.c_str(), (unsigned long long)func);
     return gaddr(tramp);
 }

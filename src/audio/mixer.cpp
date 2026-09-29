@@ -8,8 +8,12 @@
 #include <mutex>
 #include <vector>
 #include <windows.h>
+#ifdef _WIN32
 #include <audioclient.h>
 #include <mmdeviceapi.h>
+#else
+#include <aaudio/AAudio.h>
+#endif
 
 #define MINIMP3_IMPLEMENTATION
 #include <minimp3/minimp3_ex.h>
@@ -222,6 +226,58 @@ void wav_thread(const std::string& path) {
     }
 }
 
+#ifndef _WIN32
+// Android: AAudio with blocking writes, 48 kHz float stereo.
+void audio_thread() {
+    if (!g_wav_path.empty()) {
+        wav_thread(g_wav_path);
+        return;
+    }
+    AAudioStreamBuilder* builder = nullptr;
+    AAudioStream* stream = nullptr;
+    if (AAudio_createStreamBuilder(&builder) != AAUDIO_OK) {
+        LOG_ERROR("audio: AAudio unavailable; running silent");
+        return;
+    }
+    AAudioStreamBuilder_setFormat(builder, AAUDIO_FORMAT_PCM_FLOAT);
+    AAudioStreamBuilder_setChannelCount(builder, 2);
+    AAudioStreamBuilder_setSampleRate(builder, 48000);
+    AAudioStreamBuilder_setPerformanceMode(builder, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
+    AAudioStreamBuilder_setUsage(builder, AAUDIO_USAGE_GAME);
+    bool ok = AAudioStreamBuilder_openStream(builder, &stream) == AAUDIO_OK;
+    AAudioStreamBuilder_delete(builder);
+    if (!ok || AAudioStream_requestStart(stream) != AAUDIO_OK) {
+        LOG_ERROR("audio: could not open an AAudio output stream; running silent");
+        return;
+    }
+    const int rate = AAudioStream_getSampleRate(stream);
+    LOG_INFO("audio: AAudio %d Hz, %d-frame bursts", rate, AAudioStream_getFramesPerBurst(stream));
+
+    CallbackScratch s;
+    s.abl = static_cast<u8*>(std::calloc(1, 64));
+    s.ts = static_cast<u8*>(std::calloc(1, 64));
+    s.flags = static_cast<u32*>(std::calloc(1, 16));
+    s.data = static_cast<s16*>(std::calloc(kMaxPull, 2));
+    std::vector<float> mix;
+    const u32 n = rate / 100;  // 10 ms
+    for (;;) {
+        mix.assign(n * 2, 0.0f);
+        u64 pool = objc::pool_push();
+        mix_buses(mix.data(), n, rate, s);
+        objc::pool_pop(pool);
+        mix_music(mix.data(), n, rate);
+        float master = g_master.load();
+        for (float& v : mix) v = std::clamp(v * master, -1.0f, 1.0f);
+        if (AAudioStream_write(stream, mix.data(), (int32_t)n, 100000000 /* 100 ms */) < 0) {
+            // Disconnected (e.g. headphones unplugged): reopen on the new default device.
+            AAudioStream_close(stream);
+            LOG_INFO("audio: output stream lost; reopening");
+            audio_thread();
+            return;
+        }
+    }
+}
+#else
 void audio_thread() {
     if (!g_wav_path.empty()) {
         wav_thread(g_wav_path);
@@ -280,6 +336,7 @@ void audio_thread() {
         render->ReleaseBuffer(n, 0);
     }
 }
+#endif
 
 void ensure_started() {
     bool expected = false;

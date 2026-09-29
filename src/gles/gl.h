@@ -8,6 +8,8 @@ namespace gles {
 
 // Loads ANGLE and creates the EGL display + window surface for `hwnd`.
 void init(HWND hwnd);
+// Replaces the window surface (any thread); nullptr drops frames until a window is set again.
+void set_window(HWND hwnd);
 void install_gl();    // _gl* exports
 void install_eagl();  // EAGLContext, CAEAGLLayer
 
@@ -37,6 +39,9 @@ void surface_size(int& w, int& h);
 
 // Decodes PVRTC1 (4 or 2 bpp) into RGBA8.
 void pvrtc_decode(const u8* src, int width, int height, bool two_bpp, u8* rgba_out);
+
+// Looks up a function of the OpenGL ES library (ANGLE's libGLESv2.dll, or the device's libGLESv2.so).
+void* gl_proc(const char* name);
 
 // Function-pointer access for internal use (present blit, texture uploads).
 namespace fn {

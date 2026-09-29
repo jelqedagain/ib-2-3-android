@@ -36,12 +36,14 @@ constexpr EGLint EGL_NONE = 0x3038, EGL_RED_SIZE = 0x3024, EGL_GREEN_SIZE = 0x30
                  EGL_WINDOW_BIT = 0x4, EGL_RENDERABLE_TYPE = 0x3040, EGL_OPENGL_ES3_BIT = 0x40,
                  EGL_CONTEXT_MAJOR_VERSION = 0x3098, EGL_CONTEXT_MINOR_VERSION = 0x30FB, EGL_WIDTH = 0x3057,
                  EGL_HEIGHT = 0x3056, EGL_PLATFORM_ANGLE_ANGLE = 0x3202, EGL_PLATFORM_ANGLE_TYPE_ANGLE = 0x3203,
-                 EGL_PLATFORM_ANGLE_TYPE_D3D11_ANGLE = 0x3208, EGL_OPENGL_ES_API = 0x30A0;
+                 EGL_PLATFORM_ANGLE_TYPE_D3D11_ANGLE = 0x3208, EGL_OPENGL_ES_API = 0x30A0, EGL_PBUFFER_BIT = 0x1;
 
 struct Egl {
     HMODULE lib = nullptr;
     void*(__stdcall* GetProcAddress)(const char*) = nullptr;
     EGLDisplay(__stdcall* GetPlatformDisplayEXT)(u32, void*, const EGLint*) = nullptr;
+    EGLDisplay(__stdcall* GetDisplay)(void*) = nullptr;
+    EGLSurface(__stdcall* CreatePbufferSurface)(EGLDisplay, EGLConfig, const EGLint*) = nullptr;
     EGLBoolean(__stdcall* Initialize)(EGLDisplay, EGLint*, EGLint*) = nullptr;
     EGLBoolean(__stdcall* ChooseConfig)(EGLDisplay, const EGLint*, EGLConfig*, EGLint, EGLint*) = nullptr;
     EGLSurface(__stdcall* CreateWindowSurface)(EGLDisplay, EGLConfig, HWND, const EGLint*) = nullptr;
@@ -52,6 +54,7 @@ struct Egl {
     EGLBoolean(__stdcall* QuerySurface)(EGLDisplay, EGLSurface, EGLint, EGLint*) = nullptr;
     EGLint(__stdcall* GetError)() = nullptr;
     EGLBoolean(__stdcall* BindAPI)(u32) = nullptr;
+    EGLBoolean(__stdcall* DestroySurface)(EGLDisplay, EGLSurface) = nullptr;
     EGLContext(__stdcall* GetCurrentContext)() = nullptr;
     EGLSurface(__stdcall* GetCurrentSurface)(EGLint) = nullptr;
     EGLDisplay dpy = nullptr;
@@ -59,6 +62,9 @@ struct Egl {
     EGLSurface surf = nullptr;
     EGLContext root = nullptr;
     std::mutex mutex;
+    // The window surface can be replaced (set_window); presenting holds this lock.
+    std::mutex surface_mutex;
+    u64 surface_generation = 0;
 } g;
 
 struct ContextData : objc::HostData {
@@ -72,6 +78,7 @@ struct ContextData : objc::HostData {
 
 thread_local objc::id t_current = 0;
 thread_local bool t_surface_bound = false;
+thread_local u64 t_surface_generation = 0;
 
 EGLContext create_context() {
     const EGLint attrs[] = {EGL_CONTEXT_MAJOR_VERSION, 3, EGL_CONTEXT_MINOR_VERSION, 0, EGL_NONE};
@@ -99,15 +106,22 @@ bool take_screenshot_request(std::string& name) {
 
 void surface_size(int& w, int& h) {
     EGLint ew = 0, eh = 0;
-    g.QuerySurface(g.dpy, g.surf, EGL_WIDTH, &ew);
-    g.QuerySurface(g.dpy, g.surf, EGL_HEIGHT, &eh);
+    if (g.surf) {
+        g.QuerySurface(g.dpy, g.surf, EGL_WIDTH, &ew);
+        g.QuerySurface(g.dpy, g.surf, EGL_HEIGHT, &eh);
+    }
     w = ew;
     h = eh;
 }
 
 void init(HWND hwnd) {
+#ifdef _WIN32
     g.lib = LoadLibraryW(L"libEGL.dll");
     if (!g.lib) fatal("could not load libEGL.dll (ANGLE)");
+#else
+    g.lib = LoadLibraryW(L"libEGL.so");  // the device's own OpenGL ES driver
+    if (!g.lib) fatal("could not load libEGL.so");
+#endif
 #define EGLFN(member, name) g.member = reinterpret_cast<decltype(g.member)>(::GetProcAddress(g.lib, name))
     EGLFN(GetProcAddress, "eglGetProcAddress");
     EGLFN(Initialize, "eglInitialize");
@@ -122,23 +136,48 @@ void init(HWND hwnd) {
     EGLFN(BindAPI, "eglBindAPI");
     EGLFN(GetCurrentContext, "eglGetCurrentContext");
     EGLFN(GetCurrentSurface, "eglGetCurrentSurface");
+    EGLFN(GetDisplay, "eglGetDisplay");
+    EGLFN(CreatePbufferSurface, "eglCreatePbufferSurface");
+    EGLFN(DestroySurface, "eglDestroySurface");
 #undef EGLFN
     g.GetPlatformDisplayEXT = reinterpret_cast<decltype(g.GetPlatformDisplayEXT)>(g.GetProcAddress("eglGetPlatformDisplayEXT"));
     load_gl_functions();
 
+#ifdef _WIN32
     const EGLint dpy_attrs[] = {EGL_PLATFORM_ANGLE_TYPE_ANGLE, EGL_PLATFORM_ANGLE_TYPE_D3D11_ANGLE, EGL_NONE};
     g.dpy = g.GetPlatformDisplayEXT(EGL_PLATFORM_ANGLE_ANGLE, nullptr, dpy_attrs);
+#else
+    g.dpy = g.GetDisplay(nullptr);  // EGL_DEFAULT_DISPLAY
+#endif
     EGLint major = 0, minor = 0;
     if (!g.dpy || !g.Initialize(g.dpy, &major, &minor)) fatal("eglInitialize failed (0x%x)", g.GetError());
     g.BindAPI(EGL_OPENGL_ES_API);
     const EGLint cfg_attrs[] = {EGL_RED_SIZE, 8, EGL_GREEN_SIZE, 8, EGL_BLUE_SIZE, 8, EGL_ALPHA_SIZE, 8,
-                                EGL_DEPTH_SIZE, 24, EGL_STENCIL_SIZE, 8, EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
+                                EGL_DEPTH_SIZE, 24, EGL_STENCIL_SIZE, 8, EGL_SURFACE_TYPE, hwnd ? EGL_WINDOW_BIT : EGL_PBUFFER_BIT,
                                 EGL_RENDERABLE_TYPE, EGL_OPENGL_ES3_BIT, EGL_NONE};
     EGLint n = 0;
     if (!g.ChooseConfig(g.dpy, cfg_attrs, &g.cfg, 1, &n) || n < 1) fatal("eglChooseConfig failed (0x%x)", g.GetError());
-    g.surf = g.CreateWindowSurface(g.dpy, g.cfg, hwnd, nullptr);
-    if (!g.surf) fatal("eglCreateWindowSurface failed (0x%x)", g.GetError());
+    if (hwnd) {
+        g.surf = g.CreateWindowSurface(g.dpy, g.cfg, hwnd, nullptr);
+    } else {  // no window (Android command-line runs): render off screen
+        const EGLint pb_attrs[] = {EGL_WIDTH, 1280, EGL_HEIGHT, 720, EGL_NONE};
+        g.surf = g.CreatePbufferSurface(g.dpy, g.cfg, pb_attrs);
+    }
+    if (!g.surf) fatal("eglCreate%sSurface failed (0x%x)", hwnd ? "Window" : "Pbuffer", g.GetError());
+#ifdef _WIN32
     LOG_INFO("EGL %d.%d on ANGLE/D3D11 initialized", major, minor);
+#else
+    LOG_INFO("EGL %d.%d initialized (%s)", major, minor, hwnd ? "window" : "off-screen 1280x720");
+#endif
+}
+
+void set_window(HWND hwnd) {
+    std::lock_guard lock(g.surface_mutex);  // waits for a frame being presented
+    if (g.surf) g.DestroySurface(g.dpy, g.surf);  // EGL frees it once no thread has it current
+    g.surf = hwnd ? g.CreateWindowSurface(g.dpy, g.cfg, hwnd, nullptr) : nullptr;
+    if (hwnd && !g.surf) LOG_ERROR("eglCreateWindowSurface failed (0x%x)", g.GetError());
+    g.surface_generation++;
+    LOG_INFO("window surface %s", hwnd ? "attached" : "detached");
 }
 
 void install_eagl() {
@@ -225,14 +264,21 @@ void install_eagl() {
         d.rb_w = w;
         d.rb_h = h;
         using RS = void(__stdcall*)(u32, u32, s32, s32);
-        static RS rs = reinterpret_cast<RS>(GetProcAddress(GetModuleHandleW(L"libGLESv2.dll"), "glRenderbufferStorage"));
+        static RS rs = reinterpret_cast<RS>(gl_proc("glRenderbufferStorage"));
         rs(target, 0x8058 /*GL_RGBA8*/, w, h);
         LOG_INFO("drawable renderbuffer %d: %dx%d (scale %.2f)", rb, w, h, scale);
         return true;
     });
     method(C, "presentRenderbuffer:", [](id self, SEL, u32) {
         auto& d = objc::ensure<ContextData>(self);
-        if (!t_surface_bound) {
+        std::lock_guard surface_lock(g.surface_mutex);
+        if (!g.surf) {  // no window right now (the Android app is in the background)
+            if (t_surface_bound) g.MakeCurrent(g.dpy, nullptr, nullptr, d.ctx);
+            t_surface_bound = false;
+            return true;
+        }
+        if (!t_surface_bound || t_surface_generation != g.surface_generation) {
+            t_surface_generation = g.surface_generation;
             if (!g.MakeCurrent(g.dpy, g.surf, g.surf, d.ctx)) {
                 LOG_ERROR("eglMakeCurrent(window) failed (0x%x)", g.GetError());
                 return false;

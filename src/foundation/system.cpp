@@ -367,10 +367,10 @@ void install_system() {
     });
     method(F, "attributesOfFileSystemForPath:error:", [](id, SEL, id, u64* err) {
         if (err) *err = 0;
-        ULARGE_INTEGER free_bytes, total;
-        GetDiskFreeSpaceExW(libc::utf8_to_wide(vfs::host_home()).c_str(), &free_bytes, &total, nullptr);
+        std::error_code ec;
+        auto space = std::filesystem::space(std::filesystem::path(libc::utf8_to_wide(vfs::host_home())), ec);
         // Report like a 64 GB device so size checks behave.
-        u64 f = std::min<u64>(free_bytes.QuadPart, 32ull << 30);
+        u64 f = std::min<u64>(ec ? 0 : space.available, 32ull << 30);
         return dict({{str("NSFileSystemFreeSize"), number_uint(f)}, {str("NSFileSystemSize"), number_uint(64ull << 30)}});
     });
     method(F, "setAttributes:ofItemAtPath:error:", [](id, SEL, id, id, u64* err) {
@@ -507,9 +507,16 @@ void install_system() {
     class_method(TZ, "timeZoneWithAbbreviation:", tz);
     class_method(TZ, "timeZoneForSecondsFromGMT:", tz);
     method(TZ, "secondsFromGMT", [](id, SEL) -> s64 {
+#ifdef _WIN32
         long t;
         _get_timezone(&t);
         return -t;
+#else
+        time_t now = time(nullptr);
+        std::tm tm{};
+        localtime_r(&now, &tm);
+        return tm.tm_gmtoff;
+#endif
     });
     method(TZ, "name", [](id, SEL) { return str("America/New_York"); });
     method(TZ, "abbreviation", [](id, SEL) { return str("EST"); });

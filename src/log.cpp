@@ -4,6 +4,9 @@
 #include <string>
 #include <mutex>
 #include <windows.h>
+#ifdef __ANDROID__
+#include <android/log.h>
+#endif
 
 namespace logging {
 Level min_level = Level::Info;
@@ -31,6 +34,10 @@ void write(Level lvl, const char* fmt, ...) {
     static const u64 start = GetTickCount64();
     double secs = (GetTickCount64() - start) / 1000.0;
     std::fprintf(stderr, "[%s %7.2f %5u %-12.12s] %s\n", names[(int)lvl], secs, tid, t_name, buf);
+#ifdef __ANDROID__
+    static const int prio[] = {ANDROID_LOG_VERBOSE, ANDROID_LOG_DEBUG, ANDROID_LOG_INFO, ANDROID_LOG_WARN, ANDROID_LOG_ERROR};
+    __android_log_print(prio[(int)lvl], "ib3", "[%s] %s", t_name, buf);
+#endif
     if (g_file) {
         std::fprintf(g_file, "[%s %7.2f %5u %-12.12s] %s\n", names[(int)lvl], secs, tid, t_name, buf);
         std::fflush(g_file);

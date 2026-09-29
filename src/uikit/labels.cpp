@@ -17,10 +17,12 @@ std::mutex g_snap_mutex;
 std::vector<LabelSnapshot> g_snapshot;
 u64 g_snapshot_version = 0;
 
+#ifdef _WIN32
 HFONT make_font(int px, bool bold) {
     return CreateFontW(-px, 0, 0, 0, bold ? FW_BOLD : FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
                        ANTIALIASED_QUALITY, DEFAULT_PITCH, L"Arial");  // metrics close to iOS Helvetica
 }
+#endif
 
 void refresh_snapshot() {
     std::vector<std::pair<objc::id, CGRect>> found;
@@ -52,6 +54,14 @@ void refresh_snapshot() {
 
 }  // namespace
 
+std::vector<LabelSnapshot> visible_labels(u64& version) {
+    std::lock_guard lock(g_snap_mutex);
+    version = g_snapshot_version;
+    return g_snapshot;
+}
+
+// Android: measure_text and draw_labels are in port/android/text.cpp.
+#ifdef _WIN32
 CGSize measure_text(const std::u16string& text, double font_size, bool bold, double max_width) {
     static std::mutex m;
     std::lock_guard lock(m);
@@ -63,12 +73,6 @@ CGSize measure_text(const std::u16string& text, double font_size, bool bold, dou
     SelectObject(dc, old);
     DeleteObject(font);
     return CGSize{(double)(r.right - r.left), (double)(r.bottom - r.top)};
-}
-
-std::vector<LabelSnapshot> visible_labels(u64& version) {
-    std::lock_guard lock(g_snap_mutex);
-    version = g_snapshot_version;
-    return g_snapshot;
 }
 
 void draw_labels(u8* rgba, int w, int h, const std::vector<LabelSnapshot>& labels) {
@@ -132,6 +136,7 @@ void draw_labels(u8* rgba, int w, int h, const std::vector<LabelSnapshot>& label
     DeleteObject(bmp);
     DeleteDC(dc);
 }
+#endif
 
 void install_labels() {
     using objc::class_method;
