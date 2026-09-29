@@ -2,11 +2,12 @@
 
 > **Bring your own IPA.** This download does not contain the game. To play, you need your own copy of **Infinity Blade III for iOS as an `.ipa` file (version 1.4.4)**. The launcher installs the game from it the first time you run it.
 
-**Infinity Blade III on Windows PC.** This port runs the original iOS release of Infinity Blade III on 64-bit Windows, with keyboard controls, a settings launcher, and higher resolutions.
+**Infinity Blade III on Windows PC and Android.** This port runs the original iOS release of Infinity Blade III on 64-bit Windows, with keyboard and controller support, a settings launcher and higher resolutions, and on Android phones and handhelds at 60 FPS.
 
 Infinity Blade III was pulled from the App Store in 2018 and can no longer be bought or downloaded. This project exists so the game can still be played.
 
-### [⬇ Download the latest version (Windows 10/11, 64-bit)](https://github.com/jelqscape/Infinity-Blade-III-PC-Port/releases/latest/download/InfinityBladeIII-PCPort-win64.zip)
+### [⬇ Download for Windows 10/11 (64-bit)](https://github.com/jelqscape/Infinity-Blade-III-PC-Port/releases/latest/download/InfinityBladeIII-PCPort-win64.zip)
+### [⬇ Download for Android 11+ (64-bit)](https://github.com/jelqscape/Infinity-Blade-III-PC-Port/releases/latest/download/InfinityBladeIII-Android.apk)
 
 ![The launcher](docs/launcher.png)
 
@@ -19,6 +20,8 @@ Infinity Blade III was pulled from the App Store in 2018 and can no longer be bo
 5. Click **Play**.
 
 After that, just run **Infinity Blade III.exe** and click **Play**. The first start takes about 30–60 seconds while the logos and the loading animation play.
+
+The rest of this section and the next ones are about the Windows version. For phones and handhelds, see [Android](#android).
 
 ## Controls
 
@@ -99,9 +102,25 @@ Progress is saved in `userdata\Documents\SAVE` next to the executable. Click **O
 - On Windows "N" editions without the Media Feature Pack, the movies are skipped.
 - This is a new project. Not every part of the game has been played through on it yet.
 
+## Android
+
+The Android version runs the same game, with the same bring-your-own-IPA install.
+
+1. [Download `InfinityBladeIII-Android.apk`](https://github.com/jelqscape/Infinity-Blade-III-PC-Port/releases/latest/download/InfinityBladeIII-Android.apk) on your phone and open it. Android asks you to allow installing apps from your browser or file manager the first time.
+2. Put your Infinity Blade III `.ipa` (version 1.4.4) on the phone, for example in Downloads.
+3. Open **Infinity Blade III**, tap **Choose .ipa file** and pick it. Installing takes under a minute. You can delete the `.ipa` afterwards.
+
+After that, the app starts straight into the game.
+
+- **Controls:** touch, exactly like on an iPhone. The Back button or gesture backs out of menus and pauses the game. A Bluetooth or USB keyboard uses the PC keys. Controllers are not supported yet.
+- **Screen:** the game fills wide phone screens and runs at 60 FPS.
+- **Saves:** stored in `Android/data/com.ib3port.game/files/userdata/Documents/SAVE`. They are the game's own iOS save files, the same as on PC. **Uninstalling the app deletes the game and your saves**, so copy that folder first if you want to keep them.
+- **Settings:** there is no settings screen yet. `settings.ini` in `Android/data/com.ib3port.game/files` takes the same options as on PC; for example, `MaxFPS=30` under `[Display]` saves battery.
+- **Requirements:** Android 11 or newer on a 64-bit (ARM64) device, OpenGL ES 3, and about 3 GB of free space for the game (plus room for the `.ipa` while installing). Tested on a Samsung Galaxy S25 and an AYN Odin 2.
+
 ## Reporting problems
 
-If the game stops with an error, it saves the details to `ib3rt.log` next to the executable. Please attach that file to your [issue](../../issues), and describe what you were doing.
+If the game stops with an error, it saves the details to `ib3rt.log` next to the executable (on Android, in `Android/data/com.ib3port.game/files`). Please attach that file to your [issue](../../issues), and describe what you were doing.
 
 ## How it works
 
@@ -113,6 +132,12 @@ This port is not an iPhone emulator. It runs the game's ARM64 program and implem
 - **Audio and video:** audio goes out through WASAPI, with an emulation of Apple's 3D mixer. Music is decoded with minimp3, and movies with Windows Media Foundation.
 - **Input:** mouse clicks and drags become touches. Keys are sent to Unreal Engine 3's input system under the same input names IB3's touch buttons use, so the game's own bindings run the real actions.
 - **Game-specific fixes:** a small set of engine hooks, found by reverse engineering, applies launcher settings to the engine config, keeps the startup movie from playing twice, and powers the Enter/Escape menu actions.
+
+On Android the same runtime is used, with these differences:
+
+- **CPU:** phones have ARM64 processors, so the game's code runs directly, with no translation. Calls into iOS functions go through small trampolines into the runtime.
+- **Graphics, audio and video:** the device's own OpenGL ES driver, AAudio, and Android's hardware video decoder (MediaCodec).
+- **App:** a NativeActivity, plus a small Java launcher that installs the game from the `.ipa` and shows the game's alerts as Android dialogs.
 
 ## Building from source
 
@@ -135,6 +160,13 @@ scripts/fetch-deps.sh      # dynarmic submodule and Boost headers
 `build.sh` uses a portable toolchain from `tools/` (`tools/llvm-mingw`, `tools/cmake`, `tools/ninja.exe`) if one is there, otherwise the tools on your `PATH`.
 
 `scripts/package.sh` builds the release zip in `dist/` (the version number lives in `src/app.rc`).
+
+The Android app needs, in `tools/android/`: the [Android NDK](https://developer.android.com/ndk/downloads) r30 (`android-ndk-r30`), the SDK build-tools (`build-tools`, with aapt2, d8, zipalign and apksigner) and `android-35/android.jar`, plus a JDK. Then:
+
+```sh
+./build-android.sh         # build-android/ib3android: a command-line build for testing over adb
+scripts/build-apk.sh       # dist/InfinityBladeIII-Android.apk
+```
 
 For development, `./test.sh <seconds> [options]` runs the game hidden, with its own save folder, and writes `build/testrun/ib3rt.log`. Useful options:
 

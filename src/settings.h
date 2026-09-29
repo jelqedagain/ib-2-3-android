@@ -10,7 +10,11 @@ struct Settings {
     bool fullscreen = false;
     int window_width = 1280, window_height = 720;
     int render_height = 1080;  // 720, 1080, 1440, 2160 (16:9)
+#ifdef __ANDROID__
+    int max_fps = 60;          // 30 (original) or 60
+#else
     int max_fps = 30;          // 30 (original) or 60
+#endif
     bool show_fps = false;
     // Graphics (IB3's own mobile renderer options)
     int anti_aliasing = 1;     // 0 off, 1 FXAA, 2 MSAA 4x
@@ -28,7 +32,7 @@ struct Settings {
     int cursor_speed = 100, camera_speed = 100, swipe_size = 100;
 };
 
-// Directory of the executable (with trailing backslash).
+// Directory of the executable (with trailing backslash); on Android, the app's files folder.
 std::wstring exe_dir();
 std::wstring path();  // settings.ini
 

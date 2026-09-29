@@ -1,6 +1,7 @@
 // OpenGL ES (via ANGLE) and EAGL.
 #pragma once
 #include "common.h"
+#include <functional>
 #include <string>
 #include <windows.h>
 
@@ -10,6 +11,9 @@ namespace gles {
 void init(HWND hwnd);
 // Replaces the window surface (any thread); nullptr drops frames until a window is set again.
 void set_window(HWND hwnd);
+// Boot screen: calls `draw` about 60 times a second on the calling thread, with its own context
+// current on the window surface, until the game presents its first frame.
+void present_until_first_frame(const std::function<void(int w, int h)>& draw);
 void install_gl();    // _gl* exports
 void install_eagl();  // EAGLContext, CAEAGLLayer
 

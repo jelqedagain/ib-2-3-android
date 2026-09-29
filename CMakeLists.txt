@@ -36,14 +36,14 @@ target_compile_definitions(ib3_thirdparty PRIVATE SQLITE_THREADSAFE=1 SQLITE_OMI
 if (ANDROID)
     # --- Android (ARM64): the game's code runs natively; see src/cpu_native.* and src/port/android.
     file(GLOB_RECURSE IB3_ANDROID_SOURCES CONFIGURE_DEPENDS src/*.cpp)
-    list(FILTER IB3_ANDROID_SOURCES EXCLUDE REGEX "src/(cpu\.cpp|libc/crypto\.cpp|uikit/boot\.cpp|uikit/window_win32\.cpp|game/controller\.cpp|audio/video\.cpp)$")
+    list(FILTER IB3_ANDROID_SOURCES EXCLUDE REGEX "src/(cpu\.cpp|libc/crypto\.cpp|uikit/boot\.cpp|uikit/window_win32\.cpp|game/controller\.cpp|audio/video_mf\.cpp)$")
     list(FILTER IB3_ANDROID_SOURCES EXCLUDE REGEX "src/(launcher|win)/|src/main\.cpp$|src/port/android/app\.cpp$")
     set_target_properties(ib3_thirdparty PROPERTIES POSITION_INDEPENDENT_CODE ON)
     add_library(ib3core OBJECT ${IB3_ANDROID_SOURCES} src/cpu_native.S)
     set_target_properties(ib3core PROPERTIES POSITION_INDEPENDENT_CODE ON)
     target_include_directories(ib3core PUBLIC src/port/android src external)
     target_compile_options(ib3core PUBLIC -Wno-unused-parameter -Wno-invalid-offsetof -fno-strict-aliasing)
-    target_link_libraries(ib3core PUBLIC ib3_thirdparty aaudio android log dl m)
+    target_link_libraries(ib3core PUBLIC ib3_thirdparty aaudio mediandk android log dl m)
 
     # Command-line build (adb shell; renders off screen).
     add_executable(ib3android src/main.cpp)

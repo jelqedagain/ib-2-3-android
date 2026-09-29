@@ -1,6 +1,8 @@
 // Win32 compatibility layer for the Android build (see windows.h next to this file).
 #include <windows.h>
 #include <io.h>
+#include "port/android/android_app.h"
+#include "win/dialogs.h"
 #include <android/log.h>
 #include <dirent.h>
 #include <dlfcn.h>
@@ -117,6 +119,11 @@ std::string utf32_to_utf8(const wchar_t* s, size_t n) {
 }
 
 std::string narrow(const wchar_t* w) { return w ? utf32_to_utf8(w, wcslen(w)) : std::string(); }
+
+std::wstring widen(const char* s) {
+    std::u32string u = s ? utf8_to_utf32(s, strlen(s)) : std::u32string();
+    return std::wstring(u.begin(), u.end());
+}
 
 // --- memory -------------------------------------------------------------------------------------
 
@@ -557,7 +564,13 @@ HRESULT SetThreadDescription(HANDLE, LPCWSTR name) {
 
 int MessageBoxA(HWND, const char* text, const char* caption, UINT type) {
     __android_log_print(ANDROID_LOG_ERROR, "ib3", "[%s] %s", caption ? caption : "", text ? text : "");
-    return (type & 0xf) == MB_OKCANCEL ? IDCANCEL : IDOK;
+    bool ok_cancel = (type & 0xf) == MB_OKCANCEL;
+    if (android::activity()) {  // the app: a real dialog (win::choose waits for it)
+        std::vector<std::wstring> buttons = ok_cancel ? std::vector<std::wstring>{L"Cancel", L"OK"} : std::vector<std::wstring>{L"OK"};
+        int pick = win::choose(nullptr, widen(caption), widen(text), buttons, ok_cancel ? 0 : -1);
+        return ok_cancel ? (pick == 1 ? IDOK : IDCANCEL) : IDOK;
+    }
+    return ok_cancel ? IDCANCEL : IDOK;
 }
 
 int MessageBoxW(HWND owner, LPCWSTR text, LPCWSTR caption, UINT type) {

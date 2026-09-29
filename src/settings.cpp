@@ -1,4 +1,5 @@
 #include "settings.h"
+#include <filesystem>
 #include <windows.h>
 
 namespace settings {
@@ -26,6 +27,12 @@ int clamp(int v, int lo, int hi) { return v < lo ? lo : v > hi ? hi : v; }
 }  // namespace
 
 std::wstring exe_dir() {
+#ifdef __ANDROID__
+    // The working directory: the app's files folder (port/android/app.cpp), or where the
+    // command-line build was started.
+    std::error_code ec;
+    return std::filesystem::current_path(ec).wstring() + L"/";
+#endif
     wchar_t buf[MAX_PATH * 2];
     DWORD n = GetModuleFileNameW(nullptr, buf, (DWORD)std::size(buf));
     std::wstring p(buf, n);

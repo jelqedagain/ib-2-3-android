@@ -10,6 +10,7 @@
 #include "foundation/foundation.h"
 #include "game/game.h"
 #include "gles/gl.h"
+#include "port/android/android_app.h"
 #include "settings.h"
 #include "uikit/uikit.h"
 #include <android/log.h>
@@ -21,6 +22,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <algorithm>
+#include <cmath>
 #include <string>
 
 int ib3_main(int argc, char** argv);
@@ -109,17 +111,68 @@ void set_active(bool active) {
     ns::post_to_main([active] { uikit::app_set_active(active); });
 }
 
+// Android key codes -> the Windows key codes keyboard.cpp's bindings use (physical keyboards).
+int vk_for(int32_t key) {
+    if (key >= AKEYCODE_A && key <= AKEYCODE_Z) return 'A' + (key - AKEYCODE_A);
+    if (key >= AKEYCODE_0 && key <= AKEYCODE_9) return '0' + (key - AKEYCODE_0);
+    if (key >= AKEYCODE_F1 && key <= AKEYCODE_F12) return VK_F1 + (key - AKEYCODE_F1);
+    if (key >= AKEYCODE_NUMPAD_0 && key <= AKEYCODE_NUMPAD_9) return VK_NUMPAD0 + (key - AKEYCODE_NUMPAD_0);
+    switch (key) {
+    case AKEYCODE_SPACE: return VK_SPACE;
+    case AKEYCODE_ENTER: case AKEYCODE_NUMPAD_ENTER: return VK_RETURN;
+    case AKEYCODE_ESCAPE: return VK_ESCAPE;
+    case AKEYCODE_TAB: return VK_TAB;
+    case AKEYCODE_DEL: return VK_BACK;
+    case AKEYCODE_FORWARD_DEL: return VK_DELETE;
+    case AKEYCODE_SHIFT_LEFT: return VK_LSHIFT;
+    case AKEYCODE_SHIFT_RIGHT: return VK_RSHIFT;
+    case AKEYCODE_CTRL_LEFT: return VK_LCONTROL;
+    case AKEYCODE_CTRL_RIGHT: return VK_RCONTROL;
+    case AKEYCODE_ALT_LEFT: return VK_LMENU;
+    case AKEYCODE_ALT_RIGHT: return VK_RMENU;
+    case AKEYCODE_DPAD_UP: return VK_UP;
+    case AKEYCODE_DPAD_DOWN: return VK_DOWN;
+    case AKEYCODE_DPAD_LEFT: return VK_LEFT;
+    case AKEYCODE_DPAD_RIGHT: return VK_RIGHT;
+    case AKEYCODE_PAGE_UP: return VK_PRIOR;
+    case AKEYCODE_PAGE_DOWN: return VK_NEXT;
+    case AKEYCODE_MOVE_HOME: return VK_HOME;
+    case AKEYCODE_MOVE_END: return VK_END;
+    case AKEYCODE_INSERT: return VK_INSERT;
+    case AKEYCODE_COMMA: return VK_OEM_COMMA;
+    case AKEYCODE_PERIOD: return VK_OEM_PERIOD;
+    case AKEYCODE_MINUS: return VK_OEM_MINUS;
+    case AKEYCODE_EQUALS: return VK_OEM_PLUS;
+    case AKEYCODE_SEMICOLON: return VK_OEM_1;
+    case AKEYCODE_SLASH: return VK_OEM_2;
+    case AKEYCODE_GRAVE: return VK_OEM_3;
+    case AKEYCODE_LEFT_BRACKET: return VK_OEM_4;
+    case AKEYCODE_RIGHT_BRACKET: return VK_OEM_6;
+    case AKEYCODE_APOSTROPHE: return VK_OEM_7;
+    default: return 0;
+    }
+}
+
 int32_t on_input(android_app*, AInputEvent* e) {
     if (!g_started) return 0;
     if (AInputEvent_getType(e) == AINPUT_EVENT_TYPE_KEY) {
-        if (AKeyEvent_getKeyCode(e) != AKEYCODE_BACK) return 0;  // volume keys etc. keep working
-        // Back (button or edge swipe) works like Escape on PC: closes menus or opens the pause menu.
-        int32_t action = AKeyEvent_getAction(e);
-        if (action == AKEY_EVENT_ACTION_DOWN && AKeyEvent_getRepeatCount(e) == 0) game::press_action("Back", true);
-        else if (action == AKEY_EVENT_ACTION_UP) game::press_action("Back", false);
+        int32_t key = AKeyEvent_getKeyCode(e), action = AKeyEvent_getAction(e);
+        if (key == AKEYCODE_BACK) {
+            // Back (button or edge swipe) backs out of a menu, or else opens the pause menu.
+            if (action == AKEY_EVENT_ACTION_DOWN && AKeyEvent_getRepeatCount(e) == 0) game::press_action("@StartButton", true);
+            else if (action == AKEY_EVENT_ACTION_UP) game::press_action("@StartButton", false);
+            return 1;
+        }
+        int vk = vk_for(key);
+        if (!vk || !uikit::g_key_handler) return 0;  // volume keys etc. keep working
+        if (action == AKEY_EVENT_ACTION_DOWN && AKeyEvent_getRepeatCount(e) == 0)
+            ns::post_to_main([vk] { uikit::g_key_handler(vk, true); });
+        else if (action == AKEY_EVENT_ACTION_UP)
+            ns::post_to_main([vk] { uikit::g_key_handler(vk, false); });
         return 1;
     }
     if (AInputEvent_getType(e) != AINPUT_EVENT_TYPE_MOTION) return 0;
+    if ((AInputEvent_getSource(e) & AINPUT_SOURCE_TOUCHSCREEN) != AINPUT_SOURCE_TOUCHSCREEN) return 0;
     int32_t action = AMotionEvent_getAction(e);
     size_t index = (action & AMOTION_EVENT_ACTION_POINTER_INDEX_MASK) >> AMOTION_EVENT_ACTION_POINTER_INDEX_SHIFT;
     auto finger = [e](size_t i) { return kFirstFinger + AMotionEvent_getPointerId(e, i); };
@@ -151,6 +204,13 @@ void on_cmd(android_app* app, int32_t cmd) {
         if (!app->window) break;
         uikit::set_native_window(app->window);
         if (!g_started) {
+            // Fill the screen: keep iOS's 414-point height and widen the emulated screen to the
+            // phone's shape (the game lays itself out for any width, as on iPads and iPhones).
+            int w = ANativeWindow_getWidth(app->window), h = ANativeWindow_getHeight(app->window);
+            if (w > 0 && h > 0)
+                uikit::g_device.width_pt = std::round(uikit::g_device.height_pt * std::max(w, h) / std::min(w, h));
+            __android_log_print(ANDROID_LOG_INFO, "ib3", "window %dx%d: screen %.0fx%.0f points", w, h,
+                                uikit::g_device.width_pt, uikit::g_device.height_pt);
             g_started = true;
             start_game();
         } else {
@@ -175,6 +235,10 @@ void on_cmd(android_app* app, int32_t cmd) {
 
 extern "C" JNIEXPORT void ANativeActivity_onCreate(ANativeActivity* activity, void* saved_state, size_t saved_state_size) {
     glue_ANativeActivity_onCreate(activity, saved_state, saved_state_size);
+    android::set_activity(activity);
+    jclass cls = activity->env->GetObjectClass(activity->clazz);
+    android::register_dialog_natives(activity->env, cls);
+    activity->env->DeleteLocalRef(cls);
     g_glue_focus_changed = activity->callbacks->onWindowFocusChanged;
     activity->callbacks->onWindowFocusChanged = on_focus_changed;
     hide_system_bars(activity);

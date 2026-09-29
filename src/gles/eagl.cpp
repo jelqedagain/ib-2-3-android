@@ -55,6 +55,7 @@ struct Egl {
     EGLint(__stdcall* GetError)() = nullptr;
     EGLBoolean(__stdcall* BindAPI)(u32) = nullptr;
     EGLBoolean(__stdcall* DestroySurface)(EGLDisplay, EGLSurface) = nullptr;
+    EGLBoolean(__stdcall* DestroyContext)(EGLDisplay, EGLContext) = nullptr;
     EGLContext(__stdcall* GetCurrentContext)() = nullptr;
     EGLSurface(__stdcall* GetCurrentSurface)(EGLint) = nullptr;
     EGLDisplay dpy = nullptr;
@@ -139,6 +140,7 @@ void init(HWND hwnd) {
     EGLFN(GetDisplay, "eglGetDisplay");
     EGLFN(CreatePbufferSurface, "eglCreatePbufferSurface");
     EGLFN(DestroySurface, "eglDestroySurface");
+    EGLFN(DestroyContext, "eglDestroyContext");
 #undef EGLFN
     g.GetPlatformDisplayEXT = reinterpret_cast<decltype(g.GetPlatformDisplayEXT)>(g.GetProcAddress("eglGetPlatformDisplayEXT"));
     load_gl_functions();
@@ -178,6 +180,27 @@ void set_window(HWND hwnd) {
     if (hwnd && !g.surf) LOG_ERROR("eglCreateWindowSurface failed (0x%x)", g.GetError());
     g.surface_generation++;
     LOG_INFO("window surface %s", hwnd ? "attached" : "detached");
+}
+
+void present_until_first_frame(const std::function<void(int w, int h)>& draw) {
+    const EGLint attrs[] = {EGL_CONTEXT_MAJOR_VERSION, 3, EGL_CONTEXT_MINOR_VERSION, 0, EGL_NONE};
+    EGLContext ctx = g.CreateContext(g.dpy, g.cfg, nullptr, attrs);  // not shared with the game's
+    if (!ctx) return;
+    while (!g_presented) {
+        {
+            std::lock_guard lock(g.surface_mutex);  // takes turns with presentRenderbuffer
+            if (g_presented) break;
+            if (g.surf && g.MakeCurrent(g.dpy, g.surf, g.surf, ctx)) {
+                int w, h;
+                surface_size(w, h);
+                draw(w, h);
+                g.SwapBuffers(g.dpy, g.surf);
+                g.MakeCurrent(g.dpy, nullptr, nullptr, nullptr);  // leave the surface free for the game
+            }
+        }
+        Sleep(16);
+    }
+    g.DestroyContext(g.dpy, ctx);
 }
 
 void install_eagl() {
