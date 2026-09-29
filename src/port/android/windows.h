@@ -140,6 +140,8 @@ struct MEMORY_BASIC_INFORMATION {
     SIZE_T RegionSize;
     DWORD State, Protect, Type;
 };
+// The device's memory page size: 4 KB on most phones, 16 KB on some newer ones.
+size_t host_page_size();
 void* VirtualAlloc(void* addr, SIZE_T size, DWORD type, DWORD protect);
 BOOL VirtualFree(void* addr, SIZE_T size, DWORD type);
 BOOL VirtualProtect(void* addr, SIZE_T size, DWORD protect, DWORD* old);

@@ -9,6 +9,7 @@
 #include <sys/uio.h>
 #include <ucontext.h>
 #include <unistd.h>
+#include <windows.h>  // port/android: host_page_size
 #include <cstddef>
 #include <cstring>
 #include <mutex>
@@ -152,7 +153,8 @@ void init(const macho::Image* image) {
     if (image)
         for (auto& s : image->sections)
             if (s.segname == "__TEXT") {
-                u64 lo = s.addr & ~0xfffull, hi = (s.addr + s.size + 0xfff) & ~0xfffull;
+                const u64 mask = host_page_size() - 1;  // 4 or 16 KB
+                u64 lo = s.addr & ~mask, hi = (s.addr + s.size + mask) & ~mask;
                 if (mprotect(gptr<void>(lo), hi - lo, PROT_READ | PROT_WRITE | PROT_EXEC) != 0)
                     fatal("cannot make the game's code executable");
                 __builtin___clear_cache(gptr<char>(lo), gptr<char>(hi));

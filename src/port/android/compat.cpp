@@ -324,8 +324,14 @@ BOOL CloseHandle(HANDLE h) {
 
 // --- memory ---------------------------------------------------------------------------------------
 
+size_t host_page_size() {
+    static const size_t size = (size_t)sysconf(_SC_PAGESIZE);
+    return size;
+}
+
 void* VirtualAlloc(void* addr, SIZE_T size, DWORD type, DWORD protect) {
-    size = (size + 4095) & ~size_t(4095);
+    const size_t page = host_page_size();
+    size = (size + page - 1) & ~(page - 1);
     if (!(type & MEM_RESERVE)) {  // commit inside an earlier reservation
         if (mprotect(addr, size, to_prot(protect)) != 0) return nullptr;
         return addr;
@@ -352,15 +358,17 @@ BOOL VirtualFree(void* addr, SIZE_T size, DWORD type) {
         g_reservations.erase(it);
         return TRUE;
     }
-    size = (size + 4095) & ~size_t(4095);
+    const size_t page = host_page_size();
+    size = (size + page - 1) & ~(page - 1);
     madvise(addr, size, MADV_DONTNEED);
     return mprotect(addr, size, PROT_NONE) == 0;
 }
 
 BOOL VirtualProtect(void* addr, SIZE_T size, DWORD protect, DWORD* old) {
     if (old) *old = PAGE_READWRITE;
-    uintptr_t lo = reinterpret_cast<uintptr_t>(addr) & ~uintptr_t(4095);
-    uintptr_t hi = (reinterpret_cast<uintptr_t>(addr) + size + 4095) & ~uintptr_t(4095);
+    const uintptr_t mask = host_page_size() - 1;
+    uintptr_t lo = reinterpret_cast<uintptr_t>(addr) & ~mask;
+    uintptr_t hi = (reinterpret_cast<uintptr_t>(addr) + size + mask) & ~mask;
     return mprotect(reinterpret_cast<void*>(lo), hi - lo, to_prot(protect)) == 0;
 }
 

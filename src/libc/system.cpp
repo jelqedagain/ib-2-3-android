@@ -116,7 +116,7 @@ u64 host_resident_memory() {
         if (fscanf(f, "%llu %llu", (unsigned long long*)&pages, (unsigned long long*)&resident) != 2) resident = 0;
         std::fclose(f);
     }
-    return resident * 4096;
+    return resident * host_page_size();
 }
 #endif
 std::mutex g_mmap_mutex;
@@ -354,18 +354,21 @@ void install_system() {
             return p ? gaddr(p) : kMapFailed;
         }
 #ifndef _WIN32
-        // A private (copy-on-write) file view.
-        void* view = ::mmap(nullptr, len, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, off);
+        // A private (copy-on-write) file view. The offset must be a multiple of the device's
+        // page size, which can be larger than the game's (16 KB pages on some phones).
+        u64 aligned = off & ~(u64)(host_page_size() - 1), delta = off - aligned;
+        void* view = ::mmap(nullptr, len + delta, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, aligned);
         if (view == MAP_FAILED) {
             LOG_WARN("mmap: failed (errno %d)", errno);
             vfs::set_errno(errno == EBADF ? 9 : D_ENOMEM);
             return kMapFailed;
         }
+        u64 result = gaddr(view) + delta;
         std::lock_guard lock(g_mmap_mutex);
-        g_mappings[gaddr(view)] = {view, len};
+        g_mappings[result] = {view, len + delta};
         (void)addr;
         (void)prot;
-        return gaddr(view);
+        return result;
 #else
         HANDLE fh = (HANDLE)_get_osfhandle(fd);
         if (fh == INVALID_HANDLE_VALUE) {
