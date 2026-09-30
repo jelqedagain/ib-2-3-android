@@ -4,7 +4,8 @@ Two Android apps, IB2 and IB3, are built from one codebase. Each has its own ver
 
 # IB2
 
-## Next (not released yet)
+## 1.4 beta (2026-09-30)
+- Beta: back up your saves (launcher, Back up saves) before trying it.
 - New launcher look, and a Settings page (writes settings.ini): frame rate limit 30 / 60 / 120 (120 is experimental), an FPS counter drawn in the corner, sharper shadows, music and effects volume, controller on/off and speeds.
 - Edit save page: change gold, level, XP, stat points, the four stats and bloodline before pressing Play. The game puts the numbers into the save as it loads it and saves them itself; the page shows the current values and keeps every number within what the game can take (level up to 50, XP within the level). A higher level also gives the 2 stat points per level a level-up gives. The game's checks that undo edited numbers are skipped for saves that were edited.
 - Settings: Screen can be full screen or 16:9 with black bars (for players who find the full-screen HUD stretched).
@@ -40,7 +41,8 @@ Two Android apps, IB2 and IB3, are built from one codebase. Each has its own ver
 
 # IB3
 
-## Next (not released yet)
+## 1.4 beta (2026-09-30)
+- Beta: back up your saves (launcher, Back up saves) before trying it.
 - New launcher look, and a Settings page (writes settings.ini): frame rate limit 30 / 60 / 120 (120 is experimental), an FPS counter drawn in the corner, sharper shadows, music and effects volume, controller on/off and speeds.
 - Edit save page: change gold, level, XP, stat points, the four stats and awakening before pressing Play. The game puts the numbers into the save as it loads it and saves them itself; the page shows the current values and keeps every number within what the game can take (level up to 50, XP within the level). A higher level also gives the 2 stat points per level a level-up gives. The game's checks that undo edited numbers are skipped for saves that were edited.
 - Edit save also sets chips and gem bag upgrades (up to 3), and can give every item or all perks (the developers' all-perks cheat also makes the character level 50 with every stat at 100).
