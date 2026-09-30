@@ -13,6 +13,34 @@ Phones and iPhones both use ARM64, so on Android the app's code runs directly on
 - **Audio and video:** AAudio and MediaCodec.
 - **Input:** touch, keyboard and game controllers.
 
+## Releases
+
+Each app has its own releases. Open a list to see every version; the change list for each is in [CHANGELOG.md](CHANGELOG.md).
+
+<details>
+<summary><b>Infinity Blade II versions</b></summary>
+
+- [1.3.2](https://github.com/jelqedagain/ib-2-3-android/releases/tag/ib2-v1.3.2)
+- [1.3.0](https://github.com/jelqedagain/ib-2-3-android/releases/tag/ib2-v1.3.0)
+- [1.2.4](https://github.com/jelqedagain/ib-2-3-android/releases/tag/ib2-v1.2.4)
+- [1.2.3](https://github.com/jelqedagain/ib-2-3-android/releases/tag/ib2-v1.2.3)
+- [1.2.2](https://github.com/jelqedagain/ib-2-3-android/releases/tag/ib2-v1.2.2)
+- [1.2.1](https://github.com/jelqedagain/ib-2-3-android/releases/tag/ib2-v1.2.1)
+
+</details>
+
+<details>
+<summary><b>Infinity Blade III versions</b></summary>
+
+- [1.3.3](https://github.com/jelqedagain/ib-2-3-android/releases/tag/ib3-v1.3.3)
+- [1.3.1](https://github.com/jelqedagain/ib-2-3-android/releases/tag/ib3-v1.3.1)
+- [1.2.4](https://github.com/jelqedagain/ib-2-3-android/releases/tag/ib3-v1.2.4)
+- [1.2.3](https://github.com/jelqedagain/ib-2-3-android/releases/tag/ib3-v1.2.3)
+- [1.2.1](https://github.com/jelqedagain/ib-2-3-android/releases/tag/ib3-v1.2.1)
+- [1.2.0](https://github.com/jelqedagain/ib-2-3-android/releases/tag/ib3-v1.2.0)
+
+</details>
+
 ## Building
 
 The scripts run in Git Bash on Windows and need the Android NDK, SDK build-tools, CMake, Ninja, a JDK and Python 3 in `tools/`.
