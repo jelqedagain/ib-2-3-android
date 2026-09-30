@@ -253,11 +253,8 @@ void install_eagl() {
     class_method(C, "currentContext", [](objc::Class, SEL) { return t_current; });
     class_method(C, "setCurrentContext:", [](objc::Class, SEL, id ctx) {
         DWORD me = GetCurrentThreadId();
-        LOG_DEBUG("setCurrentContext:0x%llx (was 0x%llx, owner %lu) RHIinit=%u Current=0x%llx Active[0]=0x%llx num=%d",
-                 (unsigned long long)ctx, (unsigned long long)t_current,
-                 ctx ? (unsigned long)objc::ensure<ContextData>(ctx).owner.load() : 0ul, *gptr<u32>(0x100f3f7a8),
-                 (unsigned long long)*gptr<u64>(0x100f63690),
-                 (unsigned long long)(*gptr<u64>(0x100f63680) ? *gptr<u64>(*gptr<u64>(0x100f63680)) : 0), *gptr<s32>(0x100f63688));
+        LOG_DEBUG("setCurrentContext:0x%llx (was 0x%llx, owner %lu)", (unsigned long long)ctx, (unsigned long long)t_current,
+                  ctx ? (unsigned long)objc::ensure<ContextData>(ctx).owner.load() : 0ul);
         if (t_current && t_current != ctx) {
             auto& old = objc::ensure<ContextData>(t_current);
             if (old.owner.load() == me) old.owner.store(0);
