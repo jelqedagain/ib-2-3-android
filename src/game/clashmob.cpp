@@ -488,6 +488,45 @@ void clashmob_tick(cpu::Thread& t) {
             alignas(16) u8 params[64] = {};
             LOG_INFO("clashmob: opening the ClashMob menu (%d)", ue::call_event(t, pc, "OpenClashMobMenu", params));
         }
+        // debug.ibport.clashmob dump<N>: logs each ClashMob's state, and the player's prize wheels (for checking
+        // that events show and rewards arrive)
+        u64 manager = 0;
+        GuestAddr engine = ue::engine();
+        ue::TArray<u64> mobs{};
+        if (!first && std::string(v).rfind("dump", 0) == 0 && engine && ue::read_property(t, engine, "ClashMobs", manager) &&
+            manager && ue::read_property(t, manager, "ClashMobData", mobs)) {
+            for (int i = 0; i < mobs.num; i++) {
+                GuestAddr m = mobs.at(i);
+                u8 mode = 0;
+                u64 quest = 0, pin = 0;
+                ue::read_property(t, m, "PlayMode", mode);
+                ue::read_property(t, m, "Quest", quest);
+                int left_off = ue::struct_member_offset(t, m, "Updated", "PlaysLeft");
+                int state_off = ue::struct_member_offset(t, m, "Updated", "CurState");
+                int earned_off = ue::struct_member_offset(t, m, "Updated", "RewardsEarned");
+                u64 tag = 0;
+                if (quest) {
+                    ue::read_property(t, quest, "MapPin", pin);
+                    ue::read_property(t, quest, "MapPinTag", tag);
+                }
+                int eid = ue::property_offset(t, m, "EventID");
+                LOG_INFO("clashmob: mob %s mode %d state %d plays left %d rewards %d, quest %s pin %s (%s)",
+                         eid >= 0 ? ue::read_fstring(m + eid).c_str() : "?", mode,
+                         state_off >= 0 ? *gptr<u8>(m + state_off) : -1, left_off >= 0 ? *gptr<s32>(m + left_off) : -99,
+                         earned_off >= 0 ? *gptr<s32>(m + earned_off) : -1, ue::object_name(t, quest).c_str(),
+                         ue::name_string(t, tag).c_str(), pin ? "attached" : "not attached");
+            }
+        }
+        // (and the player's prize wheels)
+        u64 pawn = 0;
+        if (!first && pc && std::string(v).rfind("dump", 0) == 0 && ue::read_property(t, pc, "Pawn", pawn) && pawn) {
+            int off = ue::property_offset(t, pawn, "NumConsumable");
+            if (off >= 0)
+                LOG_INFO("clashmob: supplies: gem wheels S/M/L %d/%d/%d, prize wheels S/M/L %d/%d/%d, ClashMob prize wheels %d",
+                         gptr<s32>(pawn + off)[25], gptr<s32>(pawn + off)[26], gptr<s32>(pawn + off)[27],
+                         gptr<s32>(pawn + off)[22], gptr<s32>(pawn + off)[23], gptr<s32>(pawn + off)[24],
+                         gptr<s32>(pawn + off)[28]);
+        }
     }
 #endif
     give_gifts(t);
