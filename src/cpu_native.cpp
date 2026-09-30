@@ -319,8 +319,8 @@ void dump_all_threads() {
     LOG_INFO("==== %zu guest threads ====", g_threads.size());
     for (Thread* t : g_threads) {
         const char* hle = t->in_hle.load();
-        LOG_INFO("thread %u (guest id %u): %s%s", t->host_tid, t->id(), hle ? "inside " : "running game code",
-                 hle ? hle : "");
+        LOG_INFO("thread %u (guest id %u): %s%s\n%s", t->host_tid, t->id(), hle ? "inside " : "running game code",
+                 hle ? hle : "", hle ? t->backtrace().c_str() : "");
     }
 }
 

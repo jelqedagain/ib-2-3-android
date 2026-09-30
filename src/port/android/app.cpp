@@ -20,6 +20,7 @@
 #include <jni.h>
 #include <pthread.h>
 #include <sys/stat.h>
+#include <sys/system_properties.h>
 #include <unistd.h>
 #include <algorithm>
 #include <cctype>
@@ -43,9 +44,21 @@ bool g_started = false;
 constexpr int kFirstFinger = 100;  // finger ids for real touches (0-99 are the runtime's own)
 
 void* game_thread(void*) {
-    static char arg0[] = "ib3";
-    char* argv[] = {arg0, nullptr};
-    int rc = ib3_main(1, argv);
+    static char arg0[] = "ib3", verbose[] = "-v", script_trace[] = "-scripttrace", dump[] = "-dump";
+    static char dump_secs[PROP_VALUE_MAX] = "";
+    char* argv[] = {arg0, nullptr, nullptr, nullptr, nullptr, nullptr};
+    int argc = 1;
+    // For testing: adb shell setprop debug.ibport.verbose 1 logs debug messages too.
+    char prop[PROP_VALUE_MAX] = "";
+    if (__system_property_get("debug.ibport.verbose", prop) > 0 && prop[0] == '1') argv[argc++] = verbose;
+    // adb shell setprop debug.ibport.scripttrace 1 logs the game's UnrealScript activity.
+    if (__system_property_get("debug.ibport.scripttrace", prop) > 0 && prop[0] == '1') argv[argc++] = script_trace;
+    // adb shell setprop debug.ibport.dump N logs where every game thread is N seconds after the start.
+    if (__system_property_get("debug.ibport.dump", dump_secs) > 0 && dump_secs[0] > '0' && dump_secs[0] <= '9') {
+        argv[argc++] = dump;
+        argv[argc++] = dump_secs;
+    }
+    int rc = ib3_main(argc, argv);
     __android_log_print(ANDROID_LOG_INFO, "ib3", "game exited (%d)", rc);
     _exit(rc);
 }

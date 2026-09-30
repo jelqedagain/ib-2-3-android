@@ -34,6 +34,10 @@ void install_startup_movie_fix();
 // Infinity Blade II: turns its store-only memory barriers into full ones (before guest code runs).
 void strengthen_memory_barriers(const macho::Image& img);
 
+// Diagnostics (-scripttrace): logs UnrealScript calls, state changes and map loads.
+void install_script_trace(const macho::Image& img);
+void install_script_trace_objc();  // after class realization
+
 // Test automation: runs a script of timed key presses, touches and screenshots (-script file).
 void run_script(const std::string& path);
 

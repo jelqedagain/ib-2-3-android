@@ -109,7 +109,7 @@ int main(int argc, char** argv) {
 #endif
     std::string app = "game/Payload/SwordGame.app";
     std::string home = "userdata";
-    bool keep_console = false, play = false, audit = false;
+    bool keep_console = false, play = false, audit = false, script_trace = false;
     std::string script;
     for (int i = 1; i < argc; i++) {
         std::string a = argv[i];
@@ -119,6 +119,7 @@ int main(int argc, char** argv) {
         else if (a == "-console") keep_console = true;
         else if (a == "-play") play = true;
         else if (a == "-audit-selectors") audit = true;
+        else if (a == "-scripttrace") script_trace = true;
         else if (a == "-script" && i + 1 < argc) script = argv[++i];
         else if (a == "-test") {
             uikit::g_test_mode = true;
@@ -211,6 +212,7 @@ int main(int argc, char** argv) {
     hle::bind_image(img);
     game::strengthen_memory_barriers(img);
     game::install_keyboard(img);
+    if (script_trace) game::install_script_trace(img);
     game::start_controller();
     game::install_config(img);
     {
@@ -219,6 +221,7 @@ int main(int argc, char** argv) {
     }
     objc::realize_image_classes(img);
     game::install_startup_movie_fix();
+    if (script_trace) game::install_script_trace_objc();
     if (audit) {
         objc::audit_selectors(img);
         return 0;
