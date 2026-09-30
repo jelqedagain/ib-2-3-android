@@ -232,6 +232,35 @@ int main(int argc, char** argv) {
     for (const char* sdk : {"Flurry", "Apsalar", "FBAppEvents", "FBInsights", "FlurryPLCrashReporter"})
         objc::stub_out_class_methods(sdk);
 
+#ifdef __ANDROID__
+    // A game that stops drawing while it is on screen is stuck (or loading very slowly): log where
+    // every game thread is, so Share logs carries it. Players cannot run adb for -dump.
+    std::thread([] {
+        logging::set_thread_name("watchdog");
+        constexpr u64 kStuckMs = 20000, kFirstFrameMs = 60000;
+        u64 last_frames = 0, since = GetTickCount64();
+        bool reported = false;
+        for (;;) {
+            Sleep(1000);
+            u64 now = GetTickCount64(), frames = uikit::frames_presented();
+            if (frames != last_frames || !uikit::app_active()) {
+                if (reported && frames != last_frames)
+                    LOG_INFO("watchdog: the game draws again after %.0f s", (now - since) / 1000.0);
+                last_frames = frames;
+                since = now;
+                reported = false;
+                continue;
+            }
+            if (!reported && now - since >= (frames ? kStuckMs : kFirstFrameMs)) {
+                reported = true;
+                LOG_WARN("watchdog: no new frame for %.0f s while on screen (%llu frames so far); where the game is:",
+                         (now - since) / 1000.0, (unsigned long long)frames);
+                cpu::dump_all_threads();
+            }
+        }
+    }).detach();
+#endif
+
     if (!script.empty()) game::run_script(script);
 
     objc::run_load_methods();
