@@ -22,6 +22,18 @@ public class GameActivity extends NativeActivity {
     @Override
     protected void onCreate(android.os.Bundle state) {
         started = true;
+        // A Java exception ends the app without a word in the game's log: add the stack trace to it.
+        Thread.UncaughtExceptionHandler previous = Thread.getDefaultUncaughtExceptionHandler();
+        java.io.File dir = getExternalFilesDir(null);
+        java.io.File log = new java.io.File(dir != null ? dir : getFilesDir(), "ib3rt.log");
+        Thread.setDefaultUncaughtExceptionHandler((thread, ex) -> {
+            try (java.io.PrintWriter w = new java.io.PrintWriter(new java.io.FileOutputStream(log, true))) {
+                w.println("[ERROR] JAVA CRASH on thread \"" + thread.getName() + "\":");
+                ex.printStackTrace(w);
+            } catch (Exception ignored) {
+            }
+            if (previous != null) previous.uncaughtException(thread, ex);
+        });
         super.onCreate(state);
     }
 

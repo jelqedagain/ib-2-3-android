@@ -639,9 +639,83 @@ public class LauncherActivity extends Activity {
         if (Build.VERSION.SDK_INT >= 31) head.append(" (").append(Build.SOC_MANUFACTURER).append(' ').append(Build.SOC_MODEL).append(')');
         head.append("\nAndroid ").append(Build.VERSION.RELEASE).append(" (API ").append(Build.VERSION.SDK_INT).append(")\n");
         out.write(head.toString().getBytes(StandardCharsets.UTF_8));
+        appendExitReasons(out);
         boolean any = appendLog(out, "Latest run", new File(filesDir(), "ib3rt.log"), limit);
         any |= appendLog(out, "The run before", new File(filesDir(), "ib3rt-previous.log"), limit);
         if (!any) throw new IOException("There are no logs yet: play the game first.");
+    }
+
+    // Android's own record of how the app's last processes ended. When the game dies without a word in
+    // its log (killed for memory, an abort in native code, a Java exception), this says which, and for
+    // a native crash includes the readable parts of Android's crash report (the tombstone).
+    private void appendExitReasons(OutputStream out) throws IOException {
+        StringBuilder s = new StringBuilder("\n===== How the app closed recently (Android's record) =====\n");
+        try {
+            android.app.ActivityManager am = getSystemService(android.app.ActivityManager.class);
+            List<android.app.ApplicationExitInfo> exits = am.getHistoricalProcessExitReasons(null, 0, 5);
+            if (exits.isEmpty()) s.append("(none)\n");
+            SimpleDateFormat time = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US);
+            boolean traced = false;
+            for (android.app.ApplicationExitInfo e : exits) {
+                s.append(time.format(new Date(e.getTimestamp()))).append("  ").append(exitReason(e.getReason()))
+                        .append(", status ").append(e.getStatus())
+                        .append(", memory ").append(e.getPss() / 1024).append(" MB (PSS) / ").append(e.getRss() / 1024).append(" MB (RSS)");
+                if (e.getDescription() != null) s.append("\n    ").append(e.getDescription());
+                s.append('\n');
+                int reason = e.getReason();
+                boolean crash = reason == android.app.ApplicationExitInfo.REASON_CRASH_NATIVE
+                        || reason == android.app.ApplicationExitInfo.REASON_ANR;
+                if (crash && !traced) {  // the most recent one is enough, and they are long
+                    InputStream trace = e.getTraceInputStream();
+                    if (trace != null) {
+                        traced = true;
+                        String text = readAll(trace);
+                        // Since Android 12 a native crash report is a protobuf: keep its readable text.
+                        if (reason == android.app.ApplicationExitInfo.REASON_CRASH_NATIVE) text = printableRuns(text);
+                        if (text.length() > 16000) text = text.substring(0, 16000) + "\n[...]";
+                        s.append(text).append('\n');
+                    }
+                }
+            }
+        } catch (Exception ex) {
+            s.append("(not available: ").append(ex).append(")\n");
+        }
+        out.write(s.toString().getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static String exitReason(int reason) {
+        switch (reason) {
+            case android.app.ApplicationExitInfo.REASON_EXIT_SELF: return "exited by itself";
+            case android.app.ApplicationExitInfo.REASON_SIGNALED: return "killed by a signal";
+            case android.app.ApplicationExitInfo.REASON_LOW_MEMORY: return "KILLED FOR LOW MEMORY";
+            case android.app.ApplicationExitInfo.REASON_CRASH: return "JAVA CRASH";
+            case android.app.ApplicationExitInfo.REASON_CRASH_NATIVE: return "NATIVE CRASH";
+            case android.app.ApplicationExitInfo.REASON_ANR: return "NOT RESPONDING (ANR)";
+            case android.app.ApplicationExitInfo.REASON_INITIALIZATION_FAILURE: return "failed to start";
+            case android.app.ApplicationExitInfo.REASON_EXCESSIVE_RESOURCE_USAGE: return "killed for using too many resources";
+            case android.app.ApplicationExitInfo.REASON_USER_REQUESTED: return "closed by the user";
+            case android.app.ApplicationExitInfo.REASON_USER_STOPPED: return "stopped by the user";
+            case android.app.ApplicationExitInfo.REASON_DEPENDENCY_DIED: return "a dependency died";
+            case android.app.ApplicationExitInfo.REASON_FREEZER: return "killed while frozen";
+            case android.app.ApplicationExitInfo.REASON_PACKAGE_UPDATED: return "app updated";
+            case android.app.ApplicationExitInfo.REASON_OTHER: return "other (" + reason + ")";
+            default: return "reason " + reason;
+        }
+    }
+
+    // Runs of 4+ printable characters, one per line (like the "strings" tool).
+    private static String printableRuns(String s) {
+        StringBuilder out = new StringBuilder(), run = new StringBuilder();
+        for (int i = 0; i <= s.length(); i++) {
+            char c = i < s.length() ? s.charAt(i) : 0;
+            if (c >= 0x20 && c < 0x7f) {
+                run.append(c);
+                continue;
+            }
+            if (run.length() >= 4) out.append(run).append('\n');
+            run.setLength(0);
+        }
+        return out.toString();
     }
 
     // Appends a log under a heading; a very long one keeps its start and its end.
