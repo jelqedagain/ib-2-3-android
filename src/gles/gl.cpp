@@ -1,5 +1,6 @@
 // OpenGL ES entry points forwarded to ANGLE (libGLESv2.dll).
 #include "gles/gl.h"
+#include "game/game.h"
 #include "hle.h"
 #include "audio/video.h"
 #include "uikit/labels.h"
@@ -495,7 +496,8 @@ std::string fix_global_initializers(const std::string& src) {
                        code.compare(0, 8, "uniform ") != 0 && code.compare(0, 10, "attribute ") != 0 &&
                        code.compare(0, 8, "varying ") != 0 && code.compare(0, 10, "precision ") != 0;
         // A constant initializer is legal as it is (Infinity Blade III's FXAA pass has several): leave those alone.
-        if (movable && only_literals(trim(code.substr(eq + 1, code.size() - eq - 2)))) movable = false;
+        // Infinity Blade III only: Infinity Blade II keeps the rewrite it shipped with in 1.3.2.
+        if (movable && !game::is_infinity_blade_2() && only_literals(trim(code.substr(eq + 1, code.size() - eq - 2)))) movable = false;
         std::string decl = movable ? trim(code.substr(0, eq)) : std::string();
         size_t name_at = decl.find_last_of(" \t");
         if (movable && name_at != std::string::npos) {

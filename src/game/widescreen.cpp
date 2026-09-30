@@ -24,14 +24,6 @@ namespace {
 constexpr double kWidestKnown = 1.8;  // the game's own upper limit for its 16:9 layout
 constexpr u8 kFloatConst = 0x1e;      // UnrealScript bytecode: EX_FloatConst
 
-bool is_infinity_blade_2() {
-    std::ifstream f(vfs::host_bundle() + "/Info.plist", std::ios::binary);
-    std::string plist((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
-    static const std::string id = "com.chairentertainment.IB2";
-    size_t at = plist.find(id);
-    return at != std::string::npos && (at + id.size() == plist.size() || !std::isalnum((unsigned char)plist[at + id.size()]));
-}
-
 std::string bytes_of(const void* p, size_t n) { return std::string((const char*)p, n); }
 
 std::string float_const(float v) { return (char)kFloatConst + bytes_of(&v, 4); }
@@ -109,6 +101,17 @@ bool serve_patched(const std::string& bundle_relative, Patch patch) {
 }
 
 }  // namespace
+
+bool is_infinity_blade_2() {
+    static const bool ib2 = [] {
+        std::ifstream f(vfs::host_bundle() + "/Info.plist", std::ios::binary);
+        std::string plist((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+        static const std::string id = "com.chairentertainment.IB2";
+        size_t at = plist.find(id);
+        return at != std::string::npos && (at + id.size() == plist.size() || !std::isalnum((unsigned char)plist[at + id.size()]));
+    }();
+    return ib2;
+}
 
 void install_widescreen() {
     double aspect = uikit::g_device.width_pt / uikit::g_device.height_pt;

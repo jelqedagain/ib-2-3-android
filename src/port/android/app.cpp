@@ -251,6 +251,7 @@ int32_t on_input(android_app*, AInputEvent* e) {
 // Tells Android the rate the game draws at, so a 120 or 144 Hz screen runs at a multiple of it (60 fps
 // on a 144 Hz screen shows uneven frame times: it feels laggy even when the game keeps up).
 void hint_frame_rate(ANativeWindow* window) {
+    if (is_infinity_blade_2()) return;  // Infinity Blade III only
     float fps = settings::get().max_fps >= 60 ? 60.0f : 30.0f;
     using SetFrameRate = int32_t (*)(ANativeWindow*, float, int8_t);  // in libnativewindow, not always linkable
     void* lib = dlopen("libnativewindow.so", RTLD_NOW);

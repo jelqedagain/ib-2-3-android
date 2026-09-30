@@ -35,6 +35,10 @@ void install_widescreen();
 // Keeps the Unreal/ChAIR logo movie from playing twice when loading is slow (after class realization).
 void install_startup_movie_fix();
 
+// True when the running game is Infinity Blade II (its bundle id). Every change that is meant for only one of
+// the two apps checks this, so a fix for one never changes the other (see CLAUDE.md).
+bool is_infinity_blade_2();
+
 // Infinity Blade II: turns its store-only memory barriers into full ones (before guest code runs).
 void strengthen_memory_barriers(const macho::Image& img);
 
