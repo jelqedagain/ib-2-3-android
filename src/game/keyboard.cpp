@@ -29,7 +29,7 @@ namespace game {
 
 namespace {
 
-GuestAddr g_input_key = 0;  // USwordGameViewportClient::InputKey
+GuestAddr g_input_key = 0;  // USwordGameViewportClient::InputKey (IB3), UGameViewportClient::InputKey (IB2)
 GuestAddr g_tick_original = 0;
 GuestAddr g_exec_original = 0;
 bool g_have_reflection = false;
@@ -382,6 +382,8 @@ bool hud_is_fight() { return g_hud_fight; }
 void install_keyboard(const macho::Image& img) {
     GuestAddr tick = img.find("__ZN19UGameViewportClient4TickEf");
     g_input_key = img.find("__ZN24USwordGameViewportClient8InputKeyEP9FViewporti5FName11EInputEventfj");
+    // Infinity Blade II's viewport client does not override InputKey: the engine's own is the one it runs.
+    if (!g_input_key) g_input_key = img.find("__ZN19UGameViewportClient8InputKeyEP9FViewporti5FName11EInputEventfj");
     g_have_reflection = ue::init(img);
     if (!tick || !g_input_key) {
         LOG_WARN("keyboard: engine entry points not found; keyboard controls disabled");

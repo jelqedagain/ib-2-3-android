@@ -118,7 +118,15 @@ void run() {
     logging::set_thread_name("controller");
     const auto& st = settings::get();
     const double cursor_speed = kH * 0.9 * st.cursor_speed / 100;  // points per second at full tilt
+#ifdef __ANDROID__
+    // Handheld sticks are short: a slower camera with the cursor's quadratic response (a gentle push
+    // turns gently). There is no launcher to change it in, unlike on Windows.
+    const double camera_speed = kH * 0.8 * st.camera_speed / 100;
+    constexpr bool kCameraCurve = true;
+#else
     const double camera_speed = kH * 1.2 * st.camera_speed / 100;
+    constexpr bool kCameraCurve = false;
+#endif
     const double swipe_length = kH * 0.52 * st.swipe_size / 100;
     const double scroll_speed = kH * 1.0;
     const CGPoint centre{screen_w() / 2, kH * 0.46};  // where the enemy stands
@@ -268,7 +276,8 @@ void run() {
 
         if (camera_mode && rmag > kCameraStart) {
             if (!camera_finger.down) camera_finger.press(centre);
-            camera_finger.move({camera_finger.pos.x + p.rx * camera_speed * dt, camera_finger.pos.y - p.ry * camera_speed * dt});
+            double k = camera_speed * dt * (kCameraCurve ? rmag : 1.0);
+            camera_finger.move({camera_finger.pos.x + p.rx * k, camera_finger.pos.y - p.ry * k});
             camera_still_since = 0;
         } else if (camera_finger.down) {
             // Hold still a moment before letting go, so the game doesn't fling the view.

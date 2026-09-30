@@ -15,6 +15,7 @@ const char* const kStartName = "Start";
 namespace {
 std::mutex g_mutex;
 State g_state;
+u16 g_pressed = 0;  // buttons pressed since the last read: a tap shorter than the poll still counts
 bool g_trigger_axes = false;  // the pad reports analog triggers (so its L2/R2 keys are ignored)
 
 u16 button_for(int32_t key) {
@@ -49,6 +50,8 @@ bool init() { return true; }
 void read(State& s) {
     std::lock_guard lock(g_mutex);
     s = g_state;
+    s.buttons |= g_pressed;
+    g_pressed = 0;
 }
 
 bool game_in_foreground() { return uikit::app_active(); }
@@ -74,6 +77,7 @@ bool pad_event(const AInputEvent* e) {
             if (!g_trigger_axes) (key == AKEYCODE_BUTTON_L2 ? s.lt : s.rt) = down ? 1.0f : 0.0f;
         } else if (u16 b = button_for(key)) {
             s.buttons = down ? (s.buttons | b) : (s.buttons & ~b);
+            if (down) g_pressed |= b;
         } else if (key != AKEYCODE_BACK) {
             return false;  // e.g. volume keys
         }

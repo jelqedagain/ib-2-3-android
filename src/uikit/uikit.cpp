@@ -264,6 +264,7 @@ void touch_up(int finger, CGPoint p) { deliver_touch(finger, 2, p); }
 bool touch_active(int finger) { return g_touches.count(finger) != 0; }
 
 std::atomic<bool> g_app_active{true};
+bool app_active() { return g_app_active; }
 
 void app_set_active(bool active) {
     if (g_app_active.exchange(active) == active) return;

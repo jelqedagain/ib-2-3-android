@@ -36,7 +36,7 @@ target_compile_definitions(ib3_thirdparty PRIVATE SQLITE_THREADSAFE=1 SQLITE_OMI
 if (ANDROID)
     # --- Android (ARM64): the game's code runs natively; see src/cpu_native.* and src/port/android.
     file(GLOB_RECURSE IB3_ANDROID_SOURCES CONFIGURE_DEPENDS src/*.cpp)
-    list(FILTER IB3_ANDROID_SOURCES EXCLUDE REGEX "src/(cpu\.cpp|libc/crypto\.cpp|uikit/boot\.cpp|uikit/window_win32\.cpp|game/controller\.cpp|audio/video_mf\.cpp)$")
+    list(FILTER IB3_ANDROID_SOURCES EXCLUDE REGEX "src/(cpu\.cpp|libc/crypto\.cpp|uikit/boot\.cpp|uikit/window_win32\.cpp|game/pad_xinput\.cpp|audio/video_mf\.cpp)$")
     list(FILTER IB3_ANDROID_SOURCES EXCLUDE REGEX "src/(launcher|win)/|src/main\.cpp$|src/port/android/app\.cpp$")
     set_target_properties(ib3_thirdparty PROPERTIES POSITION_INDEPENDENT_CODE ON)
     add_library(ib3core OBJECT ${IB3_ANDROID_SOURCES} src/cpu_native.S)

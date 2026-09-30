@@ -36,6 +36,7 @@ void* main_window();          // HWND / ANativeWindow* (nullptr: render off scre
 void show_fps(unsigned fps);  // any thread (settings: ShowFPS)
 void app_will_terminate();    // tells the app delegate (uikit.cpp)
 void app_set_active(bool active);  // main thread: background / foreground, like iOS
+bool app_active();                 // whether the app is in the foreground (any thread)
 // Boot screen (launch image / startup movie) shown until the game's first frame (boot.cpp).
 void create_boot_window(void* parent_hwnd, const std::wstring& launch_image);
 void resize_boot_window(int w, int h);

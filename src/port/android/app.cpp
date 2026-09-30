@@ -203,6 +203,7 @@ int vk_for(int32_t key) {
 
 int32_t on_input(android_app*, AInputEvent* e) {
     if (!g_started) return 0;
+    if (android::pad_event(e)) return 1;  // controllers (handheld buttons, Bluetooth and USB pads)
     if (AInputEvent_getType(e) == AINPUT_EVENT_TYPE_KEY) {
         int32_t key = AKeyEvent_getKeyCode(e), action = AKeyEvent_getAction(e);
         if (key == AKEYCODE_BACK) {
