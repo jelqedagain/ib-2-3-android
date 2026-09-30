@@ -73,6 +73,10 @@ void set_cwd(const std::string& p) {
     g_cwd = p;
 }
 
+std::string g_strip_prefix;
+
+void strip_home_file_prefix(const std::string& prefix) { g_strip_prefix = prefix; }
+
 std::string to_host(const char* guest_path) {
     if (!guest_path) return {};
     std::string p = guest_path;
@@ -97,7 +101,14 @@ std::string to_host(const char* guest_path) {
         }
         return g_host_bundle + rel;
     }
-    if (starts_with(p, kHomePath)) return g_host_home + p.substr(strlen(kHomePath));
+    if (starts_with(p, kHomePath)) {
+        std::string rel = p.substr(strlen(kHomePath));
+        if (!g_strip_prefix.empty()) {
+            size_t name = rel.rfind('/') + 1;
+            if (rel.compare(name, g_strip_prefix.size(), g_strip_prefix) == 0) rel.erase(name, g_strip_prefix.size());
+        }
+        return g_host_home + rel;
+    }
     return {};
 }
 

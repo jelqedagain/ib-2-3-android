@@ -5,6 +5,7 @@
 #include "libc/pthread.h"
 #include "objc/internal.h"
 #include <condition_variable>
+#include <memory>
 #include <mutex>
 #include <windows.h>
 
@@ -34,9 +35,56 @@ id offline_error() {
 
 struct RequestData : objc::HostData {
     id url = 0;
+    std::string method = "GET";
+    std::vector<std::pair<std::string, std::string>> headers;
+    std::vector<u8> body;
 };
 
+struct ResponseData : objc::HostData {
+    id url = 0;
+    int status = 200;
+    std::string content_type;
+    u64 length = 0;
+};
+
+std::function<bool(const HttpRequest&, HttpResponse&)> g_local_server;
+
+void set_header(RequestData& d, const std::string& name, const std::string& value) {
+    for (auto& [k, v] : d.headers)
+        if (_stricmp(k.c_str(), name.c_str()) == 0) {
+            v = value;
+            return;
+        }
+    d.headers.push_back({name, value});
+}
+
+// The response for a request the port serves itself, or false (the request fails as offline).
+bool serve(id req, HttpResponse& out) {
+    if (!g_local_server || !req) return false;
+    auto* d = objc::get<RequestData>(req);
+    if (!d) return false;
+    HttpRequest r{d->method, utf8(objc::send(d->url, "absoluteString")), d->headers, d->body};
+    if (!g_local_server(r, out)) {
+        LOG_DEBUG("http: %s %s -> offline", r.method.c_str(), r.url.c_str());
+        return false;
+    }
+    LOG_INFO("http: %s %s -> %d (%zu bytes, served by the port)", r.method.c_str(), r.url.c_str(), out.status, out.body.size());
+    return true;
+}
+
+id make_response(id req, const HttpResponse& r) {
+    id resp = objc::alloc(objc::class_named("NSHTTPURLResponse"));
+    auto& d = objc::ensure<ResponseData>(resp);
+    d.url = objc::retain(objc::send(req, "URL"));
+    d.status = r.status;
+    d.content_type = r.content_type;
+    d.length = r.body.size();
+    return objc::autorelease(resp);
+}
+
 }  // namespace
+
+void set_local_server(std::function<bool(const HttpRequest&, HttpResponse&)> server) { g_local_server = std::move(server); }
 
 void install_misc() {
     using objc::class_method;
@@ -190,7 +238,7 @@ void install_misc() {
     method(CA, "setName:", [](id, SEL, id) {});
     method(CA, "setDelegate:", [](id, SEL, id) {});
 
-    // ---- networking: always offline ----
+    // ---- networking: offline, except requests the port serves itself (set_local_server) ----
     Class RQ = objc::host_class("NSURLRequest");
     Class MRQ = objc::host_class("NSMutableURLRequest", "NSURLRequest");
     auto make_request = [](Class c, id url) {
@@ -209,63 +257,121 @@ void install_misc() {
         objc::ensure<RequestData>(t.x(0)).url = objc::retain(t.x(2));
     });
     method(RQ, "URL", [](id self, SEL) { return objc::ensure<RequestData>(self).url; });
-    method(RQ, "HTTPMethod", [](id, SEL) { return str("GET"); });
-    method(RQ, "allHTTPHeaderFields", [](id, SEL) { return dict({}); });
-    method(RQ, "HTTPBody", [](id, SEL) -> id { return 0; });
+    method(RQ, "HTTPMethod", [](id self, SEL) { return str(objc::ensure<RequestData>(self).method); });
+    method(RQ, "allHTTPHeaderFields", [](id self, SEL) {
+        std::vector<std::pair<id, id>> items;
+        for (auto& [k, v] : objc::ensure<RequestData>(self).headers) items.push_back({str(k), str(v)});
+        return dict(items);
+    });
+    method(RQ, "valueForHTTPHeaderField:", [](id self, SEL, id name) -> id {
+        std::string n = utf8(name);
+        for (auto& [k, v] : objc::ensure<RequestData>(self).headers)
+            if (_stricmp(k.c_str(), n.c_str()) == 0) return str(v);
+        return 0;
+    });
+    method(RQ, "HTTPBody", [](id self, SEL) -> id {
+        auto& b = objc::ensure<RequestData>(self).body;
+        return b.empty() ? 0 : data_with(b.data(), b.size());
+    });
     method(RQ, "copyWithZone:", [](id self, SEL, u64) { return objc::retain(self); });
     method(RQ, "mutableCopyWithZone:", [](id self, SEL, u64) { return objc::retain(self); });
-    for (const char* s : {"setHTTPMethod:", "setHTTPBody:", "setURL:", "setAllHTTPHeaderFields:", "setHTTPBodyStream:"})
-        method(MRQ, s, [](id, SEL, id) {});
-    method(MRQ, "setValue:forHTTPHeaderField:", [](id, SEL, id, id) {});
-    method(MRQ, "addValue:forHTTPHeaderField:", [](id, SEL, id, id) {});
+    method(MRQ, "setHTTPMethod:", [](id self, SEL, id m) { objc::ensure<RequestData>(self).method = utf8(m); });
+    method(MRQ, "setHTTPBody:", [](id self, SEL, id body) { objc::ensure<RequestData>(self).body = data_bytes(body); });
+    method(MRQ, "setURL:", [](id self, SEL, id url) {
+        auto& d = objc::ensure<RequestData>(self);
+        objc::retain(url);
+        objc::release(d.url);
+        d.url = url;
+    });
+    method(MRQ, "setAllHTTPHeaderFields:", [](id self, SEL, id fields) {
+        auto& d = objc::ensure<RequestData>(self);
+        for (auto& [k, v] : dict_items(fields)) set_header(d, utf8(k), utf8(v));
+    });
+    method(MRQ, "setHTTPBodyStream:", [](id, SEL, id) {});
+    method(MRQ, "setValue:forHTTPHeaderField:", [](id self, SEL, id value, id name) {
+        set_header(objc::ensure<RequestData>(self), utf8(name), utf8(value));
+    });
+    method(MRQ, "addValue:forHTTPHeaderField:", [](id self, SEL, id value, id name) {
+        set_header(objc::ensure<RequestData>(self), utf8(name), utf8(value));
+    });
     method(MRQ, "setTimeoutInterval:", [](id, SEL, double) {});
     method(MRQ, "setCachePolicy:", [](id, SEL, u64) {});
     method(MRQ, "setHTTPShouldHandleCookies:", [](id, SEL, bool) {});
+    method(MRQ, "setHTTPShouldUsePipelining:", [](id, SEL, bool) {});
 
     Class CONN = objc::host_class("NSURLConnection");
     struct ConnData : objc::HostData {
         id delegate = 0;
-        bool cancelled = false;
+        id request = 0;
+        bool cancelled = false, started = false;
     };
-    auto fail_later = [](id conn) {
+    // Answers on the connection's run loop, as a real connection would: the response, its data and
+    // the end, or the offline error.
+    auto start_connection = [](id conn) {
+        auto& cd = objc::ensure<ConnData>(conn);
+        if (cd.started) return;
+        cd.started = true;
+        auto response = std::make_shared<HttpResponse>();
+        bool served = serve(cd.request, *response);
         objc::retain(conn);
-        RunLoop::current().post([conn] {
+        RunLoop::current().post([conn, response, served] {
             auto& d = objc::ensure<ConnData>(conn);
-            if (!d.cancelled && d.delegate && objc::responds_to(d.delegate, objc::sel("connection:didFailWithError:")))
+            auto has = [&](const char* s) { return d.delegate && objc::responds_to(d.delegate, objc::sel(s)); };
+            if (!d.cancelled && served) {
+                if (has("connection:didReceiveResponse:"))
+                    objc::send(d.delegate, "connection:didReceiveResponse:", {conn, make_response(d.request, *response)});
+                if (!response->body.empty() && has("connection:didReceiveData:"))
+                    objc::send(d.delegate, "connection:didReceiveData:", {conn, data_with(response->body.data(), response->body.size())});
+                if (!d.cancelled && has("connectionDidFinishLoading:")) objc::send(d.delegate, "connectionDidFinishLoading:", {conn});
+            } else if (!d.cancelled && has("connection:didFailWithError:")) {
                 objc::send(d.delegate, "connection:didFailWithError:", {conn, offline_error()});
+            }
             objc::release(conn);
         });
     };
-    static decltype(fail_later) s_fail_later = fail_later;
+    static decltype(start_connection) s_start = start_connection;
     method(CONN, "initWithRequest:delegate:", [](id self, SEL, id req, id delegate) {
-        LOG_DEBUG("NSURLConnection to %s -> offline", objc::describe(objc::send(req, "URL")).c_str());
-        objc::ensure<ConnData>(self).delegate = objc::retain(delegate);
-        s_fail_later(self);
+        auto& d = objc::ensure<ConnData>(self);
+        d.delegate = objc::retain(delegate);
+        d.request = objc::retain(req);
+        s_start(self);
         return self;
     });
     method(CONN, "initWithRequest:delegate:startImmediately:", [](id self, SEL, id req, id delegate, bool start) {
-        LOG_DEBUG("NSURLConnection to %s -> offline", objc::describe(objc::send(req, "URL")).c_str());
-        objc::ensure<ConnData>(self).delegate = objc::retain(delegate);
-        if (start) s_fail_later(self);
+        auto& d = objc::ensure<ConnData>(self);
+        d.delegate = objc::retain(delegate);
+        d.request = objc::retain(req);
+        if (start) s_start(self);
         return self;
     });
     class_method(CONN, "connectionWithRequest:delegate:", [](Class c, SEL, id req, id delegate) {
         return objc::autorelease(objc::send(objc::alloc(c), "initWithRequest:delegate:", {req, delegate}));
     });
-    method(CONN, "start", [](id self, SEL) { s_fail_later(self); });
+    method(CONN, "start", [](id self, SEL) { s_start(self); });
     method(CONN, "cancel", [](id self, SEL) { objc::ensure<ConnData>(self).cancelled = true; });
     method(CONN, "scheduleInRunLoop:forMode:", [](id, SEL, id, id) {});
     method(CONN, "setDelegateQueue:", [](id, SEL, id) {});
-    class_method(CONN, "sendSynchronousRequest:returningResponse:error:", [](Class, SEL, id, u64* resp, u64* err) -> id {
+    class_method(CONN, "sendSynchronousRequest:returningResponse:error:", [](Class, SEL, id req, u64* resp, u64* err) -> id {
+        HttpResponse r;
+        if (serve(req, r)) {
+            if (resp) *resp = make_response(req, r);
+            if (err) *err = 0;
+            return data_with(r.body.data(), r.body.size());
+        }
         if (resp) *resp = 0;
         if (err) *err = offline_error();
         return 0;
     });
-    class_method(CONN, "sendAsynchronousRequest:queue:completionHandler:", [](Class, SEL, id, id, GuestAddr block) {
+    class_method(CONN, "sendAsynchronousRequest:queue:completionHandler:", [](Class, SEL, id req, id, GuestAddr block) {
         GuestAddr b = objc::block_copy(block);
-        post_to_main([b] {
-            objc::call_block(b, {0, 0, offline_error()});
+        auto r = std::make_shared<HttpResponse>();
+        bool served = serve(req, *r);
+        objc::retain(req);
+        post_to_main([b, r, served, req] {
+            if (served) objc::call_block(b, {make_response(req, *r), data_with(r->body.data(), r->body.size()), 0});
+            else objc::call_block(b, {0, 0, offline_error()});
             objc::block_release(b);
+            objc::release(req);
         });
     });
     Class COOK = objc::host_class("NSHTTPCookieStorage");
@@ -278,8 +384,17 @@ void install_misc() {
     method(COOK, "deleteCookie:", [](id, SEL, id) {});
     method(COOK, "setCookie:", [](id, SEL, id) {});
     method(COOK, "setCookieAcceptPolicy:", [](id, SEL, u64) {});
-    objc::host_class("NSURLResponse");
-    objc::host_class("NSHTTPURLResponse", "NSURLResponse");
+    Class RESP = objc::host_class("NSURLResponse");
+    Class HRESP = objc::host_class("NSHTTPURLResponse", "NSURLResponse");
+    method(RESP, "URL", [](id self, SEL) { return objc::ensure<ResponseData>(self).url; });
+    method(RESP, "expectedContentLength", [](id self, SEL) -> s64 { return (s64)objc::ensure<ResponseData>(self).length; });
+    method(RESP, "MIMEType", [](id self, SEL) { return str(objc::ensure<ResponseData>(self).content_type); });
+    method(RESP, "textEncodingName", [](id, SEL) { return str("utf-8"); });
+    method(HRESP, "statusCode", [](id self, SEL) -> s64 { return objc::ensure<ResponseData>(self).status; });
+    method(HRESP, "allHeaderFields", [](id self, SEL) {
+        auto& d = objc::ensure<ResponseData>(self);
+        return dict({{str("Content-Type"), str(d.content_type)}, {str("Content-Length"), str(std::to_string(d.length))}});
+    });
     objc::host_class("NSHTTPCookie");
 
     // ---- archiving / JSON: not supported (callers treat nil as "no cached data") ----

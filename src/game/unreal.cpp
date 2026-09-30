@@ -136,6 +136,13 @@ int property_offset(cpu::Thread& t, GuestAddr obj, const char* name) {
     return g_offsets[key] = off;
 }
 
+int param_offset(cpu::Thread& t, GuestAddr obj, const std::string& func, const char* param) {
+    GuestAddr fn = t.call(g_find_function, {obj, fname(t, func), 0});
+    if (!fn || (g_offset_field < 0 && !locate_offset_field(t, *gptr<u64>(obj + kObjClass)))) return -1;
+    GuestAddr prop = find_property(t, fn, param);
+    return prop ? (int)*gptr<u32>(prop + g_offset_field) : -1;
+}
+
 bool call_event(cpu::Thread& t, GuestAddr obj, const std::string& func, void* params) {
     GuestAddr fn = t.call(g_find_function, {obj, fname(t, func), 0});
     if (!fn) return false;

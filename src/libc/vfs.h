@@ -17,6 +17,10 @@ const std::string& host_bundle();
 // Serves `host_path` in place of a file of the app bundle (`bundle_relative`, e.g. "Binaries/Commands.txt").
 void override_bundle_file(const std::string& bundle_relative, const std::string& host_path);
 
+// Files in the app sandbox whose names start with `prefix` are the same files without it. (The game names its
+// saves after the player's online account; offline ClashMobs give it one, and it must keep the same saves.)
+void strip_home_file_prefix(const std::string& prefix);
+
 // Maps a guest path (absolute or relative to the guest cwd) to a host UTF-8 path.
 // Returns "" for paths outside the sandbox that have no host equivalent.
 std::string to_host(const char* guest_path);

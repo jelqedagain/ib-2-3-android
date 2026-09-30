@@ -4,6 +4,7 @@
 #include <string>
 
 namespace macho { struct Image; }
+namespace cpu { class Thread; }
 
 namespace game {
 
@@ -44,6 +45,14 @@ void strengthen_memory_barriers(const macho::Image& img);
 
 // Save editor: applies the launcher's Edit save values to the game's save and writes the current ones out.
 void install_save_editor(const macho::Image& img);
+
+// ClashMobs offline (IB3): serves the game's ClashMob server requests from the port.
+void install_clashmob(const macho::Image& img);
+void clashmob_tick(cpu::Thread& t);  // once a second, from the save editor's engine tick
+// Script functions ClashMobs answer themselves, from the save editor's interpreter hook (UObject::ProcessInternal):
+// true when the call was answered (its result written to `result`).
+bool clashmob_wants_script_hook();
+bool clashmob_script_call(cpu::Thread& t, GuestAddr frame, GuestAddr result);
 
 // Diagnostics (-scripttrace): logs UnrealScript calls, state changes and map loads.
 void install_script_trace(const macho::Image& img);

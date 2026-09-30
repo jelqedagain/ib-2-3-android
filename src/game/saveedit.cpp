@@ -365,6 +365,7 @@ void on_tick(cpu::Thread& t) {
     }
 #endif
     enforce_frame_cap(t);
+    clashmob_tick(t);
     Objects o = find_objects(t);
     if (!o.ok()) {
         player_since = 0;
@@ -406,9 +407,10 @@ void install_save_editor(const macho::Image& img) {
     // The script interpreter is hooked only when there are edits to make, or the save was edited (its
     // checks run on every load); otherwise the game runs exactly as before.
     g_skip_checks = file_exists(kUsedMarker);
-    if (g_skip_checks || file_exists(kPendingFile)) {
+    if (g_skip_checks || file_exists(kPendingFile) || clashmob_wants_script_hook()) {
         if (GuestAddr pi = img.find("__ZN7UObject15ProcessInternalER6FFramePv"))
             g_process_internal = hook::install(pi, "UObject::ProcessInternal", [](cpu::Thread& t) {
+                if (clashmob_script_call(t, t.x(1), t.x(2))) return;
                 GuestAddr fn = *gptr<u64>(t.x(1) + kFrameNode);
                 Watched w = watched(t, fn);
                 if (w == Watched::FinishLoading) {

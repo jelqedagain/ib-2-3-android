@@ -50,6 +50,9 @@ bool read_property(cpu::Thread& t, GuestAddr obj, const char* name, T& out) {
 // Byte offset in `obj` of member `member` of its struct property `struct_prop`, or -1.
 int struct_member_offset(cpu::Thread& t, GuestAddr obj, const char* struct_prop, const char* member);
 
+// Byte offset of parameter `param` in the parameter block of `obj`'s script function `func`, or -1.
+int param_offset(cpu::Thread& t, GuestAddr obj, const std::string& func, const char* param);
+
 // Calls script function `func` on `obj` with a parameter block (UObject::ProcessEvent).
 bool call_event(cpu::Thread& t, GuestAddr obj, const std::string& func, void* params);
 

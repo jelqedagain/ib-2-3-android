@@ -1,6 +1,7 @@
 // Host implementations of Foundation classes, plus helpers for other HLE modules.
 #pragma once
 #include "objc/runtime.h"
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -67,6 +68,20 @@ void post_to_main(std::function<void()> fn);
 bool is_main_thread();
 void run_main_queue_once();  // called from the main run loop
 void set_main_thread();
+
+// --- HTTP: requests the port answers itself (everything else stays offline) ---
+struct HttpRequest {
+    std::string method, url;
+    std::vector<std::pair<std::string, std::string>> headers;
+    std::vector<u8> body;
+};
+struct HttpResponse {
+    int status = 200;
+    std::string content_type = "application/json";
+    std::string body;
+};
+// Returns true and fills the response for requests it serves. Called on the requesting thread.
+void set_local_server(std::function<bool(const HttpRequest&, HttpResponse&)> server);
 
 void install_string();
 void install_collections();

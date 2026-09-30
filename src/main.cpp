@@ -217,6 +217,7 @@ int main(int argc, char** argv) {
     game::install_config(img);
     game::install_widescreen();
     game::install_save_editor(img);
+    game::install_clashmob(img);
     {
         const auto& st = settings::get();
         audio::set_volumes(st.music_volume / 100.0f, st.effects_volume / 100.0f);
