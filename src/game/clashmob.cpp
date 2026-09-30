@@ -472,6 +472,7 @@ void set_fstring(cpu::Thread& t, void* where, const std::string& s) {
 // Gives the game its MCP account id once its social manager (GEngine.MyMob) exists: SwordMyMobManager.McpId is
 // set directly, in memory from the game's own allocator (the game frees or regrows it itself later).
 void give_account(cpu::Thread& t);
+void give_gifts(cpu::Thread& t);
 
 void clashmob_tick(cpu::Thread& t) {
     if (is_infinity_blade_2()) return;
@@ -489,7 +490,45 @@ void clashmob_tick(cpu::Thread& t) {
         }
     }
 #endif
+    give_gifts(t);
     give_account(t);
+}
+
+// clashmob-gift.ini (PrizeWheels=N): ClashMob Prize Wheels to hand to the player once, in the world. (Wheels won
+// before the port showed the prize wheel again were thrown away by the game.)
+void give_gifts(cpu::Thread& t) {
+    constexpr const char* kGiftFile = "clashmob-gift.ini";
+    constexpr u8 kPrizeWheel = 28;  // eTouchRewardActor TRA_GrabBag_Uber
+    static u64 last = 0;
+    u64 now = GetTickCount64();
+    if (now - last < 5000) return;
+    last = now;
+    std::ifstream f(kGiftFile);
+    if (!f) return;
+    int wheels = 0;
+    std::string line;
+    while (std::getline(f, line))
+        if (line.rfind("PrizeWheels=", 0) == 0) wheels = std::atoi(line.c_str() + 12);
+    f.close();
+    GuestAddr pc = ue::player_controller(t);
+    u64 pawn = 0;
+    if (!pc || !ue::read_property(t, pc, "Pawn", pawn) || !pawn || !ue::is_a(t, pawn, "SwordPlayer")) return;
+    std::remove(kGiftFile);
+    if (wheels <= 0) return;
+    const char* fn = "AddConsumable";
+    int o_type = ue::param_offset(t, pawn, fn, "Consumable"), o_count = ue::param_offset(t, pawn, fn, "AddCount"),
+        o_max = ue::param_offset(t, pawn, fn, "bIgnoreMax"), o_ret = ue::param_offset(t, pawn, fn, "ReturnValue");
+    if (o_type < 0 || o_count < 0 || o_max < 0) {
+        LOG_WARN("clashmob: %s not found; no gift", fn);
+        return;
+    }
+    alignas(16) u8 params[128] = {};
+    params[o_type] = kPrizeWheel;
+    *reinterpret_cast<s32*>(params + o_count) = wheels;
+    *reinterpret_cast<u32*>(params + o_max) = 1;
+    ue::call_event(t, pawn, fn, params);
+    LOG_INFO("clashmob: gave %d ClashMob Prize Wheel(s) (%s)", wheels,
+             o_ret >= 0 && *reinterpret_cast<u32*>(params + o_ret) ? "added" : "refused");
 }
 
 void give_account(cpu::Thread& t) {
@@ -549,7 +588,9 @@ bool clashmob_wants_script_hook() { return !is_infinity_blade_2(); }
 //   come late in it. A ClashMob quest counts as a side quest, so ClashMobs show from the start.
 // - SwordBattleEvent.RewardGoalString(RewardIdx): the text of a reward tier. For damage events (BT_Kill1Boss) the
 //   game's text has no number ("KILL TITAN" for every tier), so the port writes "DO 5,000 DAMAGE".
-enum class Target { None, UserHasMcpId, GetShowQuestType, RewardGoalString };
+// - SwordInventoryItem.ShouldBeHidden() for the ClashMob Prize Wheel (TRA_GrabBag_Uber): it was hidden when
+//   ClashMobs ended (HiddenLevel=-1), and the game throws hidden rewards away. It is shown again.
+enum class Target { None, UserHasMcpId, GetShowQuestType, RewardGoalString, ShouldBeHidden };
 
 std::string with_commas(long long v) {
     std::string s = std::to_string(v);
@@ -570,6 +611,7 @@ bool clashmob_script_call(cpu::Thread& t, GuestAddr frame, GuestAddr result) {
         Target k = name == "UserHasMcpId" && cls == "SwordMyMobManager"      ? Target::UserHasMcpId
                    : name == "GetShowQuestType" && cls == "SwordQuestData" ? Target::GetShowQuestType
                    : name == "RewardGoalString" && cls == "SwordBattleEvent" ? Target::RewardGoalString
+                   : name == "ShouldBeHidden"                                  ? Target::ShouldBeHidden
                                                                             : Target::None;
         it = targets.emplace(fn, k).first;
     }
@@ -578,6 +620,12 @@ bool clashmob_script_call(cpu::Thread& t, GuestAddr frame, GuestAddr result) {
         u64 clashmob = 0;
         if (!ue::read_property(t, quest, "ClashMob", clashmob) || !clashmob) return false;
         if (result) *gptr<u8>(result) = 1;  // SQT_QuestSecondary
+        return true;
+    }
+    if (it->second == Target::ShouldBeHidden) {
+        GuestAddr item = *gptr<u64>(frame + kFrameObject);
+        if (ue::object_name(t, item) != "TRA_GrabBag_Uber") return false;
+        if (result) *gptr<u32>(result) = 0;
         return true;
     }
     if (it->second == Target::RewardGoalString) {
