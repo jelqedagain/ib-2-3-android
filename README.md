@@ -18,7 +18,7 @@ Phones and iPhones both use ARM64, so on Android the app's code runs directly on
 <details>
 <summary><b>Click for IB2</b></summary>
 
-**Download:** [all IB2 APKs](https://github.com/jelqedagain/ib-2-3-android/releases/tag/ib2) · [IB2 on archive.org](https://archive.org/details/infinity-blade-2-android)
+**Download:** [IB2 APK](https://github.com/jelqedagain/ib-2-3-android/releases/tag/ib2) · [IB2 on archive.org](https://archive.org/details/infinity-blade-2-android)
 
 **1.3.2** (2026-09-30)
 
@@ -55,7 +55,7 @@ Phones and iPhones both use ARM64, so on Android the app's code runs directly on
 <details>
 <summary><b>Click for IB3</b></summary>
 
-**Download:** [all IB3 APKs](https://github.com/jelqedagain/ib-2-3-android/releases/tag/ib3) · [IB3 on archive.org](https://archive.org/details/infinity-blade-3-android)
+**Download:** [IB3 APK](https://github.com/jelqedagain/ib-2-3-android/releases/tag/ib3) · [IB3 on archive.org](https://archive.org/details/infinity-blade-3-android)
 
 **1.3.3** (2026-09-30)
 
