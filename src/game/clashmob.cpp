@@ -632,8 +632,10 @@ bool clashmob_wants_script_hook() { return !is_infinity_blade_2(); }
 //   come late in it. A ClashMob quest counts as a side quest, so ClashMobs show from the start.
 // - SwordBattleEvent.RewardGoalString(RewardIdx): the text of a reward tier. For damage events (BT_Kill1Boss) the
 //   game's text has no number ("KILL TITAN" for every tier), so the port writes "DO 5,000 DAMAGE".
-// - SwordInventoryItem.ShouldBeHidden() for the ClashMob Prize Wheel (TRA_GrabBag_Uber): it was hidden when
-//   ClashMobs ended (HiddenLevel=-1), and the game throws hidden rewards away. It is shown again.
+// - SwordInventoryItem.ShouldBeHidden(P) for the ClashMob Prize Wheel (TRA_GrabBag_Uber): a reward-only wheel (the
+//   only one with no chip price), hidden (HiddenLevel=-1), and the game throws hidden rewards away. It stays hidden in
+//   the shop; it is not hidden when a reward is given (SwordPlayer.OwnMaxOfConsumable), nor while the player has one
+//   (so it shows in Supplies to be spun).
 enum class Target { None, UserHasMcpId, GetShowQuestType, RewardGoalString, ShouldBeHidden };
 
 std::string with_commas(long long v) {
@@ -667,8 +669,19 @@ bool clashmob_script_call(cpu::Thread& t, GuestAddr frame, GuestAddr result) {
         return true;
     }
     if (it->second == Target::ShouldBeHidden) {
+        constexpr u64 kFrameLocals = 0x30;
+        constexpr int kPrizeWheel = 28;  // eTouchRewardActor TRA_GrabBag_Uber
         GuestAddr item = *gptr<u64>(frame + kFrameObject);
         if (ue::object_name(t, item) != "TRA_GrabBag_Uber") return false;
+        GuestAddr prev = *gptr<u64>(frame + kFramePrevious);
+        GuestAddr caller = prev ? *gptr<u64>(prev + kFrameNode) : 0;
+        bool reward = caller && ue::object_name(t, caller) == "OwnMaxOfConsumable";
+        bool owned = false;
+        int p_off = ue::param_offset(t, item, "ShouldBeHidden", "P");
+        GuestAddr player = p_off >= 0 ? *gptr<u64>(*gptr<u64>(frame + kFrameLocals) + p_off) : 0;
+        int n_off = player ? ue::property_offset(t, player, "NumConsumable") : -1;
+        if (n_off >= 0) owned = gptr<s32>(player + n_off)[kPrizeWheel] > 0;
+        if (!reward && !owned) return false;  // the game's answer: hidden
         if (result) *gptr<u32>(result) = 0;
         return true;
     }
