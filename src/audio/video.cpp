@@ -17,8 +17,9 @@ struct Movie {
     std::mutex m;
     std::condition_variable cv;
     bool playing = false, stop_requested = false, restart_requested = false, finished = false, visible = false;
+    bool sound_ended_logged = false;
     double clock_base = 0;   // movie time at clock_start
-    double clock_start = 0;  // NSDate seconds when (re)started; used without a soundtrack
+    double clock_start = 0;  // NSDate seconds when (re)started; used without a soundtrack or after it ends
     std::function<void()> on_finished;
 };
 
@@ -31,8 +32,16 @@ int g_frame_w = 0, g_frame_h = 0;
 u64 g_serial = 0;
 
 double movie_clock(Movie& mv) {
-    if (mv.info.sound) return audio::music_time(mv.info.sound);
-    return mv.clock_base + (mv.playing ? ns::now_ref() - mv.clock_start : 0);
+    if (mv.info.sound && (!mv.playing || audio::music_playing(mv.info.sound))) return audio::music_time(mv.info.sound);
+    // No soundtrack, or it ended before the picture. It can be a few frames shorter, and a finished
+    // track reads 0 again, so the last frames were never due and the movie never ended (IB2's
+    // Logo.m4v after Isa's scene: black screen). The wall clock carries on from where it was.
+    double t = mv.clock_base + (mv.playing ? ns::now_ref() - mv.clock_start : 0);
+    if (mv.info.sound && !mv.sound_ended_logged) {
+        mv.sound_ended_logged = true;
+        LOG_INFO("video: soundtrack of %s ended at %.2f s of %.2f s", mv.path.c_str(), t, mv.info.duration);
+    }
+    return t;
 }
 
 void finish(Movie* mv) {
@@ -65,6 +74,7 @@ void decode_loop(Movie* mv) {
                 mv->finished = false;
                 mv->clock_base = 0;
                 mv->clock_start = ns::now_ref();
+                mv->sound_ended_logged = false;
                 if (mv->info.sound) audio::music_set_time(mv->info.sound, 0);
             }
         }
@@ -117,11 +127,12 @@ void play(const std::shared_ptr<Movie>& mv) {
             mv->restart_requested = true;
             mv->finished = false;
         }
+        // Soundtrack first, under the lock: while `playing` is set without it, the clock takes it as ended.
+        if (mv->info.sound) audio::music_play(mv->info.sound, 0);
         mv->playing = true;
         mv->visible = true;
         mv->clock_start = ns::now_ref();
     }
-    if (mv->info.sound) audio::music_play(mv->info.sound, 0);
     {
         std::lock_guard lock(g_frame_mutex);
         g_visible = mv;
@@ -170,11 +181,11 @@ void restart(const std::shared_ptr<Movie>& mv) {
         std::lock_guard lock(mv->m);
         mv->restart_requested = true;
         resume = mv->visible;
+        if (mv->info.sound) {
+            audio::music_set_time(mv->info.sound, 0);
+            if (resume) audio::music_play(mv->info.sound, 0);
+        }
         if (resume) mv->playing = true;
-    }
-    if (mv->info.sound) {
-        audio::music_set_time(mv->info.sound, 0);
-        if (resume) audio::music_play(mv->info.sound, 0);
     }
     mv->cv.notify_all();
 }

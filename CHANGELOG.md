@@ -4,6 +4,9 @@ Two Android apps, IB2 and IB3, are built from one codebase. Each has its own ver
 
 # IB2
 
+## 1.4 beta 2 (2026-09-30)
+- Fixed a black screen after the final scene with game copies that include the Logo movie. When a movie's sound ended a few frames before its picture, the movie never finished and the game waited for it forever. Movies now keep time by the clock once their sound has ended. The same bug could also leave the game on the startup logo on some phones.
+
 ## 1.4 beta (2026-09-30)
 - Beta: back up your saves (launcher, Back up saves) before trying it.
 - New launcher look, and a Settings page (writes settings.ini): frame rate limit 30 / 60 / 120 (120 is experimental), an FPS counter drawn in the corner, sharper shadows, music and effects volume, controller on/off and speeds.

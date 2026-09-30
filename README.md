@@ -20,6 +20,10 @@ Phones and iPhones both use ARM64, so on Android the app's code runs directly on
 
 **Download:** [IB2 APK](https://github.com/jelqedagain/ib-2-3-android/releases/tag/ib2) · [IB2 on archive.org](https://archive.org/details/infinity-blade-2-android)
 
+**1.4 beta 2** (2026-09-30)
+
+- Fixed a black screen after the final scene with game copies that include the Logo movie. When a movie's sound ended a few frames before its picture, the movie never finished and the game waited for it forever. Movies now keep time by the clock once their sound has ended. The same bug could also leave the game on the startup logo on some phones.
+
 **1.4 beta** (2026-09-30)
 
 - Beta: back up your saves (launcher, Back up saves) before trying it.
