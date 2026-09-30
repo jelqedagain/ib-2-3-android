@@ -39,11 +39,15 @@ if (ANDROID)
     list(FILTER IB3_ANDROID_SOURCES EXCLUDE REGEX "src/(cpu\.cpp|libc/crypto\.cpp|uikit/boot\.cpp|uikit/window_win32\.cpp|game/pad_xinput\.cpp|audio/video_mf\.cpp)$")
     list(FILTER IB3_ANDROID_SOURCES EXCLUDE REGEX "src/(launcher|win)/|src/main\.cpp$|src/port/android/app\.cpp$")
     set_target_properties(ib3_thirdparty PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    # ETC2 encoder: PVRTC textures are re-encoded for Android GPUs (src/gles/gl.cpp).
+    add_library(etcpak STATIC external/etcpak/ProcessRGB.cpp external/etcpak/Tables.cpp external/etcpak/Dither.cpp)
+    set_target_properties(etcpak PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    target_compile_options(etcpak PRIVATE -w -O3)
     add_library(ib3core OBJECT ${IB3_ANDROID_SOURCES} src/cpu_native.S)
     set_target_properties(ib3core PROPERTIES POSITION_INDEPENDENT_CODE ON)
     target_include_directories(ib3core PUBLIC src/port/android src external)
     target_compile_options(ib3core PUBLIC -Wno-unused-parameter -Wno-invalid-offsetof -fno-strict-aliasing)
-    target_link_libraries(ib3core PUBLIC ib3_thirdparty aaudio mediandk android log dl m)
+    target_link_libraries(ib3core PUBLIC ib3_thirdparty etcpak aaudio mediandk android log dl m)
 
     # Command-line build (adb shell; renders off screen).
     add_executable(ib3android src/main.cpp)

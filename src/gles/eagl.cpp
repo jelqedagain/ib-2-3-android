@@ -10,6 +10,8 @@
 #include <mutex>
 #ifdef __ANDROID__
 #include <sys/system_properties.h>
+#include <unistd.h>
+#include <cstdio>
 #include <time.h>
 #endif
 
@@ -30,6 +32,43 @@ void request_screenshot(const std::string& name) {
 }
 
 namespace {
+
+#ifdef __ANDROID__
+// Memory for the perf line. Android's own reports (dumpsys meminfo, its exit records) leave out most of
+// what the Adreno driver holds for textures, so that comes from the driver's per-process counters.
+std::string memory_summary() {
+    auto read_u64 = [](const std::string& path, u64& v) {
+        FILE* f = std::fopen(path.c_str(), "r");
+        if (!f) return false;
+        unsigned long long x = 0;
+        bool ok = std::fscanf(f, "%llu", &x) == 1;
+        std::fclose(f);
+        v = x;
+        return ok;
+    };
+    char buf[256];
+    u64 pages = 0, resident = 0;
+    if (FILE* f = std::fopen("/proc/self/statm", "r")) {
+        if (std::fscanf(f, "%llu %llu", (unsigned long long*)&pages, (unsigned long long*)&resident) != 2) resident = 0;
+        std::fclose(f);
+    }
+    int n = snprintf(buf, sizeof buf, "RAM %llu MB", (unsigned long long)(resident * sysconf(_SC_PAGESIZE) >> 20));
+    std::string kgsl = "/sys/class/kgsl/kgsl/proc/" + std::to_string(getpid());
+    u64 gpu = 0, gpu_peak = 0, tex = 0;
+    if (read_u64(kgsl + "/kernel", gpu)) {
+        read_u64(kgsl + "/kernel_max", gpu_peak);
+        read_u64(kgsl + "/memtype/texture", tex);
+        n += snprintf(buf + n, sizeof buf - n, ", GPU %llu MB (textures %llu MB, peak %llu MB)", (unsigned long long)(gpu >> 20),
+                      (unsigned long long)(tex >> 20), (unsigned long long)(gpu_peak >> 20));
+    }
+    Etc2Stats etc = etc2_stats();
+    if (etc.textures)
+        snprintf(buf + n, sizeof buf - n, ", %llu textures as ETC2 (%llu MB instead of %llu MB, %llu ms)",
+                 (unsigned long long)etc.textures, (unsigned long long)(etc.bytes >> 20),
+                 (unsigned long long)(etc.rgba_bytes >> 20), (unsigned long long)(etc.us / 1000));
+    return buf;
+}
+#endif
 
 using EGLDisplay = void*;
 using EGLConfig = void*;
@@ -377,8 +416,8 @@ void install_eagl() {
             if (span >= 10) {
 #ifdef __ANDROID__
                 double cpu = cpu_now();
-                LOG_INFO("perf: %.1f fps, worst frame %.0f ms, %d frames over 25 ms, %.0f%% of one CPU core", count / span, worst,
-                         slow, (cpu - cpu_window) / span * 100);
+                LOG_INFO("perf: %.1f fps, worst frame %.0f ms, %d frames over 25 ms, %.0f%% of one CPU core, %s", count / span,
+                         worst, slow, (cpu - cpu_window) / span * 100, memory_summary().c_str());
                 cpu_window = cpu;
 #else
                 LOG_INFO("perf: %.1f fps, worst frame %.0f ms, %d frames over 25 ms", count / span, worst, slow);

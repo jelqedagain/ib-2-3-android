@@ -12,6 +12,11 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#ifdef __ANDROID__
+#include <etcpak/ProcessRGB.hpp>
+#include <chrono>
+#include <thread>
+#endif
 
 namespace gles {
 
@@ -536,6 +541,64 @@ std::string smooth_modulated_shadows(const std::string& src) {
     return out;
 }
 
+#ifdef __ANDROID__
+// Android GPUs can't sample PVRTC, and decoded to RGBA8 it takes 8x (2 bpp: 16x) the memory the game
+// budgets for: over 1 GB of textures at the beach, 2 GB while the tutorial hands over to it, enough for
+// Android to kill IB3 on 6-8 GB phones. There it is re-encoded as ETC2 (4 bpp, 8 with alpha).
+namespace {
+std::atomic<u64> g_etc2_textures{0}, g_etc2_bytes{0}, g_etc2_rgba_bytes{0}, g_etc2_us{0};
+
+bool reencode_pvrtc_as_etc2() {
+    static const bool on = !game::is_infinity_blade_2();  // IB3 only
+    return on;
+}
+
+// `rgba` is w x h RGBA8; returns ETC2 blocks for the texture padded to whole 4x4 blocks.
+std::vector<u64> encode_etc2(const u8* rgba, int w, int h, bool alpha) {
+    const int bw = (w + 3) / 4, bh = (h + 3) / 4, pw = bw * 4;
+    // etcpak wants BGRA pixels and whole blocks: swap red/blue, repeat the last row/column into the padding.
+    std::vector<u32> px((size_t)pw * bh * 4);
+    for (int y = 0; y < bh * 4; y++) {
+        const u8* row = rgba + (size_t)std::min(y, h - 1) * w * 4;
+        u32* out = &px[(size_t)y * pw];
+        for (int x = 0; x < pw; x++) {
+            const u8* p = row + std::min(x, w - 1) * 4;
+            out[x] = p[2] | (p[1] << 8) | (p[0] << 16) | ((u32)p[3] << 24);
+        }
+    }
+    const int words = alpha ? 2 : 1;  // ETC2 RGBA: an EAC alpha block before each colour block
+    std::vector<u64> blocks((size_t)bw * bh * words);
+    auto rows = [&](int y0, int y1) {
+        if (y0 >= y1) return;
+        const u32* src = &px[(size_t)y0 * 4 * pw];
+        u64* dst = &blocks[(size_t)y0 * bw * words];
+        if (alpha) CompressEtc2Rgba(src, dst, (u32)((y1 - y0) * bw), pw, true);
+        else CompressEtc2Rgb(src, dst, (u32)((y1 - y0) * bw), pw, true);
+    };
+    // Big textures are split over a few threads (a 2048x2048 one is 262144 blocks).
+    const int threads = bw * bh >= 16384 ? (int)std::min(4u, std::max(1u, std::thread::hardware_concurrency())) : 1;
+    if (threads == 1) {
+        rows(0, bh);
+    } else {
+        std::vector<std::thread> pool;
+        int step = (bh + threads - 1) / threads;
+        for (int i = 1; i < threads; i++) pool.emplace_back(rows, i * step, std::min(bh, (i + 1) * step));
+        rows(0, std::min(bh, step));
+        for (auto& t : pool) t.join();
+    }
+    return blocks;
+}
+}  // namespace
+#endif
+
+Etc2Stats etc2_stats() {
+#ifdef __ANDROID__
+    return {g_etc2_textures, g_etc2_bytes, g_etc2_rgba_bytes, g_etc2_us};
+#else
+    return {};
+#endif
+}
+
 void install_gl() {
 #define REGISTER(name, ret, params, args)     hle::fn("_" #name, [] params -> ret { ErrorCheck check{#name}; return p_##name args; });
     GL_FUNCS(REGISTER)
@@ -564,6 +627,21 @@ void install_gl() {
             bool two_bpp = fmt == 0x8C01 || fmt == 0x8C03;
             std::vector<u8> rgba((size_t)std::max(w, 1) * std::max(h, 1) * 4);
             if (data) pvrtc_decode(static_cast<const u8*>(data), w, h, two_bpp, rgba.data());
+#ifdef __ANDROID__
+            if (reencode_pvrtc_as_etc2() && w > 0 && h > 0) {
+                auto t0 = std::chrono::steady_clock::now();
+                bool alpha = fmt == 0x8C02 || fmt == 0x8C03;  // PVRTC RGBA formats
+                std::vector<u64> etc = encode_etc2(rgba.data(), w, h, alpha);
+                GLsizei bytes = (GLsizei)(etc.size() * 8);
+                p_glCompressedTexImage2D(target, level, alpha ? 0x9278 : 0x9274,  // GL_COMPRESSED_RGBA8_ETC2_EAC / RGB8_ETC2
+                                         w, h, border, bytes, etc.data());
+                if (g_etc2_textures++ == 0) LOG_INFO("textures: PVRTC is re-encoded as ETC2 (Android GPUs can't use PVRTC)");
+                g_etc2_bytes += bytes;
+                g_etc2_rgba_bytes += rgba.size();
+                g_etc2_us += std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - t0).count();
+                return;
+            }
+#endif
             p_glTexImage2D(target, level, GL_RGBA, w, h, border, GL_RGBA, GL_UNSIGNED_BYTE, data ? rgba.data() : nullptr);
             return;
         }

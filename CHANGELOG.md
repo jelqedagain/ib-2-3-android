@@ -30,6 +30,10 @@ Two Android apps, IB2 and IB3, are built from one codebase. Each has its own ver
 
 # IB3
 
+## 1.3.4 (2026-09-30)
+- Fixed the game being closed by Android for low memory, seen right after the tutorial on a Galaxy S21 FE. Android GPUs can't read the game's PVRTC textures, and unpacked to full size they took over 1.2 GB at the beach (about 2 GB at the peak, while the tutorial hands over to the beach). They are now re-encoded as ETC2, which Android GPUs read directly: about 235 MB of textures at the beach, GPU memory peak about 390 MB.
+- The `perf:` log line also shows memory: RAM, GPU memory (textures and peak) and the texture re-encoding totals.
+
 ## 1.3.3 (2026-09-30)
 - Aimed at frame-rate drops below 60 on some Adreno phones (a Red Magic 11 Pro dropped to about 54 in outdoor scenes and the hideout). The cause is not confirmed; the changes are:
   - The window surface is released between frames only on GPUs other than Adreno (the fix was for Mali phones; on Adreno it may only cost frame time).

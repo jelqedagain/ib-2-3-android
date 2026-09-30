@@ -3,8 +3,8 @@
      a NativeActivity (GameActivity); LauncherActivity installs it from the player's .ipa first. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="@PACKAGE@"
-    android:versionCode="13"
-    android:versionName="1.3.3">
+    android:versionCode="14"
+    android:versionName="1.3.4">
 
     <uses-feature android:glEsVersion="0x00030000" android:required="true" />
 

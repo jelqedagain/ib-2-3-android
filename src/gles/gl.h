@@ -44,6 +44,12 @@ void surface_size(int& w, int& h);
 // Decodes PVRTC1 (4 or 2 bpp) into RGBA8.
 void pvrtc_decode(const u8* src, int width, int height, bool two_bpp, u8* rgba_out);
 
+// Android: PVRTC textures re-encoded as ETC2 so far (uploads, their size, the RGBA8 size they replace, time).
+struct Etc2Stats {
+    u64 textures, bytes, rgba_bytes, us;
+};
+Etc2Stats etc2_stats();
+
 // Looks up a function of the OpenGL ES library (ANGLE's libGLESv2.dll, or the device's libGLESv2.so).
 void* gl_proc(const char* name);
 
