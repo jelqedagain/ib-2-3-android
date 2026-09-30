@@ -28,6 +28,10 @@ void set_fake_pad(const std::string& control, float value);
 // Applies settings.ini (graphics, frame rate) to the engine's config as it loads.
 void install_config(const macho::Image& img);
 
+// Infinity Blade II on screens longer than 16:9: serves patched copies of its HUD layout script and
+// menu backdrops. If the patch does not apply, the emulated screen goes back to 16:9.
+void install_widescreen();
+
 // Keeps the Unreal/ChAIR logo movie from playing twice when loading is slow (after class realization).
 void install_startup_movie_fix();
 

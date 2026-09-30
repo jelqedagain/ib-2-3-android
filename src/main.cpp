@@ -215,6 +215,7 @@ int main(int argc, char** argv) {
     if (script_trace) game::install_script_trace(img);
     game::start_controller();
     game::install_config(img);
+    game::install_widescreen();
     {
         const auto& st = settings::get();
         audio::set_volumes(st.music_volume / 100.0f, st.effects_volume / 100.0f);
