@@ -66,6 +66,7 @@ struct Egl {
     // The window surface can be replaced (set_window); presenting holds this lock.
     std::mutex surface_mutex;
     u64 surface_generation = 0;
+    HWND window = nullptr;  // what the window surface was made for
 } g;
 
 struct ContextData : objc::HostData {
@@ -159,6 +160,7 @@ void init(HWND hwnd) {
                                 EGL_RENDERABLE_TYPE, EGL_OPENGL_ES3_BIT, EGL_NONE};
     EGLint n = 0;
     if (!g.ChooseConfig(g.dpy, cfg_attrs, &g.cfg, 1, &n) || n < 1) fatal("eglChooseConfig failed (0x%x)", g.GetError());
+    g.window = hwnd;
     if (hwnd) {
         g.surf = g.CreateWindowSurface(g.dpy, g.cfg, hwnd, nullptr);
     } else {  // no window (Android command-line runs): render off screen
@@ -177,6 +179,7 @@ void set_window(HWND hwnd) {
     std::lock_guard lock(g.surface_mutex);  // waits for a frame being presented
     // Presenting holds the window current only while it holds this lock (see presentRenderbuffer).
     if (g.surf) g.DestroySurface(g.dpy, g.surf);
+    g.window = hwnd;
     g.surf = hwnd ? g.CreateWindowSurface(g.dpy, g.cfg, hwnd, nullptr) : nullptr;
     if (hwnd && !g.surf) LOG_ERROR("eglCreateWindowSurface failed (0x%x)", g.GetError());
     g.surface_generation++;
@@ -187,6 +190,7 @@ void present_until_first_frame(const std::function<void(int w, int h)>& draw) {
     const EGLint attrs[] = {EGL_CONTEXT_MAJOR_VERSION, 3, EGL_CONTEXT_MINOR_VERSION, 0, EGL_NONE};
     EGLContext ctx = g.CreateContext(g.dpy, g.cfg, nullptr, attrs);  // not shared with the game's
     if (!ctx) return;
+    bool drew = false;
     while (!g_presented) {
         {
             std::lock_guard lock(g.surface_mutex);  // takes turns with presentRenderbuffer
@@ -197,11 +201,25 @@ void present_until_first_frame(const std::function<void(int w, int h)>& draw) {
                 draw(w, h);
                 g.SwapBuffers(g.dpy, g.surf);
                 g.MakeCurrent(g.dpy, nullptr, nullptr, nullptr);  // leave the surface free for the game
+                drew = true;
             }
         }
         Sleep(16);
     }
     g.DestroyContext(g.dpy, ctx);
+#ifdef __ANDROID__
+    // Give the game a window surface of its own, as after coming back from the background. On Mali
+    // GPUs the game's textures were garbled until the app left the screen and returned while the
+    // surface it drew on was the one this second context had also drawn on.
+    std::lock_guard lock(g.surface_mutex);
+    if (drew && g.surf && g.window) {
+        g.DestroySurface(g.dpy, g.surf);
+        g.surf = g.CreateWindowSurface(g.dpy, g.cfg, g.window, nullptr);
+        if (!g.surf) LOG_ERROR("eglCreateWindowSurface failed (0x%x)", g.GetError());
+        g.surface_generation++;
+        LOG_INFO("window surface renewed for the game");
+    }
+#endif
 }
 
 void install_eagl() {
