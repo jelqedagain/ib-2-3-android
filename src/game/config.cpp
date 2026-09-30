@@ -39,7 +39,7 @@ void apply(cpu::Thread& t, GuestAddr config) {
     // clamped to [Min, Max]SmoothedFrameRate. Loading hitches drag the average down and the cap
     // cannot climb back (the limiter sleeps to hold it), so the game stayed at ~40 in 60 FPS mode.
     // Pin the range to the chosen rate.
-    std::string fps = s.max_fps >= 60 ? "60" : "30";
+    std::string fps = std::to_string(s.max_fps);
     set("Engine.Engine", "MinSmoothedFrameRate", fps, g_engine_ini);
     set("Engine.Engine", "MaxSmoothedFrameRate", fps, g_engine_ini);
 
@@ -83,6 +83,9 @@ void apply_as_startup_commands() {
     std::string commands = read_file(vfs::host_bundle() + "/Binaries/Commands.txt");
     commands += "\n; Added by the port: sharper character shadows at today's screen resolutions\n";
     commands += std::string("Scale Set MaxShadowResolution ") + (s.high_res_shadows ? "2048" : "1024") + "\n";
+    // The Community Patch caps the frame rate at 62 (about 60); a later line wins.
+    if (s.max_fps != 60)
+        commands += "Set Engine MaxSmoothedFrameRate " + std::to_string(s.max_fps == 30 ? 30 : s.max_fps + 2) + "\n";
 
     std::string command_line = read_file(vfs::host_bundle() + "/CookedIPhone/UE3CommandLine.txt");
     if (command_line.find("-exec=") == std::string::npos) command_line += " -exec=\"Commands.txt\"";
@@ -98,7 +101,8 @@ void apply_as_startup_commands() {
     std::ofstream(dir + "/UE3CommandLine.txt", std::ios::binary) << command_line;
     vfs::override_bundle_file("Binaries/Commands.txt", dir + "/Commands.txt");
     vfs::override_bundle_file("CookedIPhone/UE3CommandLine.txt", dir + "/UE3CommandLine.txt");
-    LOG_INFO("settings: shadow resolution %s set by a startup command", s.high_res_shadows ? "2048" : "1024");
+    LOG_INFO("settings: shadow resolution %s, %d fps cap set by startup commands", s.high_res_shadows ? "2048" : "1024",
+             s.max_fps);
 }
 
 }  // namespace

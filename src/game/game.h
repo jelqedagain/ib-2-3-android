@@ -42,6 +42,9 @@ bool is_infinity_blade_2();
 // Infinity Blade II: turns its store-only memory barriers into full ones (before guest code runs).
 void strengthen_memory_barriers(const macho::Image& img);
 
+// Save editor: applies the launcher's Edit save values to the game's save and writes the current ones out.
+void install_save_editor(const macho::Image& img);
+
 // Diagnostics (-scripttrace): logs UnrealScript calls, state changes and map loads.
 void install_script_trace(const macho::Image& img);
 void install_script_trace_objc();  // after class realization

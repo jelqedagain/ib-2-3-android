@@ -50,7 +50,13 @@ void load() {
     s.render_height = read_int(L"Display", L"RenderResolution", d.render_height);
     if (s.render_height != 720 && s.render_height != 1080 && s.render_height != 1440 && s.render_height != 2160)
         s.render_height = d.render_height;
-    s.max_fps = read_int(L"Display", L"MaxFPS", d.max_fps) >= 60 ? 60 : 30;
+    int fps = read_int(L"Display", L"MaxFPS", d.max_fps);
+#ifdef __ANDROID__
+    s.max_fps = fps >= 120 ? 120 : fps >= 60 ? 60 : 30;
+    s.widescreen = read_int(L"Display", L"Widescreen", d.widescreen) != 0;
+#else
+    s.max_fps = fps >= 60 ? 60 : 30;
+#endif
     s.show_fps = read_int(L"Display", L"ShowFPS", d.show_fps) != 0;
     s.anti_aliasing = clamp(read_int(L"Graphics", L"AntiAliasing", d.anti_aliasing), 0, 2);
     s.dynamic_shadows = read_int(L"Graphics", L"DynamicShadows", d.dynamic_shadows) != 0;
@@ -75,6 +81,9 @@ void save() {
     write_int(L"Display", L"WindowHeight", s.window_height);
     write_int(L"Display", L"RenderResolution", s.render_height);
     write_int(L"Display", L"MaxFPS", s.max_fps);
+#ifdef __ANDROID__
+    write_int(L"Display", L"Widescreen", s.widescreen);
+#endif
     write_int(L"Display", L"ShowFPS", s.show_fps);
     write_int(L"Graphics", L"AntiAliasing", s.anti_aliasing);
     write_int(L"Graphics", L"DynamicShadows", s.dynamic_shadows);

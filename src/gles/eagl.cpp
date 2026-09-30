@@ -385,6 +385,18 @@ void install_eagl() {
         if (n <= 5 || n % 120 == 0) log_frame_stats(n);
         if (!draw_movie(sw, sh)) blit_to_window(rb, d.rb_w, d.rb_h, sw, sh);
         if (g_overlay) g_overlay(sw, sh);
+#ifdef __ANDROID__
+        if (unsigned fps = uikit::shown_fps()) {  // settings: Show FPS
+            static std::vector<u8> panel;
+            static int pw = 0, ph = 0;
+            static unsigned drawn = 0;
+            if (fps != drawn) {
+                uikit::render_text_panel({std::to_string(fps) + " FPS"}, sh * 0.03f, panel, pw, ph);
+                drawn = fps;
+            }
+            if (!panel.empty()) draw_rgba_rect(panel.data(), pw, ph, 0xF9500000ull + fps, sh / 40, sh / 40, pw, ph, sh);
+        }
+#endif
         if (g_screenshot_every && n % g_screenshot_every == 0) {
             char path[64];
             snprintf(path, sizeof path, "shot_%05llu.png", (unsigned long long)n);

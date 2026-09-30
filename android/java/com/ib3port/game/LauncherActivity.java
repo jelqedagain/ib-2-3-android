@@ -6,7 +6,6 @@ import android.content.ClipData;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
-import android.graphics.Color;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Build;
@@ -17,7 +16,6 @@ import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
 import android.view.WindowManager;
-import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
@@ -67,8 +65,8 @@ public class LauncherActivity extends Activity {
     private String gameName, ipaVersion, bundleId, size;
     private TextView status;
     private ProgressBar progress;
-    private Button choose;
-    private final List<Button> menuButtons = new ArrayList<>();
+    private View choose;
+    private final List<View> menuButtons = new ArrayList<>();
 
     private File filesDir() {
         File dir = getExternalFilesDir(null);
@@ -138,123 +136,155 @@ public class LauncherActivity extends Activity {
         }
     }
 
-    // The screen's column, starting with the game's icon and name.
-    private LinearLayout column() {
-        LinearLayout column = new LinearLayout(this);
-        column.setOrientation(LinearLayout.VERTICAL);
-        column.setGravity(Gravity.CENTER_HORIZONTAL);
-        column.setPadding(dp(32), dp(24), dp(32), dp(24));
+    // The left half of the screen: the game's icon, its name and a line under it.
+    private LinearLayout brandPanel(String subtitle) {
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
 
         ImageView icon = new ImageView(this);
         Drawable d = getApplicationInfo().loadIcon(getPackageManager());
         icon.setImageDrawable(d);
-        column.addView(icon, new LinearLayout.LayoutParams(dp(72), dp(72)));
+        icon.setBackground(Ui.rounded(this, 0xFF000000, 20, 0));
+        icon.setClipToOutline(true);
+        icon.setElevation(dp(6));
+        panel.addView(icon, new LinearLayout.LayoutParams(dp(84), dp(84)));
 
-        TextView title = new TextView(this);
-        title.setText(gameName);
-        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 26);
-        title.setTextColor(Color.WHITE);
-        title.setGravity(Gravity.CENTER);
-        title.setPadding(0, dp(12), 0, dp(8));
-        column.addView(title);
-        return column;
+        TextView title = Ui.text(this, gameName, 30, Ui.TEXT, true);
+        title.setPadding(0, dp(16), 0, 0);
+        panel.addView(title);
+        TextView sub = Ui.text(this, subtitle, 13, Ui.SUBTEXT, false);
+        sub.setPadding(0, dp(3), 0, 0);
+        panel.addView(sub);
+        return panel;
     }
 
-    private void addStatus(LinearLayout column) {
-        status = new TextView(this);
-        status.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
-        status.setTextColor(0xFFDDDDDD);
-        status.setGravity(Gravity.CENTER);
-        status.setPadding(0, dp(10), 0, 0);
-        column.addView(status, new LinearLayout.LayoutParams(dp(520), LinearLayout.LayoutParams.WRAP_CONTENT));
+    private TextView makeStatus() {
+        status = Ui.text(this, "", 13.5f, Ui.SUBTEXT, false);
+        status.setPadding(0, dp(14), 0, 0);
+        return status;
     }
 
-    private void show(LinearLayout column) {
+    // Two halves side by side (the launcher is landscape); each scrolls if the screen is short.
+    private void show(View left, View right) {
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.HORIZONTAL);
+        root.setGravity(Gravity.CENTER_VERTICAL);
+        root.setPadding(dp(48), dp(20), dp(40), dp(20));
+        Ui.screenBackground(root);
+        root.addView(scrollable(left), new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1));
+        View gap = new View(this);
+        root.addView(gap, new LinearLayout.LayoutParams(dp(32), 1));
+        root.addView(scrollable(right), new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.15f));
+        setContentView(root);
+        showingSettings = false;
+        hideSystemBars();
+    }
+
+    // Full screen like the game; a swipe from the edge shows the bars for a moment.
+    private void hideSystemBars() {
+        android.view.WindowInsetsController c = getWindow().getInsetsController();
+        if (c == null) return;
+        c.hide(android.view.WindowInsets.Type.statusBars() | android.view.WindowInsets.Type.navigationBars());
+        c.setSystemBarsBehavior(android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+    }
+
+    private View scrollable(View content) {
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
         scroll.setVerticalScrollBarEnabled(false);
-        scroll.setBackgroundColor(Color.BLACK);
         LinearLayout center = new LinearLayout(this);
-        center.setGravity(Gravity.CENTER);
-        center.addView(column);
+        center.setGravity(Gravity.CENTER_VERTICAL);
+        center.addView(content, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         scroll.addView(center);
-        setContentView(scroll);
+        return scroll;
     }
 
     private void buildInstallScreen() {
-        LinearLayout column = column();
-        TextView body = new TextView(this);
-        body.setText("Bring your own IPA.\n\nThis app runs the original iOS release of " + gameName + " (version " + ipaVersion + "). "
-                + "Choose your .ipa file and the game is installed into this app, which needs about " + size + " of free space. "
-                + "Your .ipa is only read, never changed or sent anywhere.");
-        body.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
-        body.setTextColor(0xFFCCCCCC);
-        body.setGravity(Gravity.CENTER);
-        column.addView(body, new LinearLayout.LayoutParams(dp(520), LinearLayout.LayoutParams.WRAP_CONTENT));
+        LinearLayout left = brandPanel("Android port " + appVersion());
 
-        choose = new Button(this);
-        choose.setText("Choose .ipa file");
+        LinearLayout card = Ui.card(this);
+        card.setPadding(dp(22), dp(20), dp(22), dp(22));
+        card.addView(Ui.text(this, "Bring your own IPA", 18, Ui.TEXT, true));
+        TextView body = Ui.text(this, "This app runs the original iOS release of " + gameName + " (version " + ipaVersion + "). "
+                + "Choose your .ipa file and the game is installed into this app, which needs about " + size + " of free space.\n\n"
+                + "Your .ipa is only read, never changed or sent anywhere.", 14, Ui.SUBTEXT, false);
+        body.setLineSpacing(0, 1.15f);
+        body.setPadding(0, dp(8), 0, 0);
+        card.addView(body);
+
+        choose = Ui.primaryButton(this, "Choose .ipa file");
         choose.setOnClickListener(v -> pickIpa());
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(52));
         lp.topMargin = dp(20);
-        column.addView(choose, lp);
+        card.addView(choose, lp);
 
         progress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
         progress.setMax(1000);
+        progress.setProgressTintList(android.content.res.ColorStateList.valueOf(Ui.ACCENT));
         progress.setVisibility(View.GONE);
-        LinearLayout.LayoutParams pp = new LinearLayout.LayoutParams(dp(420), LinearLayout.LayoutParams.WRAP_CONTENT);
-        pp.topMargin = dp(20);
-        column.addView(progress, pp);
+        LinearLayout.LayoutParams pp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        pp.topMargin = dp(16);
+        card.addView(progress, pp);
+        card.addView(makeStatus());
 
-        addStatus(column);
-        show(column);
+        show(left, card);
     }
 
     private void buildMenuScreen() {
-        LinearLayout column = column();
-        TextView version = new TextView(this);
-        version.setText("Android port " + appVersion());
-        version.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
-        version.setTextColor(0xFF888888);
-        version.setGravity(Gravity.CENTER);
-        column.addView(version);
-
-        Button play = new Button(this);
-        play.setText("Play");
-        play.setTextSize(TypedValue.COMPLEX_UNIT_SP, 20);
+        menuButtons.clear();
+        LinearLayout left = brandPanel("Android port " + appVersion());
+        TextView play = Ui.primaryButton(this, "▶   Play");
         play.setOnClickListener(v -> startGame());
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(260), LinearLayout.LayoutParams.WRAP_CONTENT);
-        lp.topMargin = dp(20);
-        column.addView(play, lp);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(260), dp(56));
+        lp.topMargin = dp(26);
+        left.addView(play, lp);
         menuButtons.add(play);
+        left.addView(makeStatus(), new LinearLayout.LayoutParams(dp(320), LinearLayout.LayoutParams.WRAP_CONTENT));
 
-        LinearLayout row = new LinearLayout(this);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setGravity(Gravity.CENTER);
-        addMenuButton(row, "Back up saves", v -> pickBackupFile());
-        addMenuButton(row, "Restore saves", v -> pickRestoreFile());
-        addMenuButton(row, "Share logs", v -> copyLogs()).setOnLongClickListener(v -> {
-            shareLogFile();
-            return true;
-        });
-        LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        rp.topMargin = dp(12);
-        column.addView(row, rp);
-
-        addStatus(column);
-        show(column);
+        LinearLayout card = Ui.card(this);
+        addMenuRow(card, "Settings", "Frame rate, screen, graphics, sound", v -> showSettings());
+        addMenuRow(card, "Edit save", "Gold, level, stats, items", v -> showSaveEditor());
+        addMenuRow(card, "Back up saves", "Save your progress to a .zip file", v -> pickBackupFile());
+        addMenuRow(card, "Restore saves", "Load your progress from a backup", v -> pickRestoreFile());
+        addMenuRow(card, "Share logs", "Copies the log for bug reports. Hold to send it as a file.", v -> copyLogs())
+            .setOnLongClickListener(v -> {
+                shareLogFile();
+                return true;
+            });
+        show(left, card);
     }
 
-    private Button addMenuButton(LinearLayout row, String text, View.OnClickListener click) {
-        Button b = new Button(this);
-        b.setText(text);
-        b.setAllCaps(false);
-        b.setOnClickListener(click);
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        lp.leftMargin = lp.rightMargin = dp(6);
-        row.addView(b, lp);
-        menuButtons.add(b);
-        return b;
+    private View addMenuRow(LinearLayout card, String title, String subtitle, View.OnClickListener click) {
+        if (card.getChildCount() > 0) card.addView(Ui.divider(this));
+        LinearLayout row = Ui.actionRow(this, title, subtitle, click);
+        card.addView(row);
+        menuButtons.add(row);
+        return row;
+    }
+
+    private boolean showingSettings;  // a page opened from the menu (Settings, Edit save): Back returns to the menu
+
+    private boolean isIb2() {
+        return getPackageName().equals("com.ib2port.game");
+    }
+
+    private void showSettings() {
+        setContentView(SettingsScreen.build(this, new File(filesDir(), "settings.ini"), isIb2(), GameActivity.started, this::buildMenuScreen));
+        showingSettings = true;
+        hideSystemBars();
+    }
+
+    private void showSaveEditor() {
+        setContentView(SaveEditorScreen.build(this, filesDir(), isIb2(), GameActivity.started, this::buildMenuScreen));
+        showingSettings = true;
+        hideSystemBars();
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (showingSettings) buildMenuScreen();
+        else super.onBackPressed();
     }
 
     private void pickIpa() {
@@ -427,7 +457,7 @@ public class LauncherActivity extends Activity {
     }
 
     private void runTask(String working, Task task) {
-        for (Button b : menuButtons) b.setEnabled(false);
+        for (View b : menuButtons) Ui.setEnabled(b, false);
         status.setText(working);
         new Thread(() -> {
             String message;
@@ -438,7 +468,7 @@ public class LauncherActivity extends Activity {
             }
             final String text = message;
             runOnUiThread(() -> {
-                for (Button b : menuButtons) b.setEnabled(true);
+                for (View b : menuButtons) Ui.setEnabled(b, true);
                 if (text != null) status.setText(text);
             });
         }).start();

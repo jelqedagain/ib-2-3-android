@@ -47,11 +47,27 @@ bool read_property(cpu::Thread& t, GuestAddr obj, const char* name, T& out) {
     return true;
 }
 
+// Byte offset in `obj` of member `member` of its struct property `struct_prop`, or -1.
+int struct_member_offset(cpu::Thread& t, GuestAddr obj, const char* struct_prop, const char* member);
+
 // Calls script function `func` on `obj` with a parameter block (UObject::ProcessEvent).
 bool call_event(cpu::Thread& t, GuestAddr obj, const std::string& func, void* params);
 
 // Logs every script property of `obj`'s class (name, type, offset), for reverse engineering.
 void dump_properties(cpu::Thread& t, GuestAddr obj, const char* filter = nullptr);
+
+// Logs the values of `obj`'s game (Sword*) properties, then those of the game objects it points to.
+void dump_values(cpu::Thread& t, GuestAddr obj, int depth = 0);
+
+// Logs the game (Sword*) script functions of `obj`'s class whose names contain one of `words`
+// ("gold|xp|level", lower case).
+void dump_functions(cpu::Thread& t, GuestAddr obj, const char* words);
+
+// GEngine, or 0 before the engine exists.
+GuestAddr engine();
+
+// GEngine->GamePlayers[0]->Actor (the player controller), or 0.
+GuestAddr player_controller(cpu::Thread& t);
 
 // GEngine->GamePlayers[0]->Actor->PlayerInput, or 0.
 GuestAddr player_input(cpu::Thread& t);

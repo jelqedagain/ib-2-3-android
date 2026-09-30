@@ -34,6 +34,10 @@ extern std::function<void(int vk, bool down)> g_key_handler;
 void create_window();         // on the main thread; installs ns::g_main_pump if it has messages to pump
 void* main_window();          // HWND / ANativeWindow* (nullptr: render off screen)
 void show_fps(unsigned fps);  // any thread (settings: ShowFPS)
+#ifdef __ANDROID__
+unsigned shown_fps();  // the last one shown, 0 when the counter is off
+void render_text_panel(const std::vector<std::string>& lines, float px, std::vector<u8>& rgba, int& w, int& h);
+#endif
 void app_will_terminate();    // tells the app delegate (uikit.cpp)
 void app_set_active(bool active);  // main thread: background / foreground, like iOS
 bool app_active();                 // whether the app is in the foreground (any thread)

@@ -44,10 +44,13 @@ void set_native_window(void* window) { g_window = window; }
 void create_window() {}
 void* main_window() { return g_window.load(); }
 
-void show_fps(unsigned fps) {
-    static unsigned n = 0;
-    if (++n % 5 == 0) LOG_INFO("%u FPS", fps);
-}
+namespace {
+std::atomic<unsigned> g_shown_fps{0};
+}  // namespace
+
+// Drawn in the top-left corner after each frame (gles/eagl.cpp).
+void show_fps(unsigned fps) { g_shown_fps = std::max(fps, 1u); }
+unsigned shown_fps() { return g_shown_fps; }
 
 // Boot screen: the startup movie plays while the engine loads, before the game draws anything.
 void create_boot_window(void* window, const std::wstring&) {

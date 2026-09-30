@@ -251,8 +251,8 @@ int32_t on_input(android_app*, AInputEvent* e) {
 // Tells Android the rate the game draws at, so a 120 or 144 Hz screen runs at a multiple of it (60 fps
 // on a 144 Hz screen shows uneven frame times: it feels laggy even when the game keeps up).
 void hint_frame_rate(ANativeWindow* window) {
-    if (is_infinity_blade_2()) return;  // Infinity Blade III only
-    float fps = settings::get().max_fps >= 60 ? 60.0f : 30.0f;
+    float fps = (float)settings::get().max_fps;
+    if (is_infinity_blade_2() && fps == 60) return;  // IB2 at its default rate: as before (no hint)
     using SetFrameRate = int32_t (*)(ANativeWindow*, float, int8_t);  // in libnativewindow, not always linkable
     void* lib = dlopen("libnativewindow.so", RTLD_NOW);
     auto set = reinterpret_cast<SetFrameRate>(dlsym(lib ? lib : RTLD_DEFAULT, "ANativeWindow_setFrameRate"));
@@ -270,11 +270,13 @@ void on_cmd(android_app* app, int32_t cmd) {
             // Fill the screen: keep iOS's 414-point height and widen the emulated screen to the
             // phone's shape (Infinity Blade III lays itself out for any width). Infinity Blade II
             // only knows the iPhone screens of its time: it is widened only on phones longer than
-            // 16:9, where game::install_widescreen patches its HUD layout (or goes back to 16:9).
+            // 16:9, where game::install_widescreen patches its HUD layout (or goes back to 16:9), unless
+            // the player chose 16:9 with black bars in the settings.
             int w = ANativeWindow_getWidth(app->window), h = ANativeWindow_getHeight(app->window);
             if (w > 0 && h > 0) {
                 double width = std::round(uikit::g_device.height_pt * std::max(w, h) / std::min(w, h));
-                if (!is_infinity_blade_2() || width > uikit::g_device.width_pt) uikit::g_device.width_pt = width;
+                if (!is_infinity_blade_2() || (width > uikit::g_device.width_pt && settings::get().widescreen))
+                    uikit::g_device.width_pt = width;
             }
             __android_log_print(ANDROID_LOG_INFO, "ib3", "window %dx%d: screen %.0fx%.0f points", w, h,
                                 uikit::g_device.width_pt, uikit::g_device.height_pt);

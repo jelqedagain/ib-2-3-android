@@ -18,7 +18,7 @@ VERSION="$(sed -n 's/.*android:versionName="\([^"]*\)".*/\1/p' android/AndroidMa
 rm -rf build-android/apk* && mkdir -p "$COMMON/classes" "$COMMON/lib/arm64-v8a" dist
 
 # The Java activities (launcher/installer, dialogs), compiled to classes.dex.
-javac --release 11 -classpath "$JAR" -d "$COMMON/classes" -Xlint:-options $(find android/java -name '*.java')
+javac --release 11 -encoding UTF-8 -classpath "$JAR" -d "$COMMON/classes" -Xlint:-options $(find android/java -name '*.java')
 java -cp "$BT/lib/d8.jar" com.android.tools.r8.D8 --release --min-api 30 --lib "$JAR" --output "$COMMON" \
     $(find "$COMMON/classes" -name '*.class')
 
