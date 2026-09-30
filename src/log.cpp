@@ -29,7 +29,13 @@ void write(Level lvl, const char* fmt, ...) {
     vsnprintf(buf, sizeof(buf), fmt, ap);
     va_end(ap);
     std::lock_guard lock(g_mutex);
-    if (!g_file) g_file = std::fopen("ib3rt.log", "w");
+    if (!g_file) {
+#ifdef __ANDROID__
+        // Keep the last run's log: after a crash, the player reopens the app to send it (Share logs).
+        std::rename("ib3rt.log", "ib3rt-previous.log");
+#endif
+        g_file = std::fopen("ib3rt.log", "w");
+    }
     unsigned tid = GetCurrentThreadId();
     static const u64 start = GetTickCount64();
     double secs = (GetTickCount64() - start) / 1000.0;
@@ -50,9 +56,14 @@ void show_error_dialog(const char* what) {
     if (!g_error_dialogs) return;
     static std::atomic<bool> shown{false};
     if (shown.exchange(true)) return;  // one dialog, even if several threads fail
+#ifdef __ANDROID__
+    std::string text = g_app_name + " stopped because of an error:\n\n" + what +
+                       "\n\nIf you report the problem, open the app again and tap Share logs, then paste the log into your report.";
+#else
     std::string text = g_app_name + " stopped because of an error:\n\n" + what +
                        "\n\nDetails were saved to ib3rt.log next to the game. If you report the problem, please "
                        "include that file.";
+#endif
     MessageBoxA(nullptr, text.c_str(), g_app_name.c_str(), MB_ICONERROR | MB_TOPMOST);
 }
 }  // namespace logging

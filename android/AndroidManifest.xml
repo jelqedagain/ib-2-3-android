@@ -40,5 +40,11 @@
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation|uiMode|density">
             <meta-data android:name="android.app.lib_name" android:value="ib3" />
         </activity>
+        <!-- Hands the log report to the app picked in the share sheet (Share logs). -->
+        <provider
+            android:name="com.ib3port.game.ShareProvider"
+            android:authorities="@PACKAGE@.share"
+            android:exported="false"
+            android:grantUriPermissions="true" />
     </application>
 </manifest>

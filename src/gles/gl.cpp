@@ -206,6 +206,10 @@ void* gl_proc(const char* name) { return reinterpret_cast<void*>(GetProcAddress(
 FrameStats g_stats;
 
 void log_frame_stats(u64 frame) {
+    if (frame == 1) {  // which GPU and driver: many graphics bugs are specific to one
+        auto str = [](GLenum name) { const u8* s = p_glGetString(name); return s ? reinterpret_cast<const char*>(s) : "?"; };
+        LOG_INFO("GPU: %s (%s), %s", str(GL_RENDERER), str(GL_VENDOR), str(GL_VERSION));
+    }
     // Drain errors the game did not look at.
     u32 pending = 0;
     while (p_glGetError() != 0 && pending < 32) pending++;

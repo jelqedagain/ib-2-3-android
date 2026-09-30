@@ -16,6 +16,15 @@ import android.widget.TextView;
  * iOS alerts are shown here as Android dialogs (see src/port/android/dialogs.cpp).
  */
 public class GameActivity extends NativeActivity {
+    /** Whether the game has run in this process (it keeps its save files in memory until it exits). */
+    static boolean started;
+
+    @Override
+    protected void onCreate(android.os.Bundle state) {
+        started = true;
+        super.onCreate(state);
+    }
+
     /** Reports the button chosen (and the text typed, for text prompts) for alert `id`. */
     static native void nativeAlertResult(int id, int button, String text);
 
