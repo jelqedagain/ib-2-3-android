@@ -1,30 +1,54 @@
 # Changelog
 
+One codebase builds two Android apps that share a version number:
+
+- **IB2 app:** Infinity Blade II (`com.ib2port.game`)
+- **IB3 app:** Infinity Blade III (`com.ib3port.game`)
+
+Each entry says which app a change is for. "Both" means the shared code, so it applies to both apps. A version number is skipped for an app when that app was not released at that version.
+
 ## 1.3.2 (2026-09-30)
-- Full screen on phones longer than 16:9 for the Infinity Blade II app: the HUD layout limit is raised in a patched copy served to the app, and the menu backdrops are widened to match. Falls back to 16:9 if the patch does not apply.
-- A watchdog writes where every game thread is to the log if the app stops drawing while on screen.
+Released: **IB2 app only** (the IB3 app stays at 1.3.1).
+
+- **IB2:** Full screen on phones longer than 16:9 (for example Galaxy S25/S26 and Pixel phones). The app serves the game patched copies of its HUD layout script and menu backdrops, so the HUD fills the screen, touch zones line up, and the menu backdrops cover the wider view. If the patch does not apply, it falls back to 16:9 with black bars. This replaces the 1.2.2 behaviour.
+- **Both:** A watchdog writes where every game thread is to the log when the app stops drawing while on screen.
 
 ## 1.3.1 (2026-09-30)
-- Share logs includes how the app last closed (exit reasons and crash text); Java crashes are logged.
+Released: **IB3 app only**.
+
+- **Both (code), IB3 (released):** Share logs also includes how the app last closed (Android exit reasons and crash text), and Java crashes are logged.
 
 ## 1.3.0 (2026-09-29)
-- Game controller support.
-- Fixed the black screen after the ending scene in Infinity Blade II (a nil image name now returns no image, as on iOS).
-- Memory barriers in Infinity Blade II are made full ones, fixing a render-thread crash on some phones.
+Released: **both apps**.
+
+- **Both:** Game controller support (built-in handheld controls and Bluetooth/USB pads).
+- **IB2:** Fixed the black screen after Isa's scene at the end of the game: the game asked for a missing image by nil name, which now returns no image, as on iOS.
+- **IB2:** Store-only memory barriers are made full ones, fixing a render-thread crash on some newer phones (seen on a Galaxy S25 FE).
 
 ## 1.2.4 (2026-09-29)
-- App menu: Play, Back up saves, Restore saves, Share logs.
-- A fresh window surface after the boot screen (fixes wrong textures on some Mali GPUs).
+Released: **both apps**.
+
+- **Both:** App menu with Play, Back up saves, Restore saves and Share logs (for bug reports).
+- **Both:** The game gets a fresh window surface after the boot screen, fixing wrong textures on some Mali GPUs.
 
 ## 1.2.3 (2026-09-29)
-- Window surface released between frames (fixes corruption after resuming on Mali GPUs).
-- Offline answers for the game's Game Center, account and iCloud requests.
+Released: **both apps**.
+
+- **Both:** The window surface is released between frames, fixing corrupted pictures after switching apps on Mali GPUs.
+- **IB2:** The game's Game Center, account, iAd and iCloud requests now always get an offline answer.
 
 ## 1.2.2 (2026-09-29)
-- Infinity Blade II keeps a 16:9 screen on longer phones (replaced in 1.3.2).
+Released: **IB2 app** (the IB3 app was rebuilt at this version with no changes for it).
+
+- **IB2:** Menus and fight buttons were zoomed in and cut off on phones longer than 16:9. The app now keeps a 16:9 screen there, with black bars at the sides (replaced in 1.3.2).
 
 ## 1.2.1 (2026-09-29)
-- Very large movies are converted at half size.
+Released: **IB3 app** update, and the **first release of the IB2 app**.
+
+- **IB2:** First release, built from the same code as the IB3 app, with sharp character shadows on non-Apple GPUs.
+- **IB3:** Very large movies are converted at half size.
 
 ## 1.2.0 (2026-09-29)
-- Movies, full-screen 60 FPS, Android dialogs, install from an `.ipa`.
+**IB3 app** (the IB2 app did not exist yet).
+
+- Movies, full-screen 60 FPS, the game's alerts as Android dialogs, and installing the game from an `.ipa`.
