@@ -48,10 +48,27 @@ std::vector<Event> events() {
     return {
         {"port-darkknight", day - 86400, day + 6 * 86400, 5,
          "[SwordBattleEvent]\n"
+         "Title=The Dark Knight Trial\n"
+         "Version=1.4\n"  // must list SwordClashMobManager.BattleEventVersion
          "BattleType=BT_KillNBosses\n"
-         "BossObj=B_Boss_GameObjs.10ft_sns.10ft_SnS_BlackKnight\n"
+         "BossObj=10ft_SnS_BlackKnight\n"  // a SwordBossItems.ini item (HasValidBoss looks it up)
          "RequiredLevel=1\n"
-         "MapName=E01_Obelisk_Nav\n"
+         "MaxPlays=10\n"
+         // Reward tiers: the treasure (eTouchRewardActor) given for reaching each goal. ".Key=" adds an array
+         // entry (UE3 ini syntax); a plain "Key=" would replace the one before.
+         ".RewardType=TRA_Gold_Large\n"
+         ".RewardData=\n"
+         ".RewardGoal=1\n"
+         ".RewardType=TRA_GrabBag_Uber\n"
+         ".RewardData=\n"
+         ".RewardGoal=3\n"
+         ".RewardType=TRA_Chips_Large\n"
+         ".RewardData=\n"
+         ".RewardGoal=5\n"
+         "MapName=00_ClashMob_BaseScripting\n"  // the ClashMob level (story maps keep their own bosses)
+         // Its scenery, streamed into it: cm_obelisk_art, cm_lake_art, cm_dunes_art, C01_CM_Monastery_Art,
+         // B20_FieldBurning_CM, B20_CrackedDesert_CM or B20_SandDay_CM
+         "SubMapName=cm_obelisk_art\n"
          "QuestMapPin=MapPin_Obelisk_A\n"},
     };
 }
@@ -158,7 +175,7 @@ std::string challenge_json(const Event& e, const Status& s) {
         .str("endDate", iso_time(e.end))
         .str("completedDate", over || won ? iso_time(won ? s.update_time : e.end) : "")
         .str("purgeDate", iso_time(e.end + 30 * 86400))
-        .str("challengeType", "SOCIAL")
+        .str("challengeType", "SOLO")  // "SOCIAL" is a co-op mob (parent and child rounds)
         .num("attempts", s.attempts)
         .num("successfulAttempts", s.successful)
         .num("goalValue", e.goal)
@@ -202,7 +219,7 @@ std::string challenge_json(const Event& e, const Status& s) {
 std::string status_json(const std::string& challenge, const Status& s) {
     return Json()
         .str("challengeId", challenge)
-        .str("epicId", player_id())
+        .str("epicId", "")  // the game's account id: none (see clashmob_script_call)
         .str("saveSlotId", s.slot)
         .num("numAttempts", s.attempts)
         .num("numSuccessfulAttempts", s.successful)
@@ -240,12 +257,13 @@ std::string query_value(const std::string& query, const std::string& key) {
     return "";
 }
 
+// "/sword/api/x" -> {"sword", "api", "x"}. Empty parts in the middle stay: the player has no account id, so
+// the game asks for ".../users//saveSlots/0".
 std::vector<std::string> split_path(const std::string& path) {
     std::vector<std::string> out;
-    std::istringstream in(path);
+    std::istringstream in(path.size() > 1 && path[0] == '/' ? path.substr(1) : path);
     std::string part;
-    while (std::getline(in, part, '/'))
-        if (!part.empty()) out.push_back(part);
+    while (std::getline(in, part, '/')) out.push_back(part);
     return out;
 }
 
@@ -300,8 +318,7 @@ bool serve(const ns::HttpRequest& req, ns::HttpResponse& resp) {
     }
     // POST /sword/api/challenges/{id}/users: the statuses of the players listed in the body
     if (p.size() == 5 && p[4] == "users") {
-        bool asked = req.body.empty() || body.find(player_id()) != std::string::npos;
-        resp.body = asked && s.accepted ? "[" + status_json(e->id, s) + "]" : "[]";
+        resp.body = s.accepted ? "[" + status_json(e->id, s) + "]" : "[]";  // the one player there is
         return true;
     }
     // POST /sword/api/challenges/{id}/users/{epicId}/saveSlots/{slot}[/updateProgress|/updateReward]
@@ -420,20 +437,37 @@ void give_account(cpu::Thread& t) {
 
 bool clashmob_wants_script_hook() { return !is_infinity_blade_2(); }
 
-// The ClashMob code asks SwordMyMobManager.UserHasMcpId() before showing an event (on the map, in its menu). The
-// player has no online account (one would make the game look for another set of saves), so for the ClashMob
-// code only, the answer is yes. Everything else (saves, cloud) still sees no account.
+// Script functions answered here:
+// - SwordMyMobManager.UserHasMcpId(): the ClashMob code only shows an event to players with an online account. The
+//   player has none (one would make the game look for another set of saves), so for the ClashMob code only, the
+//   answer is yes. Everything else (saves, cloud) still sees no account.
+// - SwordQuestData.GetShowQuestType(): the map shows the quest types the story has introduced so far, and ClashMobs
+//   come late in it. A ClashMob quest counts as a side quest, so ClashMobs show from the start.
+enum class Target { None, UserHasMcpId, GetShowQuestType };
+
 bool clashmob_script_call(cpu::Thread& t, GuestAddr frame, GuestAddr result) {
-    constexpr u64 kFrameNode = 0x18, kFramePrevious = 0x38, kObjOuter = 0x40;
+    constexpr u64 kFrameNode = 0x18, kFrameObject = 0x20, kFramePrevious = 0x38, kObjOuter = 0x40;
     static std::mutex mutex;
-    static std::unordered_map<GuestAddr, bool> targets, callers;
+    static std::unordered_map<GuestAddr, Target> targets;
+    static std::unordered_map<GuestAddr, bool> callers;
     GuestAddr fn = *gptr<u64>(frame + kFrameNode);
     std::lock_guard lock(mutex);
     auto it = targets.find(fn);
-    if (it == targets.end())
-        it = targets.emplace(fn, ue::object_name(t, fn) == "UserHasMcpId" &&
-                                     ue::object_name(t, *gptr<u64>(fn + kObjOuter)) == "SwordMyMobManager").first;
-    if (!it->second) return false;
+    if (it == targets.end()) {
+        std::string name = ue::object_name(t, fn), cls = ue::object_name(t, *gptr<u64>(fn + kObjOuter));
+        Target k = name == "UserHasMcpId" && cls == "SwordMyMobManager"      ? Target::UserHasMcpId
+                   : name == "GetShowQuestType" && cls == "SwordQuestData" ? Target::GetShowQuestType
+                                                                            : Target::None;
+        it = targets.emplace(fn, k).first;
+    }
+    if (it->second == Target::GetShowQuestType) {
+        GuestAddr quest = *gptr<u64>(frame + kFrameObject);
+        u64 clashmob = 0;
+        if (!ue::read_property(t, quest, "ClashMob", clashmob) || !clashmob) return false;
+        if (result) *gptr<u8>(result) = 1;  // SQT_QuestSecondary
+        return true;
+    }
+    if (it->second != Target::UserHasMcpId) return false;
     GuestAddr prev = *gptr<u64>(frame + kFramePrevious);
     GuestAddr caller = prev ? *gptr<u64>(prev + kFrameNode) : 0;
     auto c = callers.find(caller);
