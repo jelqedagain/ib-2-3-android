@@ -1,8 +1,8 @@
 # Changelog
 
-Two Android apps are built from one codebase. Each has its own versions and its own releases; a version number is skipped for an app when that app did not change. Release tags are `ib2-v<version>` and `ib3-v<version>`.
+Two Android apps, IB2 and IB3, are built from one codebase. Each has its own version history; a version number is skipped for an app when that app did not change. Tags are `ib2-v<version>` and `ib3-v<version>`.
 
-# Infinity Blade II (IB2)
+# IB2
 
 ## 1.3.2 (2026-09-30)
 - Full screen on phones longer than 16:9 (for example Galaxy S25/S26 and Pixel phones). The app serves the game patched copies of its HUD layout script and menu backdrops, so the HUD fills the screen, touch zones line up, and the menu backdrops cover the wider view. If the patch does not apply, it falls back to 16:9 with black bars.
@@ -11,7 +11,7 @@ Two Android apps are built from one codebase. Each has its own versions and its 
 
 ## 1.3.0 (2026-09-29)
 - Game controller support (built-in handheld controls and Bluetooth/USB pads).
-- Fixed the black screen after Isa's scene at the end of the game: the game asked for a missing image by nil name, which now returns no image, as on iOS.
+- Fixed the black screen after the final scene of the game: the game asked for a missing image by nil name, which now returns no image, as on iOS.
 - Store-only memory barriers are made full ones, fixing a render-thread crash on some newer phones (seen on a Galaxy S25 FE).
 
 ## 1.2.4 (2026-09-29)
@@ -26,9 +26,9 @@ Two Android apps are built from one codebase. Each has its own versions and its 
 - Menus and fight buttons were zoomed in and cut off on phones longer than 16:9. The app now keeps a 16:9 screen there, with black bars at the sides (replaced in 1.3.2).
 
 ## 1.2.1 (2026-09-29)
-- Infinity Blade II for Android, with sharp character shadows on GPUs other than Apple's.
+- First IB2 build, with sharp character shadows on GPUs other than Apple's.
 
-# Infinity Blade III (IB3)
+# IB3
 
 ## 1.3.3 (2026-09-30)
 - Aimed at frame-rate drops below 60 on some Adreno phones (a Red Magic 11 Pro dropped to about 54 in outdoor scenes and the hideout). The cause is not confirmed; the changes are:
