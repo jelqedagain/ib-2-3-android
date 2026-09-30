@@ -26,3 +26,10 @@ settings.ini
 /build-android/
 /tools/
 /Infinity Blade III.exe.*.old
+
+# Game artwork: local builds only, never committed
+android/res-ib2/
+android/res-ib3/
+assets/app.ico
+assets/app.png
+docs/
