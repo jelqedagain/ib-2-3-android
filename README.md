@@ -6,13 +6,15 @@
 
 Infinity Blade III was pulled from the App Store in 2018 and can no longer be bought or downloaded. This project exists so the game can still be played.
 
-### [⬇ Download the APK (Android 11+, 64-bit)](https://github.com/jelqscape/Infinity-Blade-III-Android/releases/latest/download/InfinityBladeIII-Android.apk)
+### [⬇ Download the APK (Android 11+, 64-bit)](https://archive.org/details/infinity-blade-3-android)
+
+The same code also builds an **Infinity Blade II** app (version 1.3.5 `.ipa`, for example the Community Patch v2.5): [download it here](https://archive.org/details/infinity-blade-2-android). Both apps can be installed side by side.
 
 ![Infinity Blade III running on a Galaxy S25](docs/android-gameplay.jpg)
 
 ## Install and play
 
-1. [Download `InfinityBladeIII-Android.apk`](https://github.com/jelqscape/Infinity-Blade-III-Android/releases/latest/download/InfinityBladeIII-Android.apk) on your phone and open it. The first time, Android asks you to allow installing apps from your browser or file manager. All versions are on the [Releases](../../releases) page.
+1. [Download the APK](https://archive.org/details/infinity-blade-3-android) on your phone and open it. The first time, Android asks you to allow installing apps from your browser or file manager. The download page also has the changelog and the source code of each version.
 2. Put your Infinity Blade III `.ipa` (version 1.4.4) on the phone, for example in Downloads.
 3. Open **Infinity Blade III**, tap **Choose .ipa file** and pick it. Installing takes under a minute. You can delete the `.ipa` afterwards.
 
@@ -112,8 +114,8 @@ The build scripts run in Git Bash on Windows. They need, in `tools/android/`:
 Plus CMake 3.20 or newer (`tools/cmake`), Ninja (`tools/ninja.exe`), a JDK and Python 3.
 
 ```sh
-git clone https://github.com/jelqscape/Infinity-Blade-III-Android.git
-cd Infinity-Blade-III-Android
+git clone https://github.com/jelqedagain/ib-2-3-android.git
+cd ib-2-3-android
 scripts/build-apk.sh       # dist/InfinityBladeIII-Android.apk
 ./build-android.sh         # build-android/ib3android: a command-line build for testing over adb
 ```
@@ -122,7 +124,7 @@ The first run of `scripts/build-apk.sh` creates a signing key in `tools/android/
 
 ## Windows version
 
-The same project also runs Infinity Blade III on Windows PCs, with keyboard and controller support and a settings launcher. The Windows download is on the [Releases](../../releases) page, and its instructions are on the [`windows` branch](../../tree/windows).
+The same project also runs Infinity Blade III on Windows PCs, with keyboard and controller support and a settings launcher. The Windows version is not published here at the moment.
 
 ## Credits and legal
 
