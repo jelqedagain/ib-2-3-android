@@ -8,7 +8,7 @@ One codebase builds two Android apps that share a version number:
 Each entry says which app a change is for. "Both" means the shared code, so it applies to both apps. A version number is skipped for an app when that app was not released at that version.
 
 ## 1.3.2 (2026-09-30)
-Released: **IB2 app only** (the IB3 app stays at 1.3.1).
+Released: **IB2 app** (the IB3 app on archive.org stays at 1.3.1; an IB3 build of the same code, with no IB3-specific changes, is attached to the GitHub release).
 
 - **IB2:** Full screen on phones longer than 16:9 (for example Galaxy S25/S26 and Pixel phones). The app serves the game patched copies of its HUD layout script and menu backdrops, so the HUD fills the screen, touch zones line up, and the menu backdrops cover the wider view. If the patch does not apply, it falls back to 16:9 with black bars. This replaces the 1.2.2 behaviour.
 - **Both:** A watchdog writes where every game thread is to the log when the app stops drawing while on screen.
