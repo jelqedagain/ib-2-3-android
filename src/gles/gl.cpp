@@ -5,6 +5,8 @@
 #include "uikit/labels.h"
 #include <miniz/miniz.h>
 #include <atomic>
+#include <cctype>
+#include <cstring>
 #include <mutex>
 #include <string>
 #include <unordered_map>
@@ -204,6 +206,11 @@ void load_gl_functions() {
 void* gl_proc(const char* name) { return reinterpret_cast<void*>(GetProcAddress(g_gles, name)); }
 
 FrameStats g_stats;
+
+bool gpu_is_adreno() {
+    const u8* r = p_glGetString(GL_RENDERER);
+    return r && std::strstr(reinterpret_cast<const char*>(r), "Adreno");
+}
 
 void log_frame_stats(u64 frame) {
     if (frame == 1) {  // which GPU and driver: many graphics bugs are specific to one
@@ -446,6 +453,29 @@ struct ErrorCheck {
 // GLSL ES 1.00 only allows constant initializers on global variables. Apple's compiler also took
 // uniforms (Infinity Blade II's light shafts: `float BloomScale = LightShaftParameters.y;`), which
 // stricter drivers reject. Such globals become plain declarations assigned at the start of main().
+// Whether an expression is made of numbers and constructors of basic types only (no variable, uniform or call).
+bool only_literals(const std::string& s) {
+    for (size_t i = 0; i < s.size();) {
+        unsigned char c = (unsigned char)s[i];
+        if (std::isalpha(c) || c == '_') {
+            size_t j = i;
+            while (j < s.size() && (std::isalnum((unsigned char)s[j]) || s[j] == '_')) j++;
+            std::string w = s.substr(i, j - i);
+            bool type = w == "float" || w == "int" || w == "bool" || w == "true" || w == "false" || w.compare(0, 3, "vec") == 0 ||
+                        w.compare(0, 4, "ivec") == 0 || w.compare(0, 4, "bvec") == 0 || w.compare(0, 3, "mat") == 0;
+            if (!type) return false;
+            i = j;
+        } else if (std::isdigit(c) || c == '.') {
+            while (i < s.size() && (std::isalnum((unsigned char)s[i]) || s[i] == '.' ||
+                                    ((s[i] == '-' || s[i] == '+') && (s[i - 1] == 'e' || s[i - 1] == 'E'))))
+                i++;
+        } else {
+            i++;
+        }
+    }
+    return true;
+}
+
 std::string fix_global_initializers(const std::string& src) {
     auto trim = [](std::string s) {
         size_t a = s.find_first_not_of(" \t\r"), b = s.find_last_not_of(" \t\r");
@@ -464,6 +494,8 @@ std::string fix_global_initializers(const std::string& src) {
                        code.find_first_of("{}(") > eq && code.find(',') > eq && code.compare(0, 6, "const ") != 0 &&
                        code.compare(0, 8, "uniform ") != 0 && code.compare(0, 10, "attribute ") != 0 &&
                        code.compare(0, 8, "varying ") != 0 && code.compare(0, 10, "precision ") != 0;
+        // A constant initializer is legal as it is (Infinity Blade III's FXAA pass has several): leave those alone.
+        if (movable && only_literals(trim(code.substr(eq + 1, code.size() - eq - 2)))) movable = false;
         std::string decl = movable ? trim(code.substr(0, eq)) : std::string();
         size_t name_at = decl.find_last_of(" \t");
         if (movable && name_at != std::string::npos) {
@@ -590,7 +622,15 @@ void install_gl() {
         std::string src;
         for (GLsizei i = 0; i < count; i++)
             src += lengths && lengths[i] >= 0 ? std::string(strings[i], lengths[i]) : std::string(strings[i]);
-        std::string fixed = smooth_modulated_shadows(fix_global_initializers(src));
+        std::string moved = fix_global_initializers(src);
+        std::string fixed = smooth_modulated_shadows(moved);
+        static std::atomic<int> total{0}, rewritten{0};
+        int n = ++total;
+        if (moved != src || fixed != moved) {
+            int r = ++rewritten;
+            if (r <= 10 || r % 50 == 0)
+                LOG_INFO("shader %d rewritten (%d so far): %s", n, r, moved != src ? "globals moved into main" : "shadow filter");
+        }
         if (fixed == src) return p_glShaderSource(s, count, strings, lengths);
         const char* one = fixed.c_str();
         p_glShaderSource(s, 1, &one, nullptr);

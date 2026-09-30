@@ -3,8 +3,14 @@
 #include "gles/gl.h"
 #include "objc/internal.h"
 #include "uikit/uikit.h"
+#include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <mutex>
+#ifdef __ANDROID__
+#include <sys/system_properties.h>
+#include <time.h>
+#endif
 
 namespace gles {
 
@@ -351,14 +357,53 @@ void install_eagl() {
                 g_shot_request.clear();
             }
         }
+        {   // One line every 10 s that shows at a glance how the game is running (for bug reports).
+            using clock = std::chrono::steady_clock;
+            static clock::time_point last = clock::now(), window = last;
+            static int count = 0, slow = 0;
+            static double worst = 0;
+#ifdef __ANDROID__
+            auto cpu_now = [] { timespec ts; clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &ts); return ts.tv_sec + ts.tv_nsec * 1e-9; };
+            static double cpu_window = cpu_now();
+#endif
+            clock::time_point now = clock::now();
+            double ms = std::chrono::duration<double, std::milli>(now - last).count();
+            last = now;
+            count++;
+            worst = std::max(worst, ms);
+            if (ms > 25) slow++;
+            double span = std::chrono::duration<double>(now - window).count();
+            if (span >= 10) {
+#ifdef __ANDROID__
+                double cpu = cpu_now();
+                LOG_INFO("perf: %.1f fps, worst frame %.0f ms, %d frames over 25 ms, %.0f%% of one CPU core", count / span, worst,
+                         slow, (cpu - cpu_window) / span * 100);
+                cpu_window = cpu;
+#else
+                LOG_INFO("perf: %.1f fps, worst frame %.0f ms, %d frames over 25 ms", count / span, worst, slow);
+#endif
+                window = now;
+                count = slow = 0;
+                worst = 0;
+            }
+        }
         g.SwapBuffers(g.dpy, g.surf);
 #ifdef __ANDROID__
         // Let go of the window until the next frame. Android destroys it whenever the app leaves the
         // screen, and the game stops presenting then: a window left current on its thread was still
         // attached when that happened, and on some drivers (Mali) the game's graphics came back
         // black or with garbled textures.
-        g.MakeCurrent(g.dpy, nullptr, nullptr, d.ctx);
-        t_surface_bound = false;
+        // Adreno GPUs never showed the problem, and re-attaching the window every frame costs them
+        // frame time on some drivers: release only elsewhere. debug.ibport.keepsurface 1/0 forces it.
+        static const bool release_surface = [] {
+            char v[PROP_VALUE_MAX] = "";
+            if (__system_property_get("debug.ibport.keepsurface", v) > 0 && (v[0] == '1' || v[0] == '0')) return v[0] == '0';
+            return !gpu_is_adreno();
+        }();
+        if (release_surface) {
+            g.MakeCurrent(g.dpy, nullptr, nullptr, d.ctx);
+            t_surface_bound = false;
+        }
 #endif
         g_presented = true;
         uikit::on_frame_presented();

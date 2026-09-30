@@ -7,6 +7,16 @@ One codebase builds two Android apps that share a version number:
 
 Each entry says which app a change is for. "Both" means the shared code, so it applies to both apps. A version number is skipped for an app when that app was not released at that version.
 
+## 1.3.3 (2026-09-30)
+Released: **IB3 app only** (release tag `ib3-v1.3.3`; from now on each app's releases have their own tag series, `ib3-v…` and `ib2-v…`).
+
+- **Both (code), IB3 (released):** Aimed at frame-rate drops below 60 on some Adreno phones (a Red Magic 11 Pro dropped to about 54 in outdoor scenes and the hideout). The cause is not confirmed; the changes are:
+  - The window surface is released between frames only on GPUs other than Adreno (the fix was for Mali phones; on Adreno it may only cost frame time).
+  - The game tells Android it draws at 60 FPS, so 120 and 144 Hz screens run at a multiple of it instead of showing uneven frame times.
+  - Shaders with constant initializers are no longer rewritten, so Infinity Blade III's shaders reach the GPU exactly as the game ships them (only its FXAA pass and one vertex shader were affected).
+- **Both:** The log has a `perf:` line every 10 seconds (frames per second, worst frame, CPU use) so a bug report shows how the game ran.
+- **Both:** Share logs leaves out the game's file-open lines ("OutPath"), which filled most of the log.
+
 ## 1.3.2 (2026-09-30)
 Released: **IB2 app** (the IB3 app on archive.org stays at 1.3.1; an IB3 build of the same code, with no IB3-specific changes, is attached to the GitHub release).
 

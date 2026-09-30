@@ -725,17 +725,22 @@ public class LauncherActivity extends Activity {
             out.write("(none)\n".getBytes(StandardCharsets.UTF_8));
             return false;
         }
-        try (RandomAccessFile f = new RandomAccessFile(log, "r")) {
-            long length = f.length();
-            if (length <= limit) {
-                copy(f, out, length);
-            } else {
-                long head = limit / 4, tail = limit - head;
-                copy(f, out, head);
-                out.write(("\n[... " + (length - head - tail) + " bytes left out ...]\n").getBytes(StandardCharsets.UTF_8));
-                f.seek(length - tail);
-                copy(f, out, tail);
-            }
+        // The game writes a line for every file it opens ("OutPath"): thousands of lines that tell nothing.
+        // Without them a log is a fraction of the size, and a pasted report (Discord and some keyboards cut
+        // long text) keeps the lines that matter: the perf lines and the end of the run.
+        StringBuilder text = new StringBuilder();
+        try (java.io.BufferedReader in = new java.io.BufferedReader(new java.io.InputStreamReader(new FileInputStream(log), StandardCharsets.UTF_8))) {
+            for (String line; (line = in.readLine()) != null; )
+                if (!line.contains("] [guest] OutPath : ")) text.append(line).append('\n');
+        }
+        byte[] all = text.toString().getBytes(StandardCharsets.UTF_8);
+        if (all.length <= limit) {
+            out.write(all);
+        } else {
+            int head = (int) (limit / 4), tail = (int) (limit - head);
+            out.write(all, 0, head);
+            out.write(("\n[... " + (all.length - head - tail) + " bytes left out ...]\n").getBytes(StandardCharsets.UTF_8));
+            out.write(all, all.length - tail, tail);
         }
         return true;
     }

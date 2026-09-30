@@ -17,6 +17,7 @@
 #include <android/native_window.h>
 #include <android/window.h>
 #include <android_native_app_glue.h>
+#include <dlfcn.h>
 #include <jni.h>
 #include <pthread.h>
 #include <sys/stat.h>
@@ -247,11 +248,23 @@ int32_t on_input(android_app*, AInputEvent* e) {
     return 1;
 }
 
+// Tells Android the rate the game draws at, so a 120 or 144 Hz screen runs at a multiple of it (60 fps
+// on a 144 Hz screen shows uneven frame times: it feels laggy even when the game keeps up).
+void hint_frame_rate(ANativeWindow* window) {
+    float fps = settings::get().max_fps >= 60 ? 60.0f : 30.0f;
+    using SetFrameRate = int32_t (*)(ANativeWindow*, float, int8_t);  // in libnativewindow, not always linkable
+    void* lib = dlopen("libnativewindow.so", RTLD_NOW);
+    auto set = reinterpret_cast<SetFrameRate>(dlsym(lib ? lib : RTLD_DEFAULT, "ANativeWindow_setFrameRate"));
+    int rc = set ? set(window, fps, ANATIVEWINDOW_FRAME_RATE_COMPATIBILITY_FIXED_SOURCE) : -1;
+    __android_log_print(ANDROID_LOG_INFO, "ib3", "frame rate hint %.0f fps (%d)", fps, rc);
+}
+
 void on_cmd(android_app* app, int32_t cmd) {
     switch (cmd) {
     case APP_CMD_INIT_WINDOW:
         if (!app->window) break;
         uikit::set_native_window(app->window);
+        hint_frame_rate(app->window);
         if (!g_started) {
             // Fill the screen: keep iOS's 414-point height and widen the emulated screen to the
             // phone's shape (Infinity Blade III lays itself out for any width). Infinity Blade II

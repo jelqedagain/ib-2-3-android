@@ -47,6 +47,9 @@ void pvrtc_decode(const u8* src, int width, int height, bool two_bpp, u8* rgba_o
 // Looks up a function of the OpenGL ES library (ANGLE's libGLESv2.dll, or the device's libGLESv2.so).
 void* gl_proc(const char* name);
 
+// Whether the current context runs on a Qualcomm Adreno GPU (needs a current context).
+bool gpu_is_adreno();
+
 // Function-pointer access for internal use (present blit, texture uploads).
 namespace fn {
 using GLenum = u32;
