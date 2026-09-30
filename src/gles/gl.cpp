@@ -543,15 +543,11 @@ std::string smooth_modulated_shadows(const std::string& src) {
 
 #ifdef __ANDROID__
 // Android GPUs can't sample PVRTC, and decoded to RGBA8 it takes 8x (2 bpp: 16x) the memory the game
-// budgets for: over 1 GB of textures at the beach, 2 GB while the tutorial hands over to it, enough for
-// Android to kill IB3 on 6-8 GB phones. There it is re-encoded as ETC2 (4 bpp, 8 with alpha).
+// budgets for. IB3: over 1 GB of textures at the beach, 2 GB while the tutorial hands over to it, enough
+// for Android to kill it on 6-8 GB phones; IB2: 0.7-0.9 GB, GPU peaks of 1.2 GB. On Android both games'
+// PVRTC is re-encoded as ETC2 (4 bpp, 8 with alpha).
 namespace {
 std::atomic<u64> g_etc2_textures{0}, g_etc2_bytes{0}, g_etc2_rgba_bytes{0}, g_etc2_us{0};
-
-bool reencode_pvrtc_as_etc2() {
-    static const bool on = !game::is_infinity_blade_2();  // IB3 only
-    return on;
-}
 
 // `rgba` is w x h RGBA8; returns ETC2 blocks for the texture padded to whole 4x4 blocks.
 std::vector<u64> encode_etc2(const u8* rgba, int w, int h, bool alpha) {
@@ -628,7 +624,7 @@ void install_gl() {
             std::vector<u8> rgba((size_t)std::max(w, 1) * std::max(h, 1) * 4);
             if (data) pvrtc_decode(static_cast<const u8*>(data), w, h, two_bpp, rgba.data());
 #ifdef __ANDROID__
-            if (reencode_pvrtc_as_etc2() && w > 0 && h > 0) {
+            if (w > 0 && h > 0) {
                 auto t0 = std::chrono::steady_clock::now();
                 bool alpha = fmt == 0x8C02 || fmt == 0x8C03;  // PVRTC RGBA formats
                 std::vector<u64> etc = encode_etc2(rgba.data(), w, h, alpha);

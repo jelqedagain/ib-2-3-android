@@ -4,6 +4,11 @@ Two Android apps, IB2 and IB3, are built from one codebase. Each has its own ver
 
 # IB2
 
+## 1.3.5 (2026-09-30)
+- Textures use about a quarter of the memory. Android GPUs can't read the game's PVRTC textures, and unpacked to full size they took 700-900 MB, with GPU memory peaks of 1.2 GB, enough for Android to close the game for low memory on 6-8 GB phones. They are now re-encoded as ETC2, which Android GPUs read directly: about 220 MB of textures, GPU memory peak about 330 MB.
+- The log has a `perf:` line every 10 seconds (frames per second, worst frame, CPU use, RAM and GPU memory) so a bug report shows how the game ran.
+- Share logs leaves out the game's file-open lines ("OutPath"), which filled most of the log.
+
 ## 1.3.2 (2026-09-30)
 - Full screen on phones longer than 16:9 (for example Galaxy S25/S26 and Pixel phones). The app serves the game patched copies of its HUD layout script and menu backdrops, so the HUD fills the screen, touch zones line up, and the menu backdrops cover the wider view. If the patch does not apply, it falls back to 16:9 with black bars.
 - Share logs includes how the app last closed (Android exit reasons and crash text); Java crashes are logged.
