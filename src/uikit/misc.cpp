@@ -5,8 +5,11 @@
 #include "uikit/labels.h"
 #include "foundation/foundation.h"
 #include "foundation/runloop.h"
+#include "libc/format.h"
+#include "libc/vfs.h"
 #include "objc/internal.h"
 #include <cmath>
+#include <filesystem>
 
 namespace uikit {
 
@@ -211,9 +214,28 @@ void install_misc() {
         std::memcpy(gptr<void>(t.x(8)), identity, sizeof identity);
     });
     Class IMG = objc::host_class("UIImage");
-    for (const char* s : {"imageNamed:", "imageWithContentsOfFile:", "imageWithData:", "imageWithCGImage:"})
-        class_method(IMG, s, [](Class c, SEL, id) { return objc::autorelease(objc::alloc(c)); });
-    method(IMG, "initWithContentsOfFile:", [](id self, SEL, id) { return self; });
+    // No name, or a file that is not there, gives nil, as on iOS. Infinity Blade II asks for Logo.m4v
+    // after Isa's post-credits scene; the Community Patch has neither Logo.m4v nor Logo.png, so the
+    // game calls imageNamed:nil, and a made-up image made it wait forever for a splash screen that
+    // never ends (black screen, music playing).
+    for (const char* s : {"imageNamed:", "imageWithData:"})
+        class_method(IMG, s, [](Class c, SEL, id arg) -> id { return arg ? objc::autorelease(objc::alloc(c)) : 0; });
+    // -CGImage below is always NULL, so this one cannot tell a real image from none.
+    class_method(IMG, "imageWithCGImage:", [](Class c, SEL, id) { return objc::autorelease(objc::alloc(c)); });
+    static auto file_exists = [](id path) {
+        if (!path) return false;
+        std::string host = vfs::to_host(utf8(path).c_str());
+        std::error_code ec;
+        return !host.empty() && std::filesystem::exists(std::filesystem::path(libc::utf8_to_wide(host)), ec);
+    };
+    class_method(IMG, "imageWithContentsOfFile:", [](Class c, SEL, id path) -> id {
+        return file_exists(path) ? objc::autorelease(objc::alloc(c)) : 0;
+    });
+    method(IMG, "initWithContentsOfFile:", [](id self, SEL, id path) -> id {
+        if (file_exists(path)) return self;
+        objc::release(self);
+        return 0;
+    });
     method(IMG, "initWithData:", [](id self, SEL, id) { return self; });
     method(IMG, "size", [](id, SEL) { return CGSize{1, 1}; });
     method(IMG, "scale", [](id, SEL) { return 1.0; });
