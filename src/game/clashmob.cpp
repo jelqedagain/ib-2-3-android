@@ -45,7 +45,8 @@ GuestAddr g_dlmalloc = 0;  // the game's allocator: strings handed to its script
 // BossObj (a SwordBossItems.ini item), BossLevel / BossScaledLevel (the boss is at least BossLevel, and at the
 // player's level times BossScaledLevel), BossHealth, BossBaseDamage, EndTime (seconds per play, 30 by default),
 // MaxPlays, reward tiers (.RewardType = an eTouchRewardActor treasure, .RewardData, .RewardGoal; ".Key=" adds an
-// array entry), MapName, SubMapName (the scenery) and QuestMapPin (where it shows on the world map).
+// array entry), MapName, SubMapName (the scenery) and QuestMapPin (where it shows on the world map). Keep the
+// tiers' money to one currency: the event's summary adds up all tiers and labels the sum with the last one's.
 //
 // What one play scores, by BattleType: BT_KillNBosses 1 per boss killed (one boss per play), BT_Kill1Boss the
 // damage done to one big boss, BT_TimeSurvival the seconds survived, BT_TreasureCollection the bags collected,
@@ -69,7 +70,7 @@ MaxPlays=10
 .RewardType=TRA_GrabBag_Uber
 .RewardData=
 .RewardGoal=3
-.RewardType=TRA_Chips_Large
+.RewardType=TRA_GrabBag_LargeGem
 .RewardData=
 .RewardGoal=5
 MapName=00_ClashMob_BaseScripting
@@ -114,7 +115,7 @@ MaxPlays=10
 .RewardType=TRA_Gold_Medium
 .RewardData=
 .RewardGoal=15
-.RewardType=TRA_Chips_Medium
+.RewardType=TRA_Gold_Large
 .RewardData=
 .RewardGoal=30
 .RewardType=TRA_GrabBag_Uber
@@ -546,7 +547,15 @@ bool clashmob_wants_script_hook() { return !is_infinity_blade_2(); }
 //   answer is yes. Everything else (saves, cloud) still sees no account.
 // - SwordQuestData.GetShowQuestType(): the map shows the quest types the story has introduced so far, and ClashMobs
 //   come late in it. A ClashMob quest counts as a side quest, so ClashMobs show from the start.
-enum class Target { None, UserHasMcpId, GetShowQuestType };
+// - SwordBattleEvent.RewardGoalString(RewardIdx): the text of a reward tier. For damage events (BT_Kill1Boss) the
+//   game's text has no number ("KILL TITAN" for every tier), so the port writes "DO 5,000 DAMAGE".
+enum class Target { None, UserHasMcpId, GetShowQuestType, RewardGoalString };
+
+std::string with_commas(long long v) {
+    std::string s = std::to_string(v);
+    for (int i = (int)s.size() - 3; i > 0; i -= 3) s.insert(i, ",");
+    return s;
+}
 
 bool clashmob_script_call(cpu::Thread& t, GuestAddr frame, GuestAddr result) {
     constexpr u64 kFrameNode = 0x18, kFrameObject = 0x20, kFramePrevious = 0x38, kObjOuter = 0x40;
@@ -560,6 +569,7 @@ bool clashmob_script_call(cpu::Thread& t, GuestAddr frame, GuestAddr result) {
         std::string name = ue::object_name(t, fn), cls = ue::object_name(t, *gptr<u64>(fn + kObjOuter));
         Target k = name == "UserHasMcpId" && cls == "SwordMyMobManager"      ? Target::UserHasMcpId
                    : name == "GetShowQuestType" && cls == "SwordQuestData" ? Target::GetShowQuestType
+                   : name == "RewardGoalString" && cls == "SwordBattleEvent" ? Target::RewardGoalString
                                                                             : Target::None;
         it = targets.emplace(fn, k).first;
     }
@@ -568,6 +578,20 @@ bool clashmob_script_call(cpu::Thread& t, GuestAddr frame, GuestAddr result) {
         u64 clashmob = 0;
         if (!ue::read_property(t, quest, "ClashMob", clashmob) || !clashmob) return false;
         if (result) *gptr<u8>(result) = 1;  // SQT_QuestSecondary
+        return true;
+    }
+    if (it->second == Target::RewardGoalString) {
+        constexpr u64 kFrameLocals = 0x30;
+        GuestAddr event = *gptr<u64>(frame + kFrameObject);
+        u8 type = 0;
+        ue::TArray<float> goals{};
+        int idx_off = ue::param_offset(t, event, "RewardGoalString", "RewardIdx");
+        if (!result || idx_off < 0 || !ue::read_property(t, event, "BattleType", type) || type != 1 ||
+            !ue::read_property(t, event, "RewardGoal", goals))
+            return false;
+        s32 idx = *gptr<s32>(*gptr<u64>(frame + kFrameLocals) + idx_off);
+        if (idx < 0 || idx >= goals.num) return false;
+        set_fstring(t, gptr<void>(result), "DO " + with_commas((long long)goals.at(idx)) + " DAMAGE");
         return true;
     }
     if (it->second != Target::UserHasMcpId) return false;
