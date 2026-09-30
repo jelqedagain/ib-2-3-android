@@ -31,6 +31,9 @@ void install_config(const macho::Image& img);
 // Keeps the Unreal/ChAIR logo movie from playing twice when loading is slow (after class realization).
 void install_startup_movie_fix();
 
+// Infinity Blade II: turns its store-only memory barriers into full ones (before guest code runs).
+void strengthen_memory_barriers(const macho::Image& img);
+
 // Test automation: runs a script of timed key presses, touches and screenshots (-script file).
 void run_script(const std::string& path);
 

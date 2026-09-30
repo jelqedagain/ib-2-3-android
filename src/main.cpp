@@ -209,6 +209,7 @@ int main(int argc, char** argv) {
     audio::install();
 
     hle::bind_image(img);
+    game::strengthen_memory_barriers(img);
     game::install_keyboard(img);
     game::start_controller();
     game::install_config(img);
