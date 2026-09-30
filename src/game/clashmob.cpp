@@ -50,7 +50,8 @@ GuestAddr g_dlmalloc = 0;  // the game's allocator: strings handed to its script
 //
 // What one play scores, by BattleType: BT_KillNBosses 1 per boss killed (one boss per play), BT_Kill1Boss the
 // damage done to one big boss, BT_TimeSurvival the seconds survived, BT_TreasureCollection the bags collected,
-// BT_BattleChallengeTrigger the number of BattleChallengeFocus actions (parries...).
+// BT_BattleChallengeTrigger the number of BattleChallengeFocus actions (parries...). A play ends when the fight
+// does, so a survival boss needs a BossHealth no one can get through in EndTime seconds.
 
 constexpr const char* kEventsFile = "clashmob-events.ini";
 
@@ -62,6 +63,7 @@ Title=The Dark Knight Trial
 Desc=A band of DARK KNIGHTS has overrun the Obelisk! Kill one each time you play. Kill 5 to earn every reward.
 BattleType=BT_KillNBosses
 BossObj=10ft_SnS_BlackKnight
+BossLevel=10
 BossScaledLevel=1.0
 MaxPlays=10
 .RewardType=TRA_Gold_Large
@@ -85,6 +87,7 @@ Title=Clash with the MX-Goliath
 Desc=The MX-GOLIATH has 100,000 health. Do as much damage as you can in 30 seconds!
 BattleType=BT_Kill1Boss
 BossObj=20ft_B_MX-Goliath
+BossLevel=10
 BossScaledLevel=1.0
 BossHealth=100000
 MaxPlays=10
@@ -106,10 +109,12 @@ Days=7
 Goal=60
 Score=Best
 Title=Survive the Ember Knight
-Desc=The EMBER KNIGHT is stronger than you. Stay alive as long as you can!
+Desc=The EMBER KNIGHT cannot be beaten. Stay alive as long as you can!
 BattleType=BT_TimeSurvival
 BossObj=10ft_SnS_LavaLord
+BossLevel=15
 BossScaledLevel=1.5
+BossHealth=10000000
 EndTime=60
 MaxPlays=10
 .RewardType=TRA_Gold_Medium
