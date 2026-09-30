@@ -17,6 +17,7 @@
 #include <cstdlib>
 #include <ctime>
 #include <fstream>
+#include <iterator>
 #include <map>
 #include <unordered_map>
 #include <mutex>
@@ -34,43 +35,144 @@ constexpr const char* kStateFile = "clashmob-state.ini";
 GuestAddr g_dlmalloc = 0;  // the game's allocator: strings handed to its scripts must come from it
 
 // ---- the events ----
+//
+// Events are read from clashmob-events.ini next to the saves when there is one, else the ones below. One section
+// per event. The port's own keys:
+//   Days=7         how long the event runs; it then starts again, with everyone's progress reset
+//   Goal=5         the event's goal (shown in its details)
+//   Score=Total    what the reward tiers count: Total (all plays together) or Best (the best single play)
+// Every other line goes into the event file the game downloads: SwordBattleEvent properties such as BattleType,
+// BossObj (a SwordBossItems.ini item), BossLevel / BossScaledLevel (the boss is at least BossLevel, and at the
+// player's level times BossScaledLevel), BossHealth, BossBaseDamage, EndTime (seconds per play, 30 by default),
+// MaxPlays, reward tiers (.RewardType = an eTouchRewardActor treasure, .RewardData, .RewardGoal; ".Key=" adds an
+// array entry), MapName, SubMapName (the scenery) and QuestMapPin (where it shows on the world map).
+//
+// What one play scores, by BattleType: BT_KillNBosses 1 per boss killed (one boss per play), BT_Kill1Boss the
+// damage done to one big boss, BT_TimeSurvival the seconds survived, BT_TreasureCollection the bags collected,
+// BT_BattleChallengeTrigger the number of BattleChallengeFocus actions (parries...).
+
+constexpr const char* kEventsFile = "clashmob-events.ini";
+
+constexpr const char* kDefaultEvents = R"([port-darkknight]
+Days=7
+Goal=5
+Score=Total
+Title=The Dark Knight Trial
+Desc=A band of DARK KNIGHTS has overrun the Obelisk! Kill one each time you play. Kill 5 to earn every reward.
+BattleType=BT_KillNBosses
+BossObj=10ft_SnS_BlackKnight
+BossScaledLevel=1.0
+MaxPlays=10
+.RewardType=TRA_Gold_Large
+.RewardData=
+.RewardGoal=1
+.RewardType=TRA_GrabBag_Uber
+.RewardData=
+.RewardGoal=3
+.RewardType=TRA_Chips_Large
+.RewardData=
+.RewardGoal=5
+MapName=00_ClashMob_BaseScripting
+SubMapName=cm_obelisk_art
+QuestMapPin=MapPin_Obelisk_A
+
+[port-goliath]
+Days=7
+Goal=100000
+Score=Best
+Title=Clash with the MX-Goliath
+Desc=The MX-GOLIATH has 100,000 health. Do as much damage as you can in 30 seconds!
+BattleType=BT_Kill1Boss
+BossObj=20ft_B_MX-Goliath
+BossScaledLevel=1.0
+BossHealth=100000
+MaxPlays=10
+.RewardType=TRA_Gold_Medium
+.RewardData=
+.RewardGoal=500
+.RewardType=TRA_GrabBag_LargeGem
+.RewardData=
+.RewardGoal=2000
+.RewardType=TRA_GrabBag_Uber
+.RewardData=
+.RewardGoal=5000
+MapName=00_ClashMob_BaseScripting
+SubMapName=cm_dunes_art
+QuestMapPin=MapPin_Dunes_A
+
+[port-emberknight]
+Days=7
+Goal=60
+Score=Best
+Title=Survive the Ember Knight
+Desc=The EMBER KNIGHT is stronger than you. Stay alive as long as you can!
+BattleType=BT_TimeSurvival
+BossObj=10ft_SnS_LavaLord
+BossScaledLevel=1.5
+EndTime=60
+MaxPlays=10
+.RewardType=TRA_Gold_Medium
+.RewardData=
+.RewardGoal=15
+.RewardType=TRA_Chips_Medium
+.RewardData=
+.RewardGoal=30
+.RewardType=TRA_GrabBag_Uber
+.RewardData=
+.RewardGoal=60
+MapName=00_ClashMob_BaseScripting
+SubMapName=C01_CM_Monastery_Art
+QuestMapPin=MapPin_Monastary_A
+)";
 
 struct Event {
-    std::string id;
+    std::string id;        // this run of the event (its section name and the day it started)
     time_t start, end;
-    int goal;              // the mob's goal (one player here)
+    int goal;
+    bool total;            // reward tiers count all plays together (else the best play)
     std::string file;      // the SwordBattleEvent ini the game downloads
 };
 
 std::vector<Event> events() {
-    time_t now = time(nullptr);
-    time_t day = now - now % 86400;
-    return {
-        {"port-darkknight", day - 86400, day + 6 * 86400, 5,
-         "[SwordBattleEvent]\n"
-         "Title=The Dark Knight Trial\n"
-         "Version=1.4\n"  // must list SwordClashMobManager.BattleEventVersion
-         "BattleType=BT_KillNBosses\n"
-         "BossObj=10ft_SnS_BlackKnight\n"  // a SwordBossItems.ini item (HasValidBoss looks it up)
-         "RequiredLevel=1\n"
-         "MaxPlays=10\n"
-         // Reward tiers: the treasure (eTouchRewardActor) given for reaching each goal. ".Key=" adds an array
-         // entry (UE3 ini syntax); a plain "Key=" would replace the one before.
-         ".RewardType=TRA_Gold_Large\n"
-         ".RewardData=\n"
-         ".RewardGoal=1\n"
-         ".RewardType=TRA_GrabBag_Uber\n"
-         ".RewardData=\n"
-         ".RewardGoal=3\n"
-         ".RewardType=TRA_Chips_Large\n"
-         ".RewardData=\n"
-         ".RewardGoal=5\n"
-         "MapName=00_ClashMob_BaseScripting\n"  // the ClashMob level (story maps keep their own bosses)
-         // Its scenery, streamed into it: cm_obelisk_art, cm_lake_art, cm_dunes_art, C01_CM_Monastery_Art,
-         // B20_FieldBurning_CM, B20_CrackedDesert_CM or B20_SandDay_CM
-         "SubMapName=cm_obelisk_art\n"
-         "QuestMapPin=MapPin_Obelisk_A\n"},
+    std::string text;
+    if (std::ifstream f{kEventsFile}) text.assign(std::istreambuf_iterator<char>(f), {});
+    if (text.empty()) text = kDefaultEvents;
+
+    std::vector<Event> out;
+    std::string line, name;
+    int days = 7;
+    Event ev{};
+    auto finish = [&] {
+        if (name.empty()) return;
+        time_t now = time(nullptr), period = std::max(days, 1) * 86400;
+        ev.start = now - now % period;
+        ev.end = ev.start + period;
+        ev.id = name + "-" + std::to_string(ev.start / 86400);
+        ev.file = "[SwordBattleEvent]\nVersion=1.4\n" + ev.file;  // must list SwordClashMobManager.BattleEventVersion
+        out.push_back(ev);
     };
+    std::istringstream in(text);
+    while (std::getline(in, line)) {
+        while (!line.empty() && (line.back() == '\r' || line.back() == ' ')) line.pop_back();
+        if (line.empty() || line[0] == ';') continue;
+        if (line[0] == '[' && line.back() == ']') {
+            finish();
+            name = line.substr(1, line.size() - 2);
+            days = 7;
+            ev = Event{};
+            ev.goal = 1;
+            ev.total = true;
+            continue;
+        }
+        size_t eq = line.find('=');
+        std::string key = eq == std::string::npos ? line : line.substr(0, eq), value = eq == std::string::npos ? "" : line.substr(eq + 1);
+        if (key == "Days") days = std::atoi(value.c_str());
+        else if (key == "Goal") ev.goal = std::atoi(value.c_str());
+        else if (key == "Score") ev.total = _stricmp(value.c_str(), "Best") != 0;
+        else ev.file += line + "\n";
+    }
+    finish();
+    return out;
 }
 
 // ---- the player's progress ----
@@ -216,9 +318,10 @@ std::string challenge_json(const Event& e, const Status& s) {
 }
 
 // The player's status in a challenge, as ParseUserChallengeStatus reads it.
-std::string status_json(const std::string& challenge, const Status& s) {
+// The game compares highGoalProgress with the reward tiers; for "Score=Total" events that is every play together.
+std::string status_json(const Event& e, const Status& s) {
     return Json()
-        .str("challengeId", challenge)
+        .str("challengeId", e.id)
         .str("epicId", "")  // the game's account id: none (see clashmob_script_call)
         .str("saveSlotId", s.slot)
         .num("numAttempts", s.attempts)
@@ -232,7 +335,7 @@ std::string status_json(const std::string& challenge, const Status& s) {
         .flag("likedViaFacebook", false)
         .flag("commentedViaFacebook", false)
         .flag("retweeted", false)
-        .num("highGoalProgress", s.high)
+        .num("highGoalProgress", e.total ? s.progress : s.high)
         .num("rank", 1)
         .num("percentRank", 100)
         .done();
@@ -318,7 +421,7 @@ bool serve(const ns::HttpRequest& req, ns::HttpResponse& resp) {
     }
     // POST /sword/api/challenges/{id}/users: the statuses of the players listed in the body
     if (p.size() == 5 && p[4] == "users") {
-        resp.body = s.accepted ? "[" + status_json(e->id, s) + "]" : "[]";  // the one player there is
+        resp.body = s.accepted ? "[" + status_json(*e, s) + "]" : "[]";  // the one player there is
         return true;
     }
     // POST /sword/api/challenges/{id}/users/{epicId}/saveSlots/{slot}[/updateProgress|/updateReward]
@@ -334,12 +437,12 @@ bool serve(const ns::HttpRequest& req, ns::HttpResponse& resp) {
             if (add > 0) s.successful++;
             s.progress += add;
             s.high = std::max(s.high, add);
-            s.complete = s.complete || query_value(query, "didComplete") == "true" || s.progress >= e->goal;
+            s.complete = s.complete || _stricmp(query_value(query, "didComplete").c_str(), "true") == 0 || s.progress >= e->goal;
         } else if (p[8] == "updateReward") {
             s.award = std::atoi(query_value(query, "rewardValue").c_str());
         }
         save_state();
-        resp.body = status_json(e->id, s);
+        resp.body = status_json(*e, s);
         return true;
     }
     resp.status = 404;
