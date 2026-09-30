@@ -39,6 +39,11 @@ void install_startup_movie_fix();
 // the two apps checks this, so a fix for one never changes the other (see CLAUDE.md).
 bool is_infinity_blade_2();
 
+// The language the launcher chose, as iOS reports it to this game: AppleLanguages[0] ("fr", "pt-PT"...)
+// and the locale identifier ("fr_FR"). English when the game has no text in that language.
+std::string ios_language();
+std::string ios_locale();
+
 // Infinity Blade II: turns its store-only memory barriers into full ones (before guest code runs).
 void strengthen_memory_barriers(const macho::Image& img);
 

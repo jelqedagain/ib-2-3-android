@@ -5,8 +5,18 @@ import android.app.AlertDialog;
 import android.content.ClipData;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.content.pm.ShortcutInfo;
+import android.content.pm.ShortcutManager;
 import android.database.Cursor;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
+import android.graphics.Paint;
+import android.graphics.PorterDuff;
+import android.graphics.PorterDuffXfermode;
+import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
+import android.graphics.drawable.Icon;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -58,6 +68,7 @@ import java.util.zip.ZipOutputStream;
 public class LauncherActivity extends Activity {
     private static final int PICK_IPA = 1, PICK_BACKUP = 2, PICK_RESTORE = 3;
     private static final String APP_PREFIX = "Payload/SwordGame.app/";
+    private static final String ARTWORK = "iTunesArtwork";  // the .ipa's 512 px App Store icon, kept in game/
     private static final String MARKER = "ib-port-saves.txt";  // in backups: which game they are from
     private static final long FILE_LOG_LIMIT = 4L << 20;  // bytes of each log in a shared file (a Discord upload is 10 MB)
     private static final long CLIP_LOG_LIMIT = 96L << 10;  // and in the clipboard, which holds well under 1 MB
@@ -119,9 +130,83 @@ public class LauncherActivity extends Activity {
     }
 
     private void startGame() {
+        Languages.savePhoneLanguage(this, filesDir());
         startActivity(new Intent(this, GameActivity.class));
         overridePendingTransition(0, 0);
         finish();
+    }
+
+    // This app's own icon is a plain placeholder: the game's artwork is not part of this app, and an
+    // app cannot change its icon. Instead the icon from the player's own .ipa can be put on the home
+    // screen as a shortcut that opens this app.
+    private boolean canPinIcon() {
+        ShortcutManager sm = getSystemService(ShortcutManager.class);
+        return sm != null && sm.isRequestPinShortcutSupported() && gameIcon() != null;
+    }
+
+    // The game's icon with the rounded corners iOS draws: the .ipa's App Store artwork (installs from
+    // this version on), else the largest icon in the game's folder.
+    private Bitmap gameIcon() {
+        Bitmap best = BitmapFactory.decodeFile(new File(filesDir(), "game/" + ARTWORK).getPath());
+        if (best == null || best.getWidth() != best.getHeight()) {
+            best = null;
+            File[] files = new File(filesDir(), "game/" + APP_PREFIX).listFiles();
+            if (files == null) return null;
+            int bestSize = 0;
+            for (File f : files) {
+                String n = f.getName().toLowerCase(Locale.ROOT);
+                if (!n.endsWith(".png") || !n.startsWith("icon")) continue;
+                BitmapFactory.Options o = new BitmapFactory.Options();
+                o.inJustDecodeBounds = true;
+                BitmapFactory.decodeFile(f.getPath(), o);
+                if (o.outWidth < 100 || o.outWidth != o.outHeight || o.outWidth > 1024 || o.outWidth <= bestSize) continue;
+                Bitmap b = BitmapFactory.decodeFile(f.getPath());
+                if (b != null) {
+                    best = b;
+                    bestSize = o.outWidth;
+                }
+            }
+            if (best == null) return null;
+        }
+        int px = Math.min(best.getWidth(), 432);
+        Bitmap out = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888);
+        Canvas c = new Canvas(out);
+        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+        c.drawRoundRect(new RectF(0, 0, px, px), px * 0.2237f, px * 0.2237f, paint);
+        paint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.SRC_IN));
+        c.drawBitmap(Bitmap.createScaledBitmap(best, px, px, true), 0, 0, paint);
+        return out;
+    }
+
+    private void pinHomeIcon() {
+        try {
+            ShortcutManager sm = getSystemService(ShortcutManager.class);
+            Bitmap icon = gameIcon();
+            if (sm == null || icon == null) return;
+            Intent open = new Intent(this, LauncherActivity.class).setAction(Intent.ACTION_MAIN);
+            sm.requestPinShortcut(new ShortcutInfo.Builder(this, "game-icon").setShortLabel(gameName)
+                    .setIcon(Icon.createWithBitmap(icon)).setIntent(open).build(), null);
+        } catch (RuntimeException e) {
+            if (status != null) status.setText("Your home screen app does not allow adding icons.");
+        }
+    }
+
+    // After installing the game: ask whether to put its icon on the home screen, then start.
+    private void offerHomeIcon() {
+        if (!canPinIcon()) {
+            startGame();
+            return;
+        }
+        new AlertDialog.Builder(this)
+                .setTitle("Add the game's icon?")
+                .setMessage("This app's own icon is a plain placeholder. Put the icon from your .ipa on the home screen?")
+                .setCancelable(false)
+                .setNegativeButton("Not now", (d, w) -> startGame())
+                .setPositiveButton("Add icon", (d, w) -> {
+                    buildMenuScreen();
+                    pinHomeIcon();  // Android asks to confirm: stay on the menu so its prompt stays visible
+                })
+                .show();
     }
 
     private int dp(float v) {
@@ -143,8 +228,13 @@ public class LauncherActivity extends Activity {
         panel.setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
 
         ImageView icon = new ImageView(this);
-        Drawable d = getApplicationInfo().loadIcon(getPackageManager());
-        icon.setImageDrawable(d);
+        Bitmap game = installed(filesDir()) ? gameIcon() : null;
+        if (game != null) {
+            icon.setImageBitmap(game);
+        } else {
+            Drawable d = getApplicationInfo().loadIcon(getPackageManager());
+            icon.setImageDrawable(d);
+        }
         icon.setBackground(Ui.rounded(this, 0xFF000000, 20, 0));
         icon.setClipToOutline(true);
         icon.setElevation(dp(6));
@@ -252,6 +342,7 @@ public class LauncherActivity extends Activity {
                 shareLogFile();
                 return true;
             });
+        if (canPinIcon()) addMenuRow(card, "Home screen icon", "Adds the icon from your .ipa to the home screen", v -> pinHomeIcon());
         show(left, card);
     }
 
@@ -360,7 +451,7 @@ public class LauncherActivity extends Activity {
                 getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
                 if (failure == null) {
                     status.setText("Installed. Starting the game...");
-                    startGame();
+                    offerHomeIcon();
                 } else {
                     progress.setVisibility(View.GONE);
                     status.setText(failure);
@@ -439,6 +530,14 @@ public class LauncherActivity extends Activity {
                 } catch (IOException ex) {
                     deleteTree(staging);
                     throw new IOException("Extracting " + z.getName() + " failed: " + ex.getMessage());
+                }
+            }
+            ZipEntry artwork = zip.getEntry(ARTWORK);
+            if (artwork != null && artwork.getSize() < (4L << 20)) {
+                try (InputStream in = zip.getInputStream(artwork); OutputStream out = new FileOutputStream(new File(staging, ARTWORK))) {
+                    for (int n; (n = in.read(buf)) > 0; ) out.write(buf, 0, n);
+                } catch (IOException ex) {
+                    // only the home screen icon uses it (the game's own icons are the fallback)
                 }
             }
             File game = new File(files, "game");

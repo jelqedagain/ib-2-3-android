@@ -31,6 +31,9 @@ struct Settings {
     // Controller (percent multipliers of the defaults)
     bool controller = true;
     int cursor_speed = 100, camera_speed = 100, swipe_size = 100;
+    // Game language: the suffix of the game's text files (INT, FRA, DEU...). [Game] Language is the
+    // player's choice; empty means the phone's language ([Game] PhoneLanguage, written by the launcher).
+    std::string language = "INT";
 };
 
 // Directory of the executable (with trailing backslash); on Android, the app's files folder.

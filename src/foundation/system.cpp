@@ -2,6 +2,7 @@
 // NSNotificationCenter, NSError/NSException, NSCharacterSet, NSURL, NSLog and friends.
 #include "foundation/foundation.h"
 #include "foundation/runloop.h"
+#include "game/game.h"
 #include "libc/format.h"
 #include "libc/vfs.h"
 #include "objc/internal.h"
@@ -37,7 +38,7 @@ id defaults_get(id key) {
     std::lock_guard lock(g_defaults_mutex);
     id v = dict_get(g_defaults_dict, key);
     if (!v && g_registered) v = dict_get(g_registered, key);
-    if (!v && utf8(key) == "AppleLanguages") v = array({str("en")});
+    if (!v && utf8(key) == "AppleLanguages") v = array({str(game::ios_language())});
     return v;
 }
 void defaults_set(id key, id v) {
@@ -488,15 +489,16 @@ void install_system() {
     class_method(L, "systemLocale", [](Class c, SEL) { return objc::send(c, "currentLocale"); });
     class_method(L, "autoupdatingCurrentLocale", [](Class c, SEL) { return objc::send(c, "currentLocale"); });
     class_method(L, "localeWithLocaleIdentifier:", [](Class c, SEL, id) { return objc::send(c, "currentLocale"); });
-    class_method(L, "preferredLanguages", [](Class, SEL) { return array({str("en")}); });
+    class_method(L, "preferredLanguages", [](Class, SEL) { return array({str(game::ios_language())}); });
     method(L, "initWithLocaleIdentifier:", [](id self, SEL, id) { return self; });
-    method(L, "localeIdentifier", [](id, SEL) { return str("en_US"); });
+    method(L, "localeIdentifier", [](id, SEL) { return str(game::ios_locale()); });
     method(L, "objectForKey:", [](id, SEL, id key) -> id {
         std::string k = utf8(key);
-        if (k == "NSLocaleLanguageCode" || k == "kCFLocaleLanguageCodeKey") return str("en");
-        if (k == "NSLocaleCountryCode" || k == "kCFLocaleCountryCodeKey") return str("US");
+        std::string locale = game::ios_locale();  // "fr_FR"
+        if (k == "NSLocaleLanguageCode" || k == "kCFLocaleLanguageCodeKey") return str(locale.substr(0, 2));
+        if (k == "NSLocaleCountryCode" || k == "kCFLocaleCountryCodeKey") return str(locale.substr(3));
         if (k == "NSLocaleCurrencyCode") return str("USD");
-        if (k == "NSLocaleIdentifier") return str("en_US");
+        if (k == "NSLocaleIdentifier") return str(locale);
         return 0;
     });
     method(L, "displayNameForKey:value:", [](id, SEL, id, id v) { return v; });

@@ -22,6 +22,14 @@ void write_int(const wchar_t* section, const wchar_t* key, int v) {
     WritePrivateProfileStringW(section, key, std::to_wstring(v).c_str(), path().c_str());
 }
 
+std::string read_string(const wchar_t* section, const wchar_t* key) {
+    wchar_t buf[64] = {};
+    GetPrivateProfileStringW(section, key, L"", buf, (DWORD)std::size(buf), path().c_str());
+    std::string out;
+    for (const wchar_t* p = buf; *p; p++) out += (char)*p;
+    return out;
+}
+
 int clamp(int v, int lo, int hi) { return v < lo ? lo : v > hi ? hi : v; }
 
 }  // namespace
@@ -71,6 +79,9 @@ void load() {
     s.cursor_speed = clamp(read_int(L"Controller", L"CursorSpeed", d.cursor_speed), 20, 400);
     s.camera_speed = clamp(read_int(L"Controller", L"CameraSpeed", d.camera_speed), 20, 400);
     s.swipe_size = clamp(read_int(L"Controller", L"SwipeSize", d.swipe_size), 30, 300);
+    s.language = read_string(L"Game", L"Language");
+    if (s.language.empty()) s.language = read_string(L"Game", L"PhoneLanguage");
+    if (s.language.empty()) s.language = d.language;
     g_loaded = true;
 }
 
