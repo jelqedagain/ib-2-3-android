@@ -141,12 +141,12 @@ public class LauncherActivity extends Activity {
     // screen as a shortcut that opens this app.
     private boolean canPinIcon() {
         ShortcutManager sm = getSystemService(ShortcutManager.class);
-        return sm != null && sm.isRequestPinShortcutSupported() && gameIcon() != null;
+        return sm != null && sm.isRequestPinShortcutSupported() && gameIconFile() != null;
     }
 
-    // The game's icon with the rounded corners iOS draws: the .ipa's App Store artwork (installs from
-    // this version on), else the largest icon in the game's folder.
-    private Bitmap gameIcon() {
+    // The game's square icon: the .ipa's App Store artwork (installs from this version on), else the
+    // largest icon in the game's folder.
+    private Bitmap gameIconFile() {
         Bitmap best = BitmapFactory.decodeFile(new File(filesDir(), "game/" + ARTWORK).getPath());
         if (best == null || best.getWidth() != best.getHeight()) {
             best = null;
@@ -166,8 +166,14 @@ public class LauncherActivity extends Activity {
                     bestSize = o.outWidth;
                 }
             }
-            if (best == null) return null;
         }
+        return best;
+    }
+
+    // The game's icon with the rounded corners iOS draws (for this app's own screens).
+    private Bitmap gameIcon() {
+        Bitmap best = gameIconFile();
+        if (best == null) return null;
         int px = Math.min(best.getWidth(), 432);
         Bitmap out = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888);
         Canvas c = new Canvas(out);
@@ -181,11 +187,20 @@ public class LauncherActivity extends Activity {
     private void pinHomeIcon() {
         try {
             ShortcutManager sm = getSystemService(ShortcutManager.class);
-            Bitmap icon = gameIcon();
-            if (sm == null || icon == null) return;
+            Bitmap src = gameIconFile();
+            if (sm == null || src == null) return;
+            // An adaptive icon, so the home screen gives it its own shape like any app icon (a plain bitmap is
+            // shrunk onto a white disc). The visible part is the middle 72 of 108 units; the icon covers 80, so
+            // every mask shape is filled and only its corners are cut.
+            int size = 432, art = size * 80 / 108;
+            Bitmap icon = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
+            Canvas c = new Canvas(icon);
+            c.drawColor(src.getPixel(src.getWidth() / 2, 1) | 0xFF000000);
+            int at = (size - art) / 2;
+            c.drawBitmap(Bitmap.createScaledBitmap(src, art, art, true), at, at, new Paint(Paint.FILTER_BITMAP_FLAG));
             Intent open = new Intent(this, LauncherActivity.class).setAction(Intent.ACTION_MAIN);
             sm.requestPinShortcut(new ShortcutInfo.Builder(this, "game-icon").setShortLabel(gameName)
-                    .setIcon(Icon.createWithBitmap(icon)).setIntent(open).build(), null);
+                    .setIcon(Icon.createWithAdaptiveBitmap(icon)).setIntent(open).build(), null);
         } catch (RuntimeException e) {
             if (status != null) status.setText("Your home screen app does not allow adding icons.");
         }
