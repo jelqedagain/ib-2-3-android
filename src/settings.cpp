@@ -85,6 +85,7 @@ void load() {
     s.language = read_string(L"Game", L"Language");
     if (s.language.empty()) s.language = read_string(L"Game", L"PhoneLanguage");
     if (s.language.empty()) s.language = d.language;
+    s.developer_mode = read_int(L"Game", L"DeveloperMode", d.developer_mode) != 0;
     g_loaded = true;
 }
 

@@ -71,6 +71,8 @@ final class SettingsScreen {
         content.addView(Ui.sectionHeader(a, "Game"));
         LinearLayout game = Ui.card(a);
         addRow(game, languageRow());
+        addRow(game, toggle("Developer mode", "Adds the game's hidden developer options to its Options menu: god mode, unlimited"
+                + " super, kill boss, give gold and more.", "Game", "DeveloperMode", 0));
         content.addView(game);
 
         content.addView(Ui.sectionHeader(a, "Display"));

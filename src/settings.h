@@ -37,6 +37,7 @@ struct Settings {
     // Game language: the suffix of the game's text files (INT, FRA, DEU...). [Game] Language is the
     // player's choice; empty means the phone's language ([Game] PhoneLanguage, written by the launcher).
     std::string language = "INT";
+    bool developer_mode = false;  // the game's developer options in its Options menu (game/devmode.cpp)
 };
 
 // Directory of the executable (with trailing backslash); on Android, the app's files folder.

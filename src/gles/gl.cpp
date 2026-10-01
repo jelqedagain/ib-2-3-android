@@ -8,7 +8,9 @@
 #include <atomic>
 #include <cctype>
 #include <cstring>
+#include <map>
 #include <mutex>
+#include <tuple>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -545,6 +547,47 @@ bool bgra_renderable() {
     return ok;
 }
 
+// IB3 with MSAA (Settings, Anti-aliasing MSAA 4x) draws its menu scenes, such as the item models of the
+// inventory, into a framebuffer of the multisampled colour renderbuffer and the single-sampled scene depth
+// texture. Apple's driver took that; GLES calls it incomplete (0x8D56) and draws nothing, so the items
+// were invisible. Such a framebuffer gets a multisampled depth-stencil renderbuffer of the same size instead
+// (for depth and stencil: the game attaches the depth-stencil texture to both, one after the other).
+void fix_mixed_samples(GLenum target) {
+    if (game::is_infinity_blade_2()) return;
+    GLenum status = p_glCheckFramebufferStatus(target);
+    if (status != 0x8D56 /*INCOMPLETE_MULTISAMPLE*/ && status != 0x8CDD /*UNSUPPORTED*/) return;
+    GLint type = 0, color = 0, depth_type = 0, stencil_type = 0;
+    p_glGetFramebufferAttachmentParameteriv(target, 0x8CE0, 0x8CD0, &type);  // COLOR_ATTACHMENT0, OBJECT_TYPE
+    p_glGetFramebufferAttachmentParameteriv(target, 0x8CE0, 0x8CD1, &color);  // OBJECT_NAME
+    p_glGetFramebufferAttachmentParameteriv(target, 0x8D00, 0x8CD0, &depth_type);
+    p_glGetFramebufferAttachmentParameteriv(target, 0x8D20, 0x8CD0, &stencil_type);
+    if (type != (GLint)GL_RENDERBUFFER || (depth_type != 0x1702 /*TEXTURE*/ && stencil_type != 0x1702)) return;
+    GLint prev_rb = 0, samples = 0, w = 0, h = 0;
+    p_glGetIntegerv(GL_RENDERBUFFER_BINDING, &prev_rb);
+    p_glBindRenderbuffer(GL_RENDERBUFFER, color);
+    p_glGetRenderbufferParameteriv(GL_RENDERBUFFER, 0x8CAB /*SAMPLES*/, &samples);
+    p_glGetRenderbufferParameteriv(GL_RENDERBUFFER, 0x8D42 /*WIDTH*/, &w);
+    p_glGetRenderbufferParameteriv(GL_RENDERBUFFER, 0x8D43 /*HEIGHT*/, &h);
+    if (samples > 0 && w > 0 && h > 0) {
+        static std::mutex m;
+        static std::map<std::tuple<int, int, int>, GLuint> depth_buffers;
+        std::lock_guard lock(m);
+        GLuint& rb = depth_buffers[{w, h, samples}];
+        if (!rb) {
+            p_glGenRenderbuffers(1, &rb);
+            p_glBindRenderbuffer(GL_RENDERBUFFER, rb);
+            p_glRenderbufferStorageMultisample(GL_RENDERBUFFER, samples, 0x88F0 /*DEPTH24_STENCIL8*/, w, h);
+        }
+        p_glFramebufferRenderbuffer(target, 0x8D00 /*DEPTH*/, GL_RENDERBUFFER, rb);
+        p_glFramebufferRenderbuffer(target, 0x8D20 /*STENCIL*/, GL_RENDERBUFFER, rb);
+        static std::atomic<int> logged{0};
+        if (logged++ < 3)
+            LOG_INFO("msaa: framebuffer with a %d-sample colour buffer and a depth texture gets a %d-sample depth buffer (%dx%d): 0x%x",
+                     samples, samples, w, h, p_glCheckFramebufferStatus(target));
+    }
+    p_glBindRenderbuffer(GL_RENDERBUFFER, prev_rb);
+}
+
 void diag_storage(GLsizei samples, GLenum fmt, GLsizei w, GLsizei h) {
     static std::atomic<int> logged{0};
     if (!gl_diag() || logged++ >= 40) return;
@@ -770,6 +813,10 @@ void install_gl() {
         // An empty BGRA texture is a render target: RGBA where BGRA cannot be drawn into (no pixels, so no swizzle).
         if (fmt == GL_BGRA_EXT && !data && !game::is_infinity_blade_2() && !bgra_renderable()) ifmt = fmt = GL_RGBA;
         p_glTexImage2D(target, level, ifmt, w, h, border, fmt, type, data);
+        if (!ifmt && !fmt && gl_diag()) {
+            static std::atomic<int> once{0};
+            if (once++ == 0) LOG_INFO("gldiag: texture with no format from:\n%s", cpu::current().backtrace().c_str());
+        }
         static std::atomic<int> logged{0};
         if (!data && gl_diag() && logged++ < 80) {
             GLint tex = 0;
@@ -782,11 +829,13 @@ void install_gl() {
         ErrorCheck check{"glFramebufferTexture2D"};
         p_glFramebufferTexture2D(target, attachment, textarget, tex, level);
         diag_framebuffer("texture", target, attachment, tex, level);
+        fix_mixed_samples(target);
     });
     hle::fn("_glFramebufferRenderbuffer", [](GLenum target, GLenum attachment, GLenum rbtarget, GLuint rb) {
         ErrorCheck check{"glFramebufferRenderbuffer"};
         p_glFramebufferRenderbuffer(target, attachment, rbtarget, rb);
         diag_framebuffer("renderbuffer", target, attachment, rb, 0);
+        fix_mixed_samples(target);
     });
     hle::fn("_glRenderbufferStorage", [](GLenum t, GLenum fmt, GLsizei w, GLsizei h) {
         ErrorCheck check{"glRenderbufferStorage"};
@@ -808,12 +857,19 @@ void install_gl() {
         if (scissor) p_glDisable(GL_SCISSOR_TEST);
         p_glBlitFramebuffer(0, 0, w, h, 0, 0, w, h, GL_COLOR_BUFFER_BIT, GL_NEAREST);
         if (scissor) p_glEnable(GL_SCISSOR_TEST);
-        static std::atomic<int> logged{0};
-        if (gl_diag() && logged++ < 3) {
-            GLint rfb = 0, dfb = 0;
+        if (gl_diag()) {
+            GLint rfb = 0, dfb = 0, type = 0, name = 0;
             p_glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &rfb);
             p_glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &dfb);
-            LOG_INFO("gldiag: multisample resolve %dx%d from framebuffer %d to %d, GL error 0x%x", w, h, rfb, dfb, p_glGetError());
+            GLenum err = p_glGetError();
+            p_glGetFramebufferAttachmentParameteriv(GL_DRAW_FRAMEBUFFER, 0x8CE0, 0x8CD0, &type);
+            p_glGetFramebufferAttachmentParameteriv(GL_DRAW_FRAMEBUFFER, 0x8CE0, 0x8CD1, &name);
+            static std::mutex m;
+            static std::map<std::pair<int, int>, int> seen;
+            std::lock_guard lock(m);
+            if (seen[{rfb, dfb}]++ < 2)
+                LOG_INFO("gldiag: multisample resolve %dx%d from framebuffer %d to %d (colour %s %d), GL error 0x%x", w, h, rfb, dfb,
+                         type == 0x1702 ? "texture" : type == (GLint)GL_RENDERBUFFER ? "renderbuffer" : "none", name, err);
         }
     });
 

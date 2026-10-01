@@ -13,6 +13,7 @@ GuestAddr g_name_tostring = 0;  // FName::ToString() const -> FString (x8)
 GuestAddr g_app_free = 0;       // appFree(void*)
 GuestAddr g_find_property = 0;  // FindField<UProperty>(UStruct*, const wchar_t*)
 GuestAddr g_find_function = 0;  // UObject::FindFunction(FName, UBOOL) const
+GuestAddr g_app_malloc = 0;
 GuestAddr g_engine = 0;         // &GEngine
 
 // UProperty::Offset, located at runtime (see locate_offset_field).
@@ -66,6 +67,7 @@ bool init(const macho::Image& img) {
     g_app_free = img.find("__Z7appFreePv");
     g_find_property = img.find("__Z9FindFieldI9UPropertyEPT_P7UStructPKw");
     g_find_function = img.find("__ZNK7UObject12FindFunctionE5FNamej");
+    g_app_malloc = img.find("__Z9appMallocjj");
     g_engine = img.find("_GEngine");
     bool ok = g_fname_ctor && g_name_tostring && g_app_free && g_find_property && g_find_function && g_engine;
     if (!ok)
@@ -134,6 +136,24 @@ int property_offset(cpu::Thread& t, GuestAddr obj, const char* name) {
     int off = prop ? (int)*gptr<u32>(prop + g_offset_field) : -1;
     LOG_DEBUG("unreal: %s.%s at %d", object_name(t, cls).c_str(), name, off);
     return g_offsets[key] = off;
+}
+
+int param_offset(cpu::Thread& t, GuestAddr obj, const std::string& func, const char* param) {
+    GuestAddr fn = t.call(g_find_function, {obj, fname(t, func), 0});
+    if (!fn) return -1;
+    if (g_offset_field < 0 && !locate_offset_field(t, *gptr<u64>(obj + kObjClass))) return -1;
+    GuestAddr prop = find_property(t, fn, param);
+    return prop ? (int)*gptr<u32>(prop + g_offset_field) : -1;
+}
+
+FString make_fstring(cpu::Thread& t, const std::string& s) {
+    FString out{0, (s32)s.size() + 1, (s32)s.size() + 1};
+    if (!g_app_malloc) return {};
+    out.data = t.call(g_app_malloc, {(u64)out.num * 4, 8});
+    u32* w = gptr<u32>(out.data);
+    for (size_t i = 0; i < s.size(); i++) w[i] = (unsigned char)s[i];
+    w[s.size()] = 0;
+    return out;
 }
 
 bool call_event(cpu::Thread& t, GuestAddr obj, const std::string& func, void* params) {

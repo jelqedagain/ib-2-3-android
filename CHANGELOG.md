@@ -4,6 +4,9 @@ Two Android apps, IB2 and IB3, are built from one codebase. Each has its own ver
 
 # IB2
 
+## 1.6 (2026-10-01)
+- Developer mode: Settings, Game, Developer mode (off by default) adds the game's own hidden developer options to the Options menu inside the game (gear icon, Options, at the bottom): god mode, unlimited super and magic, always fast forward, boss attacks on/off, kill boss, give gold, reload last checkpoint, start next bloodline, rebalance stats, rename character, show FPS, gesture test, demo HUD, shadows, light shafts, tutorial, and dump / load an unencrypted save. They are the game's leftover functions from development; no modified .ipa is needed.
+
 ## 1.5.2 (2026-10-01)
 - Places load much faster after your first visit: the textures the app converts for Android GPUs (since 1.3.5) are now kept, so a level that loaded before is not converted again. Measured on an AYN Odin 2 the texture work at startup went from 4.4 s to 0.15 s; slower phones save more. Settings, Texture cache turns it off and deletes it (it takes a few hundred MB of storage, in the app's own storage, not in save backups).
 
@@ -51,6 +54,11 @@ Two Android apps, IB2 and IB3, are built from one codebase. Each has its own ver
 - First IB2 build, with sharp character shadows on GPUs other than Apple's.
 
 # IB3
+
+## 1.6 (2026-10-01)
+- Developer mode: Settings, Game, Developer mode (off by default) adds the game's own hidden developer options to the Options menu inside the game (gear icon, Options, at the bottom): god mode, unlimited super and magic, always fast forward, boss attacks on/off, kill boss, give gold, reload last checkpoint, start next bloodline, rebalance stats, rename character, show FPS, gesture test, demo HUD, shadows, light shafts, tutorial, and dump an unencrypted save, plus go to the Hideout and set the boss's next weapon. They are the game's leftover functions from development; no modified .ipa is needed.
+- Fixed items being invisible in the inventory with Anti-aliasing set to MSAA 4x: the game drew the item models into a framebuffer Android GPUs reject (multisampled colour with a single-sampled depth texture); it now gets a matching multisampled depth buffer.
+- The Origins recap at the start of a new game (about 2.5 minutes) can be skipped with a tap, like the game's other skippable movies.
 
 ## 1.5.2 (2026-10-01)
 - Places load much faster after your first visit: the textures the app converts for Android GPUs (since 1.3.5) are now kept, so a level that loaded before is not converted again. Measured on an AYN Odin 2 loading into the Hideout: about 12 s before, about 5 s with the cache filled; slower phones save more. Settings, Texture cache turns it off and deletes it (it takes a few hundred MB of storage, in the app's own storage, not in save backups).

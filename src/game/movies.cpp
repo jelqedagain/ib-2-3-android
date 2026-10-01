@@ -27,6 +27,26 @@ void on_initiate_startup_sequence(cpu::Thread& t) {
     t.jump(g_initiate_original);
 }
 
+// IB3's Origins recap (about 2.5 minutes at the start of a new game, and Options, Play Origins) could
+// not be skipped. A tap during a movie skips it if FMovieHelper's SkippableMovies has its name; the
+// recap is added to it.
+GuestAddr g_play_original = 0;
+
+void on_play_movie(cpu::Thread& t) {
+    objc::id self = t.x(0), name = t.x(2);
+    std::string movie = name ? ns::utf8(name) : "";
+    objc::id skippable = objc::send(self, "SkippableMovies");
+    LOG_INFO("movies: PlayMovie %s (%llu skippable)", movie.c_str(),
+             (unsigned long long)(skippable ? objc::send(skippable, "count") : 0));
+    if (skippable && movie.find("Origins") != std::string::npos && !(objc::send(skippable, "containsObject:", {name}) & 0xff)) {
+        objc::send(skippable, "addObject:", {name});
+        if (movie.size() > 2 && movie[1] == ',')  // "s,Name" / "l,Name": the game compares the name without the play-mode prefix
+            objc::send(skippable, "addObject:", {objc::send(name, "substringFromIndex:", {2})});
+        LOG_INFO("movies: %s can be skipped with a tap", movie.c_str());
+    }
+    t.jump(g_play_original);
+}
+
 }  // namespace
 
 void install_startup_movie_fix() {
@@ -37,6 +57,9 @@ void install_startup_movie_fix() {
         return;
     }
     g_initiate_original = hook::install(imp, "-[FMovieHelper InitiateStartupSequence]", on_initiate_startup_sequence);
+    if (is_infinity_blade_2()) return;
+    if (GuestAddr play = objc::lookup_imp(helper, objc::sel("PlayMovie:")))
+        g_play_original = hook::install(play, "-[FMovieHelper PlayMovie:]", on_play_movie);
 }
 
 }  // namespace game

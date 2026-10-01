@@ -402,6 +402,7 @@ void install_save_editor(const macho::Image& img) {
     g_tick = hook::install(tick, "UGameEngine::Tick", [](cpu::Thread& t) {
         on_tick(t);
         credits_tick(t);
+        devmode_tick(t);
         t.jump(g_tick);
     });
     // The script interpreter is hooked only when there are edits to make, or the save was edited (its

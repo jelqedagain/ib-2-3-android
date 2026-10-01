@@ -31,6 +31,8 @@ void install_config(const macho::Image& img);
 
 // IB3: holding a finger on the credits scrolls them faster (called every engine tick).
 void credits_tick(cpu::Thread& t);
+// Developer options added to the in-game Options list when settings developer_mode is on.
+void devmode_tick(cpu::Thread& t);
 
 // Infinity Blade II on screens longer than 16:9: serves patched copies of its HUD layout script and
 // menu backdrops. If the patch does not apply, the emulated screen goes back to 16:9.
