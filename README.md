@@ -2,6 +2,15 @@
 
 An experimental iOS emulator for Android: a compatibility layer that runs ARM64 iOS apps built on Unreal Engine 3. It is a hobby and research project.
 
+## Download
+
+| App | archive.org | GitHub |
+| --- | --- | --- |
+| **IB2** | [IB2 on archive.org](https://archive.org/details/infinity-blade-2-android) | [IB2 release](https://github.com/jelqedagain/ib-2-3-android/releases/tag/ib2) |
+| **IB3** | [IB3 on archive.org](https://archive.org/details/infinity-blade-3-android) | [IB3 release](https://github.com/jelqedagain/ib-2-3-android/releases/tag/ib3) |
+
+Both places have the same app (Android 11+, ARM64); install the `.apk` on your phone and open it. You also need your own `.ipa` of the game. Installing a new version over an old one keeps your game and saves.
+
 **This repository contains no game files.** It is only the source code of the emulator: a Mach-O loader, and implementations of the parts of iOS the apps call (C library, Objective-C runtime, Foundation, UIKit) on top of Android's OpenGL ES, AAudio and MediaCodec. To run a game you need your own copy of the app as an `.ipa` file; nothing here provides one.
 
 ## How it works
