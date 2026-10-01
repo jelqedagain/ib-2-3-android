@@ -28,6 +28,7 @@ void touch_down(int finger, CGPoint p);
 void touch_move(int finger, CGPoint p);
 void touch_up(int finger, CGPoint p);
 bool touch_active(int finger);
+int touches_down();  // fingers on the screen; safe from any thread
 // Receives WM_KEYDOWN/WM_KEYUP virtual-key codes (vk -1 = focus lost: release everything).
 extern std::function<void(int vk, bool down)> g_key_handler;
 // The platform window (uikit/window_win32.cpp, port/android/window_android.cpp).

@@ -4,6 +4,7 @@
 #include <string>
 
 namespace macho { struct Image; }
+namespace cpu { class Thread; }
 
 namespace game {
 
@@ -27,6 +28,9 @@ void set_fake_pad(const std::string& control, float value);
 
 // Applies settings.ini (graphics, frame rate) to the engine's config as it loads.
 void install_config(const macho::Image& img);
+
+// IB3: holding a finger on the credits scrolls them faster (called every engine tick).
+void credits_tick(cpu::Thread& t);
 
 // Infinity Blade II on screens longer than 16:9: serves patched copies of its HUD layout script and
 // menu backdrops. If the patch does not apply, the emulated screen goes back to 16:9.

@@ -16,6 +16,7 @@
 #include <etcpak/ProcessRGB.hpp>
 #include <chrono>
 #include <thread>
+#include <sys/system_properties.h>
 #endif
 
 namespace gles {
@@ -179,6 +180,32 @@ std::pair<int, int> fb_size(GLenum target) {
 
 std::string g_extensions;
 
+// Removes " name" from a space-separated extension list (whole words only).
+void remove_extension(std::string& list, const std::string& name) {
+    std::string padded = " " + list + " ";
+    for (size_t p; (p = padded.find(" " + name + " ")) != std::string::npos;) padded.erase(p, name.size() + 1);
+    list = padded.substr(1, padded.size() - 2);
+}
+
+// `debug.ibport.glext` changes the list for tests: "+GL_X -GL_Y" adds or hides extensions.
+void apply_extension_overrides(std::string& list) {
+#ifdef __ANDROID__
+    char v[PROP_VALUE_MAX] = {};
+    if (__system_property_get("debug.ibport.glext", v) <= 0) return;
+    std::string words = v;
+    for (size_t i = 0; i < words.size();) {
+        size_t j = words.find(' ', i);
+        if (j == std::string::npos) j = words.size();
+        std::string w = words.substr(i, j - i);
+        i = j + 1;
+        if (w.size() < 2) continue;
+        remove_extension(list, w.substr(1));
+        if (w[0] == '+') list += " " + w.substr(1);
+        LOG_INFO("GL_EXTENSIONS: %s %s (debug.ibport.glext)", w[0] == '+' ? "added" : "hidden", w.c_str() + 1);
+    }
+#endif
+}
+
 struct FrameStats {
     std::atomic<u32> draws{0}, clears{0}, errors{0};
     std::atomic<s32> last_draw_fb{-1};
@@ -218,7 +245,10 @@ bool gpu_is_adreno() {
     return r && std::strstr(reinterpret_cast<const char*>(r), "Adreno");
 }
 
+bool gl_diag();
+
 void log_frame_stats(u64 frame) {
+    if (frame == 600 && gl_diag()) g_glcheck = false;  // diagnostics: errors of the first frames only
     if (frame == 1) {  // which GPU and driver: many graphics bugs are specific to one
         auto str = [](GLenum name) { const u8* s = p_glGetString(name); return s ? reinterpret_cast<const char*>(s) : "?"; };
         LOG_INFO("GPU: %s (%s), %s", str(GL_RENDERER), str(GL_VENDOR), str(GL_VERSION));
@@ -456,6 +486,84 @@ struct ErrorCheck {
     }
 };
 
+// Diagnostics for GPUs we cannot test on (IB3 draws no world on PowerVR): render target formats,
+// framebuffer completeness and, for the first 600 frames, the first GL errors of each call.
+// On for PowerVR; debug.ibport.gldiag 1/0 forces it.
+bool gl_diag() {
+    static int on = -1;
+    if (on < 0) {
+        const u8* r = p_glGetString(GL_RENDERER);
+        if (!r) return false;  // no context yet
+        on = std::strstr(reinterpret_cast<const char*>(r), "PowerVR") != nullptr;
+#ifdef __ANDROID__
+        char v[PROP_VALUE_MAX] = {};
+        if (__system_property_get("debug.ibport.gldiag", v) > 0 && (v[0] == '0' || v[0] == '1')) on = v[0] == '1';
+#endif
+        if (on) {
+            g_glcheck = true;
+            LOG_INFO("gldiag: on (render targets, framebuffers, GL errors of the first 600 frames)");
+        }
+    }
+    return on;
+}
+
+// Whether the GPU can draw into GL_BGRA_EXT textures. IB3's render targets (scene colour, bloom,
+// shadow colour) are empty BGRA textures; PowerVR (Pixel 10) only samples BGRA, so those framebuffers
+// were incomplete and the world stayed black under the HUD (IB2's are RGBA). Tested once with a
+// small framebuffer; debug.ibport.bgrart 0/1 forces the answer.
+bool bgra_renderable() {
+    static int ok = -1;
+    if (ok >= 0) return ok;
+#ifdef __ANDROID__
+    char v[PROP_VALUE_MAX] = {};
+    if (__system_property_get("debug.ibport.bgrart", v) > 0 && (v[0] == '0' || v[0] == '1')) {
+        ok = v[0] == '1';
+        LOG_INFO("render targets: BGRA %s (debug.ibport.bgrart)", ok ? "used" : "replaced by RGBA");
+        return ok;
+    }
+#endif
+    GLint prev_tex = 0, prev_draw = 0, prev_read = 0;
+    p_glGetIntegerv(0x8069 /*GL_TEXTURE_BINDING_2D*/, &prev_tex);
+    p_glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &prev_draw);
+    p_glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &prev_read);
+    GLuint tex = 0, fbo = 0;
+    p_glGenTextures(1, &tex);
+    p_glBindTexture(GL_TEXTURE_2D, tex);
+    p_glTexImage2D(GL_TEXTURE_2D, 0, GL_BGRA_EXT, 16, 16, 0, GL_BGRA_EXT, GL_UNSIGNED_BYTE, nullptr);
+    p_glGenFramebuffers(1, &fbo);
+    p_glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fbo);
+    p_glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, 0x8CE0 /*COLOR_ATTACHMENT0*/, GL_TEXTURE_2D, tex, 0);
+    GLenum st = p_glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER);
+    p_glBindFramebuffer(GL_DRAW_FRAMEBUFFER, prev_draw);
+    p_glBindFramebuffer(GL_READ_FRAMEBUFFER, prev_read);
+    p_glDeleteFramebuffers(1, &fbo);
+    p_glBindTexture(GL_TEXTURE_2D, prev_tex);
+    p_glDeleteTextures(1, &tex);
+    while (p_glGetError() != 0) {}
+    ok = st == 0x8CD5;
+    if (!ok) LOG_INFO("render targets: this GPU cannot draw into BGRA textures (0x%x); empty ones are made RGBA", st);
+    return ok;
+}
+
+void diag_storage(GLsizei samples, GLenum fmt, GLsizei w, GLsizei h) {
+    static std::atomic<int> logged{0};
+    if (!gl_diag() || logged++ >= 40) return;
+    GLint rb = 0;
+    p_glGetIntegerv(GL_RENDERBUFFER_BINDING, &rb);
+    LOG_INFO("gldiag: renderbuffer %d: %dx%d format 0x%x, %d samples", rb, w, h, fmt, samples);
+}
+
+void diag_framebuffer(const char* what, GLenum target, GLenum attachment, GLuint object, GLint level) {
+    static std::atomic<int> n{0};
+    if (!gl_diag() || n >= 120) return;
+    n++;
+    GLint fb = 0;
+    p_glGetIntegerv(target == GL_READ_FRAMEBUFFER ? GL_READ_FRAMEBUFFER_BINDING : GL_DRAW_FRAMEBUFFER_BINDING, &fb);
+    GLenum st = p_glCheckFramebufferStatus(target);
+    LOG_INFO("gldiag: framebuffer %d: %s %u (level %d) at 0x%x -> %s 0x%x", fb, what, object, level, attachment,
+             st == 0x8CD5 ? "complete" : "INCOMPLETE", st);
+}
+
 // GLSL ES 1.00 only allows constant initializers on global variables. Apple's compiler also took
 // uniforms (Infinity Blade II's light shafts: `float BloomScale = LightShaftParameters.y;`), which
 // stricter drivers reject. Such globals become plain declarations assigned at the start of main().
@@ -608,6 +716,7 @@ void install_gl() {
             std::call_once(once, [s] {
                 g_extensions = s ? reinterpret_cast<const char*>(s) : "";
                 g_extensions += " GL_IMG_texture_compression_pvrtc GL_APPLE_framebuffer_multisample GL_APPLE_texture_max_level";
+                apply_extension_overrides(g_extensions);
                 LOG_INFO("GL_EXTENSIONS reported to game: %s", g_extensions.c_str());
             });
             return reinterpret_cast<const u8*>(g_extensions.c_str());
@@ -647,16 +756,37 @@ void install_gl() {
                                 const void* data) {
         ErrorCheck check{"glTexImage2D"};
         if (fmt == GL_BGRA_EXT) ifmt = GL_BGRA_EXT;  // APPLE_texture_format_BGRA8888 allows RGBA internal format
+        // An empty BGRA texture is a render target: RGBA where BGRA cannot be drawn into (no pixels, so no swizzle).
+        if (fmt == GL_BGRA_EXT && !data && !game::is_infinity_blade_2() && !bgra_renderable()) ifmt = fmt = GL_RGBA;
         p_glTexImage2D(target, level, ifmt, w, h, border, fmt, type, data);
+        static std::atomic<int> logged{0};
+        if (!data && gl_diag() && logged++ < 80) {
+            GLint tex = 0;
+            p_glGetIntegerv(0x8069 /*GL_TEXTURE_BINDING_2D*/, &tex);
+            LOG_INFO("gldiag: empty texture %d target 0x%x level %d: %dx%d internal 0x%x format 0x%x type 0x%x", tex, target, level, w, h,
+                     ifmt, fmt, type);
+        }
+    });
+    hle::fn("_glFramebufferTexture2D", [](GLenum target, GLenum attachment, GLenum textarget, GLuint tex, GLint level) {
+        ErrorCheck check{"glFramebufferTexture2D"};
+        p_glFramebufferTexture2D(target, attachment, textarget, tex, level);
+        diag_framebuffer("texture", target, attachment, tex, level);
+    });
+    hle::fn("_glFramebufferRenderbuffer", [](GLenum target, GLenum attachment, GLenum rbtarget, GLuint rb) {
+        ErrorCheck check{"glFramebufferRenderbuffer"};
+        p_glFramebufferRenderbuffer(target, attachment, rbtarget, rb);
+        diag_framebuffer("renderbuffer", target, attachment, rb, 0);
     });
     hle::fn("_glRenderbufferStorage", [](GLenum t, GLenum fmt, GLsizei w, GLsizei h) {
         ErrorCheck check{"glRenderbufferStorage"};
         p_glRenderbufferStorage(t, fmt, w, h);
         record_rb_size(w, h);
+        diag_storage(0, fmt, w, h);
     });
     auto ms_storage = [](GLenum t, GLsizei samples, GLenum fmt, GLsizei w, GLsizei h) {
         p_glRenderbufferStorageMultisample(t, samples, fmt, w, h);
         record_rb_size(w, h);
+        diag_storage(samples, fmt, w, h);
     };
     hle::fn("_glRenderbufferStorageMultisample", ms_storage);
     hle::fn("_glRenderbufferStorageMultisampleAPPLE", ms_storage);
@@ -667,6 +797,13 @@ void install_gl() {
         if (scissor) p_glDisable(GL_SCISSOR_TEST);
         p_glBlitFramebuffer(0, 0, w, h, 0, 0, w, h, GL_COLOR_BUFFER_BIT, GL_NEAREST);
         if (scissor) p_glEnable(GL_SCISSOR_TEST);
+        static std::atomic<int> logged{0};
+        if (gl_diag() && logged++ < 3) {
+            GLint rfb = 0, dfb = 0;
+            p_glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &rfb);
+            p_glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &dfb);
+            LOG_INFO("gldiag: multisample resolve %dx%d from framebuffer %d to %d, GL error 0x%x", w, h, rfb, dfb, p_glGetError());
+        }
     });
 
     // The game never checks compile/link status; log failures ourselves.

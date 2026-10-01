@@ -49,6 +49,10 @@ Two Android apps, IB2 and IB3, are built from one codebase. Each has its own ver
 
 # IB3
 
+## 1.5.1 (2026-10-01)
+- Fixed the world not being drawn on phones with a PowerVR GPU (Pixel 10 series): only the HUD and movies showed. The game draws its 3D world into BGRA textures, which these GPUs can read but not draw into. On GPUs like that they are now made RGBA; other phones are unchanged. On PowerVR the log also records graphics diagnostics for the first seconds.
+- End credits: hold a finger on the screen to scroll them 8 times faster. The end credits cannot be skipped and take a few minutes; they still end the same way, just sooner.
+
 ## 1.5 (2026-10-01)
 - Language setting: Settings, Language picks the game's language from the ones in your `.ipa` (16 in the usual copy). The default is your phone's language when the `.ipa` has it, otherwise English. Some text inside the levels exists only in English.
 - Home screen icon: this app's own icon is a plain placeholder, and an app cannot change its icon, so the launcher can add a home screen shortcut with the icon from your own `.ipa` (offered after installing, and the Home screen icon button). Installs from this version keep the `.ipa`'s 512 px icon for it; older installs use its 152 px one. The launcher's menu shows the same icon.

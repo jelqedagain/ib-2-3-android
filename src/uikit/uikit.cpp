@@ -191,6 +191,7 @@ id make_touch_set(id touch) { return objc::send(objc::class_named("NSSet"), "set
 // ---------------------------------------------------------------------------
 // Touches: each "finger" (mouse = 0, key bindings / scripts use others) maps to one UITouch.
 std::map<int, id> g_touches;
+std::atomic<int> g_touch_count{0};  // g_touches.size(), for other threads
 id g_event = 0;
 
 // phase: 0 began, 1 moved, 2 ended
@@ -208,6 +209,7 @@ void deliver_touch(int finger, s64 phase, CGPoint p) {
         t.view = objc::retain(hit_test(g_key_window, p));
         t.loc = t.prev = p;
         g_touches[finger] = touch;
+        g_touch_count = (int)g_touches.size();
     }
     id touch = g_touches[finger];
     auto& t = objc::ensure<TouchData>(touch);
@@ -223,6 +225,7 @@ void deliver_touch(int finger, s64 phase, CGPoint p) {
     if (t.view) objc::send(t.view, sel, {make_touch_set(touch), g_event});
     if (phase == 2) {
         g_touches.erase(finger);
+        g_touch_count = (int)g_touches.size();
         objc::release(touch);
     }
     objc::pool_pop(pool);
@@ -262,6 +265,7 @@ void touch_down(int finger, CGPoint p) { deliver_touch(finger, 0, p); }
 void touch_move(int finger, CGPoint p) { deliver_touch(finger, 1, p); }
 void touch_up(int finger, CGPoint p) { deliver_touch(finger, 2, p); }
 bool touch_active(int finger) { return g_touches.count(finger) != 0; }
+int touches_down() { return g_touch_count; }
 
 std::atomic<bool> g_app_active{true};
 bool app_active() { return g_app_active; }
