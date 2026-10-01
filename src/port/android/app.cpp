@@ -319,6 +319,7 @@ void android_main(android_app* app) {
     app->onAppCmd = on_cmd;
     app->onInputEvent = on_input;
     ANativeActivity_setWindowFlags(app->activity, AWINDOW_FLAG_KEEP_SCREEN_ON | AWINDOW_FLAG_FULLSCREEN, 0);
+    gles::set_texture_cache_dir(app->activity->internalDataPath);  // fast internal storage, not in save backups
     if (const char* dir = app->activity->externalDataPath) {
         mkdir(dir, 0770);
         if (chdir(dir) != 0) __android_log_print(ANDROID_LOG_ERROR, "ib3", "cannot use %s", dir);

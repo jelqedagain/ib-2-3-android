@@ -63,9 +63,12 @@ std::string memory_summary() {
     }
     Etc2Stats etc = etc2_stats();
     if (etc.textures)
-        snprintf(buf + n, sizeof buf - n, ", %llu textures as ETC2 (%llu MB instead of %llu MB, %llu ms)",
+        snprintf(buf + n, sizeof buf - n,
+                 ", %llu textures as ETC2 (%llu MB instead of %llu MB; %llu converted in %llu ms, %llu from cache in %llu ms)",
                  (unsigned long long)etc.textures, (unsigned long long)(etc.bytes >> 20),
-                 (unsigned long long)(etc.rgba_bytes >> 20), (unsigned long long)(etc.us / 1000));
+                 (unsigned long long)(etc.rgba_bytes >> 20), (unsigned long long)etc.converted,
+                 (unsigned long long)(etc.converted_us / 1000), (unsigned long long)etc.cached,
+                 (unsigned long long)(etc.cached_us / 1000));
     return buf;
 }
 #endif

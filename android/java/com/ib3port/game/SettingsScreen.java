@@ -103,6 +103,8 @@ final class SettingsScreen {
             addRow(graphics, choice("Texture filtering", "Sharper textures at an angle.",
                     "Graphics", "Anisotropy", 4, new int[] {1, 4, 8, 16}, new String[] {"Off", "4x", "8x", "16x"}));
         }
+        addRow(graphics, toggle("Texture cache", "Keeps the game's converted textures so places load much faster after your first visit."
+                + " Uses a few hundred MB of storage; turning it off deletes it.", "Graphics", "TextureCache", 1));
         content.addView(graphics);
 
         content.addView(Ui.sectionHeader(a, "Sound"));

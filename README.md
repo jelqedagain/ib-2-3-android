@@ -29,6 +29,10 @@ Phones and iPhones both use ARM64, so on Android the app's code runs directly on
 
 **Download:** [IB2 APK](https://github.com/jelqedagain/ib-2-3-android/releases/tag/ib2) · [IB2 on archive.org](https://archive.org/details/infinity-blade-2-android)
 
+**1.5.2** (2026-10-01)
+
+- Places load much faster after your first visit: the textures the app converts for Android GPUs (since 1.3.5) are now kept, so a level that loaded before is not converted again. Measured on an AYN Odin 2 the texture work at startup went from 4.4 s to 0.15 s; slower phones save more. Settings, Texture cache turns it off and deletes it (it takes a few hundred MB of storage, in the app's own storage, not in save backups).
+
 **1.5** (2026-10-01)
 
 - Language setting: Settings, Language picks the game's language from the ones in your `.ipa` (13 in the usual copy). The default is your phone's language when the `.ipa` has it, otherwise English. Some text inside the levels exists only in English.
@@ -88,6 +92,10 @@ Phones and iPhones both use ARM64, so on Android the app's code runs directly on
 <summary><b>Click for IB3</b></summary>
 
 **Download:** [IB3 APK](https://github.com/jelqedagain/ib-2-3-android/releases/tag/ib3) · [IB3 on archive.org](https://archive.org/details/infinity-blade-3-android)
+
+**1.5.2** (2026-10-01)
+
+- Places load much faster after your first visit: the textures the app converts for Android GPUs (since 1.3.5) are now kept, so a level that loaded before is not converted again. Measured on an AYN Odin 2 loading into the Hideout: about 12 s before, about 5 s with the cache filled; slower phones save more. Settings, Texture cache turns it off and deletes it (it takes a few hundred MB of storage, in the app's own storage, not in save backups).
 
 **1.5.1** (2026-10-01)
 

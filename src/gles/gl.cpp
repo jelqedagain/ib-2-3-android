@@ -655,7 +655,8 @@ std::string smooth_modulated_shadows(const std::string& src) {
 // for Android to kill it on 6-8 GB phones; IB2: 0.7-0.9 GB, GPU peaks of 1.2 GB. On Android both games'
 // PVRTC is re-encoded as ETC2 (4 bpp, 8 with alpha).
 namespace {
-std::atomic<u64> g_etc2_textures{0}, g_etc2_bytes{0}, g_etc2_rgba_bytes{0}, g_etc2_us{0};
+std::atomic<u64> g_etc2_textures{0}, g_etc2_bytes{0}, g_etc2_rgba_bytes{0};
+std::atomic<u64> g_converted{0}, g_converted_us{0}, g_cached{0}, g_cached_us{0};
 
 // `rgba` is w x h RGBA8; returns ETC2 blocks for the texture padded to whole 4x4 blocks.
 std::vector<u64> encode_etc2(const u8* rgba, int w, int h, bool alpha) {
@@ -697,7 +698,7 @@ std::vector<u64> encode_etc2(const u8* rgba, int w, int h, bool alpha) {
 
 Etc2Stats etc2_stats() {
 #ifdef __ANDROID__
-    return {g_etc2_textures, g_etc2_bytes, g_etc2_rgba_bytes, g_etc2_us};
+    return {g_etc2_textures, g_etc2_bytes, g_etc2_rgba_bytes, g_converted, g_converted_us, g_cached, g_cached_us};
 #else
     return {};
 #endif
@@ -730,23 +731,33 @@ void install_gl() {
         ErrorCheck check{"glCompressedTexImage2D"};
         if (fmt >= 0x8C00 && fmt <= 0x8C03) {  // PVRTC1: decode to RGBA8
             bool two_bpp = fmt == 0x8C01 || fmt == 0x8C03;
-            std::vector<u8> rgba((size_t)std::max(w, 1) * std::max(h, 1) * 4);
-            if (data) pvrtc_decode(static_cast<const u8*>(data), w, h, two_bpp, rgba.data());
 #ifdef __ANDROID__
             if (w > 0 && h > 0) {
                 auto t0 = std::chrono::steady_clock::now();
                 bool alpha = fmt == 0x8C02 || fmt == 0x8C03;  // PVRTC RGBA formats
-                std::vector<u64> etc = encode_etc2(rgba.data(), w, h, alpha);
+                u64 key = data ? texture_cache_key(data, (size_t)size, fmt, w, h) : 0;
+                std::vector<u64> etc;
+                bool cached = data && texture_cache_get(key, etc);
+                if (!cached) {
+                    std::vector<u8> rgba((size_t)w * h * 4);
+                    if (data) pvrtc_decode(static_cast<const u8*>(data), w, h, two_bpp, rgba.data());
+                    etc = encode_etc2(rgba.data(), w, h, alpha);
+                    if (data) texture_cache_put(key, etc);
+                }
                 GLsizei bytes = (GLsizei)(etc.size() * 8);
                 p_glCompressedTexImage2D(target, level, alpha ? 0x9278 : 0x9274,  // GL_COMPRESSED_RGBA8_ETC2_EAC / RGB8_ETC2
                                          w, h, border, bytes, etc.data());
                 if (g_etc2_textures++ == 0) LOG_INFO("textures: PVRTC is re-encoded as ETC2 (Android GPUs can't use PVRTC)");
                 g_etc2_bytes += bytes;
-                g_etc2_rgba_bytes += rgba.size();
-                g_etc2_us += std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - t0).count();
+                g_etc2_rgba_bytes += (u64)w * h * 4;
+                u64 us = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - t0).count();
+                (cached ? g_cached : g_converted)++;
+                (cached ? g_cached_us : g_converted_us) += us;
                 return;
             }
 #endif
+            std::vector<u8> rgba((size_t)std::max(w, 1) * std::max(h, 1) * 4);
+            if (data) pvrtc_decode(static_cast<const u8*>(data), w, h, two_bpp, rgba.data());
             p_glTexImage2D(target, level, GL_RGBA, w, h, border, GL_RGBA, GL_UNSIGNED_BYTE, data ? rgba.data() : nullptr);
             return;
         }

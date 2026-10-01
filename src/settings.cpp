@@ -73,6 +73,9 @@ void load() {
     s.bloom = read_int(L"Graphics", L"Bloom", d.bloom) != 0;
     s.depth_of_field = read_int(L"Graphics", L"DepthOfField", d.depth_of_field) != 0;
     s.anisotropy = clamp(read_int(L"Graphics", L"Anisotropy", d.anisotropy), 1, 16);
+#ifdef __ANDROID__
+    s.texture_cache = read_int(L"Graphics", L"TextureCache", d.texture_cache) != 0;
+#endif
     s.music_volume = clamp(read_int(L"Audio", L"MusicVolume", d.music_volume), 0, 100);
     s.effects_volume = clamp(read_int(L"Audio", L"EffectsVolume", d.effects_volume), 0, 100);
     s.controller = read_int(L"Controller", L"Enabled", d.controller) != 0;
@@ -103,6 +106,9 @@ void save() {
     write_int(L"Graphics", L"Bloom", s.bloom);
     write_int(L"Graphics", L"DepthOfField", s.depth_of_field);
     write_int(L"Graphics", L"Anisotropy", s.anisotropy);
+#ifdef __ANDROID__
+    write_int(L"Graphics", L"TextureCache", s.texture_cache);
+#endif
     write_int(L"Audio", L"MusicVolume", s.music_volume);
     write_int(L"Audio", L"EffectsVolume", s.effects_volume);
     write_int(L"Controller", L"Enabled", s.controller);

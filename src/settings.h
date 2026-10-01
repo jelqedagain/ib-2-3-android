@@ -25,6 +25,9 @@ struct Settings {
     bool bloom = true;
     bool depth_of_field = true;
     int anisotropy = 4;        // 1, 2, 4, 8, 16
+#ifdef __ANDROID__
+    bool texture_cache = true;  // keep the ETC2 re-encodings of the textures (gles/texcache.cpp)
+#endif
     // Audio (percent)
     int music_volume = 100;
     int effects_volume = 100;
