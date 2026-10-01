@@ -20,6 +20,12 @@ Phones and iPhones both use ARM64, so on Android the app's code runs directly on
 
 **Download:** [IB2 APK](https://github.com/jelqedagain/ib-2-3-android/releases/tag/ib2) · [IB2 on archive.org](https://archive.org/details/infinity-blade-2-android)
 
+**1.5** (2026-10-01)
+
+- Language setting: Settings, Language picks the game's language from the ones in your `.ipa` (13 in the usual copy). The default is your phone's language when the `.ipa` has it, otherwise English. Some text inside the levels exists only in English.
+- Home screen icon: this app's own icon is a plain placeholder, and an app cannot change its icon, so the launcher can add a home screen shortcut with the icon from your own `.ipa` (offered after installing, and the Home screen icon button). Installs from this version keep the `.ipa`'s 512 px icon for it; older installs use its 152 px one. The launcher's menu shows the same icon.
+- A damaged `.ipa` (for example "invalid block type" while installing) is now reported as damaged, with a hint to download it again.
+
 **1.4 beta 2** (2026-09-30)
 
 - Fixed a black screen after the final scene with game copies that include the Logo movie. When a movie's sound ended a few frames before its picture, the movie never finished and the game waited for it forever. Movies now keep time by the clock once their sound has ended. The same bug could also leave the game on the startup logo on some phones.
@@ -73,6 +79,13 @@ Phones and iPhones both use ARM64, so on Android the app's code runs directly on
 <summary><b>Click for IB3</b></summary>
 
 **Download:** [IB3 APK](https://github.com/jelqedagain/ib-2-3-android/releases/tag/ib3) · [IB3 on archive.org](https://archive.org/details/infinity-blade-3-android)
+
+**1.5** (2026-10-01)
+
+- Language setting: Settings, Language picks the game's language from the ones in your `.ipa` (16 in the usual copy). The default is your phone's language when the `.ipa` has it, otherwise English. Some text inside the levels exists only in English.
+- Home screen icon: this app's own icon is a plain placeholder, and an app cannot change its icon, so the launcher can add a home screen shortcut with the icon from your own `.ipa` (offered after installing, and the Home screen icon button). Installs from this version keep the `.ipa`'s 512 px icon for it; older installs use its 152 px one. The launcher's menu shows the same icon.
+- A damaged `.ipa` (for example "invalid block type" while installing) is now reported as damaged, with a hint to download it again.
+- Fixed a black screen with the music repeating after the final fight (the end movie never finished). The movie's sound is a few milliseconds shorter than its picture once Android decodes it, and movies kept time by their sound, so the last frame was never due. Movies now keep time by the clock once their sound has ended (the IB2 1.4 beta 2 fix). The opening movie had the same risk.
 
 **1.4 beta** (2026-09-30)
 
