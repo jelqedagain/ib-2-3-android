@@ -529,6 +529,11 @@ public class LauncherActivity extends Activity {
                     }
                 } catch (IOException ex) {
                     deleteTree(staging);
+                    // A ZipException here ("invalid block type", a bad CRC) means the .ipa's data is damaged, usually by an
+                    // interrupted or corrupted download.
+                    if (ex instanceof java.util.zip.ZipException)
+                        throw new IOException("Your .ipa file is damaged: " + z.getName().substring(APP_PREFIX.length())
+                                + " cannot be unpacked (" + ex.getMessage() + "). Download the .ipa again and choose the new copy.");
                     throw new IOException("Extracting " + z.getName() + " failed: " + ex.getMessage());
                 }
             }
