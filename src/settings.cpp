@@ -22,6 +22,14 @@ void write_int(const wchar_t* section, const wchar_t* key, int v) {
     WritePrivateProfileStringW(section, key, std::to_wstring(v).c_str(), path().c_str());
 }
 
+std::string read_string(const wchar_t* section, const wchar_t* key) {
+    wchar_t buf[64] = {};
+    GetPrivateProfileStringW(section, key, L"", buf, (DWORD)std::size(buf), path().c_str());
+    std::string out;
+    for (const wchar_t* p = buf; *p; p++) out += (char)*p;
+    return out;
+}
+
 int clamp(int v, int lo, int hi) { return v < lo ? lo : v > hi ? hi : v; }
 
 }  // namespace
@@ -65,12 +73,27 @@ void load() {
     s.bloom = read_int(L"Graphics", L"Bloom", d.bloom) != 0;
     s.depth_of_field = read_int(L"Graphics", L"DepthOfField", d.depth_of_field) != 0;
     s.anisotropy = clamp(read_int(L"Graphics", L"Anisotropy", d.anisotropy), 1, 16);
+#ifdef __ANDROID__
+    s.texture_cache = read_int(L"Graphics", L"TextureCache", d.texture_cache) != 0;
+#endif
     s.music_volume = clamp(read_int(L"Audio", L"MusicVolume", d.music_volume), 0, 100);
     s.effects_volume = clamp(read_int(L"Audio", L"EffectsVolume", d.effects_volume), 0, 100);
     s.controller = read_int(L"Controller", L"Enabled", d.controller) != 0;
     s.cursor_speed = clamp(read_int(L"Controller", L"CursorSpeed", d.cursor_speed), 20, 400);
     s.camera_speed = clamp(read_int(L"Controller", L"CameraSpeed", d.camera_speed), 20, 400);
     s.swipe_size = clamp(read_int(L"Controller", L"SwipeSize", d.swipe_size), 30, 300);
+    s.language = read_string(L"Game", L"Language");
+    if (s.language.empty()) s.language = read_string(L"Game", L"PhoneLanguage");
+    if (s.language.empty()) s.language = d.language;
+    // [Cheats], with the [Game] keys of 1.6 to 1.7 tests as the fallback.
+    s.developer_mode = read_int(L"Cheats", L"InGame", read_int(L"Game", L"DeveloperMode", d.developer_mode)) != 0;
+    s.god_mode = read_int(L"Cheats", L"GodMode", d.god_mode) != 0;
+    s.unlimited_super = read_int(L"Cheats", L"UnlimitedSuper", d.unlimited_super) != 0;
+    s.fast_forward = read_int(L"Cheats", L"FastForward", d.fast_forward) != 0;
+    s.fast_wheel = read_int(L"Cheats", L"FastWheel", read_int(L"Game", L"FastWheel", d.fast_wheel)) != 0;
+    s.gem_shop_restock = read_int(L"Cheats", L"GemShopRestock", read_int(L"Game", L"GemShopRestock", d.gem_shop_restock)) != 0;
+    // The 1.7 tests had a gem shop choice (GemShop: empty = the normal shop) instead.
+    s.all_gems = read_int(L"Cheats", L"AllGems", !read_string(L"Cheats", L"GemShop").empty()) != 0;
     g_loaded = true;
 }
 
@@ -92,12 +115,25 @@ void save() {
     write_int(L"Graphics", L"Bloom", s.bloom);
     write_int(L"Graphics", L"DepthOfField", s.depth_of_field);
     write_int(L"Graphics", L"Anisotropy", s.anisotropy);
+#ifdef __ANDROID__
+    write_int(L"Graphics", L"TextureCache", s.texture_cache);
+#endif
     write_int(L"Audio", L"MusicVolume", s.music_volume);
     write_int(L"Audio", L"EffectsVolume", s.effects_volume);
     write_int(L"Controller", L"Enabled", s.controller);
     write_int(L"Controller", L"CursorSpeed", s.cursor_speed);
     write_int(L"Controller", L"CameraSpeed", s.camera_speed);
     write_int(L"Controller", L"SwipeSize", s.swipe_size);
+}
+
+void set_cheat(const char* key, bool on) {
+    Settings& s = get();
+    std::string k = key;
+    bool* field = k == "InGame" ? &s.developer_mode : k == "GodMode" ? &s.god_mode : k == "UnlimitedSuper" ? &s.unlimited_super
+                  : k == "FastForward" ? &s.fast_forward : k == "FastWheel" ? &s.fast_wheel
+                  : k == "GemShopRestock" ? &s.gem_shop_restock : k == "AllGems" ? &s.all_gems : nullptr;
+    if (field) *field = on;
+    write_int(L"Cheats", widen(key).c_str(), on);
 }
 
 Settings& get() {

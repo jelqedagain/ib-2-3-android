@@ -50,11 +50,6 @@ final class SaveEditorScreen {
         {"Bloodline", "Awakening", "Your awakening (rebirth) number, shown on the Stats screen.", "3"},
         {"GemCarry", "Gem bag upgrades", "How many times the gem bag was made bigger.", "3"},
     };
-    private static final String[][] ACTIONS = {
-        {"GiveAllItems", "Give every item", "Adds every weapon, shield, armor, helmet and magic to your inventory.", "3"},  // IB2 has the cheat, but it does nothing
-        {"GiveAllPerks", "Give all perks", "The developers' cheat: it also makes your character level 50 with every stat at 100.", "3"},
-    };
-
     private final Activity a;
     private final File dir;
     private final String game;
@@ -62,8 +57,8 @@ final class SaveEditorScreen {
     private final Map<String, String> reported = new LinkedHashMap<>();  // the same file as text, with the game's [Limits]
     private final Map<String, String> pending = new LinkedHashMap<>();
     private final Map<String, EditText> inputs = new LinkedHashMap<>();
-    private final Map<String, Switch> switches = new LinkedHashMap<>();
     private long currentTime;
+    private boolean gameRunning;
 
     private SaveEditorScreen(Activity a, File dir, boolean ib2) {
         this.a = a;
@@ -109,6 +104,7 @@ final class SaveEditorScreen {
     }
 
     private View build(boolean gameRunning, Runnable back) {
+        this.gameRunning = gameRunning;
         LinearLayout root = new LinearLayout(a);
         root.setOrientation(LinearLayout.VERTICAL);
         Ui.screenBackground(root);
@@ -143,20 +139,25 @@ final class SaveEditorScreen {
             ? "Launch the game once to see your current gold and stats here."
             : "\"Now\" is your save as of " + DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(new Date(currentTime)) + ".";
         String how = "Changes are made to your save the next time you press Play. "
-            + (gameRunning ? "The game is running now: close it first, or it saves over them. " : "")
+            + (gameRunning ? "The game is running now, so saving changes closes it (progress since its last save is lost). " : "")
             + "Back up your saves first if you may want to go back.";
         TextView infoText = Ui.text(a, when + "\n" + how, 13.5f, Ui.SUBTEXT, false);
         infoText.setLineSpacing(0, 1.15f);
         info.addView(infoText);
-        if (!pending.isEmpty()) {
-            TextView queued = Ui.text(a, "Changes waiting for the next Play: " + describe(pending), 13.5f, Ui.ACCENT, true);
+        String waiting = describe(pending);
+        if (!waiting.isEmpty()) {
+            TextView queued = Ui.text(a, "Changes waiting for the next Play: " + waiting, 13.5f, Ui.ACCENT, true);
             queued.setPadding(0, dp(8), 0, 0);
             info.addView(queued);
             TextView discard = Ui.text(a, "Discard waiting changes", 13.5f, Ui.TEXT, true);
             discard.setPadding(0, dp(10), 0, dp(2));
             discard.setClickable(true);
             discard.setOnClickListener(v -> {
-                new File(dir, "saveedit-pending.ini").delete();
+                try {
+                    Pending.write(dir, ownedKeys(), new LinkedHashMap<>());
+                } catch (IOException e) {
+                    Toast.makeText(a, e.getMessage(), Toast.LENGTH_SHORT).show();
+                }
                 Toast.makeText(a, "Waiting changes discarded", Toast.LENGTH_SHORT).show();
                 back.run();
             });
@@ -170,14 +171,6 @@ final class SaveEditorScreen {
         for (String[] f : NUMBERS)
             if (f[3].contains(game)) addRow(numbers, numberRow(f[0], f[1], f[2]));
         content.addView(numbers);
-
-        LinearLayout actions = Ui.card(a);
-        for (String[] f : ACTIONS)
-            if (f[3].contains(game)) addRow(actions, actionRow(f[0], f[1], f[2]));
-        if (actions.getChildCount() > 0) {
-            content.addView(Ui.sectionHeader(a, "Items"));
-            content.addView(actions);
-        }
 
         LinearLayout center = new LinearLayout(a);
         center.setGravity(Gravity.CENTER_HORIZONTAL);
@@ -205,15 +198,19 @@ final class SaveEditorScreen {
         return NumberFormat.getIntegerInstance(Locale.US).format(n);
     }
 
+    // This page's keys in saveedit-pending.ini (the Cheats page owns the rest).
+    private java.util.Set<String> ownedKeys() {
+        java.util.Set<String> keys = new java.util.LinkedHashSet<>();
+        for (String[] f : NUMBERS) keys.add(f[0]);
+        return keys;
+    }
+
     private String describe(Map<String, String> edits) {
         StringBuilder s = new StringBuilder();
         for (Map.Entry<String, String> e : edits.entrySet()) {
-            String label = e.getKey();
-            for (String[] f : NUMBERS) if (f[0].equals(e.getKey()) && f[3].contains(game)) label = f[1];
-            for (String[] f : ACTIONS) if (f[0].equals(e.getKey())) label = f[1];
+            if (!ownedKeys().contains(e.getKey())) continue;
             if (s.length() > 0) s.append(", ");
-            boolean action = e.getKey().startsWith("Give");
-            s.append(label).append(action ? "" : " " + e.getValue());
+            s.append(labelOf(e.getKey())).append(' ').append(e.getValue());
         }
         return s.toString();
     }
@@ -262,7 +259,9 @@ final class SaveEditorScreen {
         long now = current.containsKey(key) ? current.get(key) : 0, limit;
         switch (key) {
             case "Level": limit = MAX_LEVEL; break;
-            case "XP": return Math.max(0, xpToNext(level) - 1);
+            case "XP":  // a save can hold more (e.g. at level 50), and keeping its level keeps its XP
+                limit = Math.max(0, xpToNext(level) - 1);
+                return current.containsKey("Level") && current.get("Level") == level ? Math.max(limit, now) : limit;
             case "StatPoints": limit = 999; break;
             case "Bloodline": limit = game.equals("3") ? reportedLong("MaxBloodline", 100) : 99; break;
             case "GemCarry": return reportedLong("MaxGemCarry", 3);
@@ -273,11 +272,7 @@ final class SaveEditorScreen {
         return Math.max(limit, now);  // never less than a save already has
     }
 
-    private View numberRow(String key, String label, String subtitle) {
-        Long now = current.get(key);
-        long lvl = current.containsKey("Level") ? current.get("Level") : 1;
-        String range = number(min(key)) + " to " + number(max(key, lvl));
-        String sub = (now != null ? "Now: " + number(now) + ". " : "") + (subtitle.isEmpty() ? "" : subtitle + " ") + range + ".";
+    private EditText numberInput() {
         EditText input = new EditText(a);
         input.setInputType(InputType.TYPE_CLASS_NUMBER);
         input.setFilters(new InputFilter[] {new InputFilter.LengthFilter(9)});
@@ -291,6 +286,15 @@ final class SaveEditorScreen {
         input.setTextSize(16);
         input.setBackground(Ui.rounded(a, 0xFF11131A, 10, Ui.CARD_LINE));
         input.setPadding(dp(12), dp(8), dp(12), dp(8));
+        return input;
+    }
+
+    private View numberRow(String key, String label, String subtitle) {
+        Long now = current.get(key);
+        long lvl = current.containsKey("Level") ? current.get("Level") : 1;
+        String range = number(min(key)) + " to " + number(max(key, lvl));
+        String sub = (now != null ? "Now: " + number(now) + ". " : "") + (subtitle.isEmpty() ? "" : subtitle + " ") + range + ".";
+        EditText input = numberInput();
         String waiting = pending.get(key);
         if (waiting != null) input.setText(waiting);
         else if (now != null) input.setText(String.valueOf(now));
@@ -314,19 +318,6 @@ final class SaveEditorScreen {
     private LinearLayout row(String title, String subtitle, View control, int controlWidth) {
         LinearLayout row = row(title, subtitle, control);
         control.setLayoutParams(new LinearLayout.LayoutParams(controlWidth, LinearLayout.LayoutParams.WRAP_CONTENT));
-        return row;
-    }
-
-    private View actionRow(String key, String label, String subtitle) {
-        Switch s = new Switch(a);
-        s.setChecked("1".equals(pending.get(key)));
-        s.setThumbTintList(new ColorStateList(new int[][] {{android.R.attr.state_checked}, {}}, new int[] {Ui.ACCENT, 0xFFB8BCC6}));
-        s.setTrackTintList(new ColorStateList(new int[][] {{android.R.attr.state_checked}, {}}, new int[] {0x80E2B155, 0xFF3A3F4C}));
-        switches.put(key, s);
-        LinearLayout row = row(label, subtitle, s);
-        row.setClickable(true);
-        row.setBackground(Ui.pressable(a, Ui.rounded(a, 0x00000000, 0, 0), 0));
-        row.setOnClickListener(v -> s.toggle());
         return row;
     }
 
@@ -367,11 +358,11 @@ final class SaveEditorScreen {
             }
             if (now == null || now != clamped || pending.containsKey(key)) edits.put(key, String.valueOf(clamped));
         }
-        for (Map.Entry<String, Switch> e : switches.entrySet())
-            if (e.getValue().isChecked()) edits.put(e.getKey(), "1");
-        File file = new File(dir, "saveedit-pending.ini");
         if (edits.isEmpty()) {
-            file.delete();
+            try {
+                Pending.write(dir, ownedKeys(), edits);  // drops this page's earlier waiting changes
+            } catch (IOException ignored) {
+            }
             if (fixed.length() > 0) {
                 new android.app.AlertDialog.Builder(a, android.R.style.Theme_DeviceDefault_Dialog_Alert)
                     .setTitle("Nothing to change")
@@ -384,10 +375,8 @@ final class SaveEditorScreen {
             }
             return;
         }
-        StringBuilder s = new StringBuilder("; Written by the launcher's Edit save page; the game applies it the next time it loads the save.\n[Edits]\n");
-        for (Map.Entry<String, String> e : edits.entrySet()) s.append(e.getKey()).append('=').append(e.getValue()).append('\n');
-        try (OutputStream out = new FileOutputStream(file)) {
-            out.write(s.toString().getBytes(StandardCharsets.UTF_8));
+        try {
+            Pending.write(dir, ownedKeys(), edits);
         } catch (IOException ex) {
             Toast.makeText(a, "Could not save the changes: " + ex.getMessage(), Toast.LENGTH_LONG).show();
             return;
@@ -397,12 +386,29 @@ final class SaveEditorScreen {
                 .setTitle("Saved, with some values changed")
                 .setMessage("These were outside what the game can take, so they were set to:" + fixed
                             + "\n\nThe changes are made when you press Play.")
-                .setPositiveButton("OK", (d, w) -> back.run())
+                .setPositiveButton("OK", (d, w) -> done(back))
                 .setCancelable(false)
                 .show();
             return;
         }
         Toast.makeText(a, "Saved. The changes are made when you press Play.", Toast.LENGTH_LONG).show();
-        back.run();
+        done(back);
+    }
+
+    // The game runs in this process and loads the save only when it starts: a running game would never
+    // read the changes, and would save over them. So it is closed, and the next Play starts it afresh.
+    private void done(Runnable back) {
+        if (!gameRunning) {
+            back.run();
+            return;
+        }
+        new android.app.AlertDialog.Builder(a, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+            .setMessage("Changes saved. The game is still running and only reads your save when it starts, so it will close now. Open it again and press Play.")
+            .setCancelable(false)
+            .setPositiveButton("OK", (d, w) -> {
+                a.finishAffinity();
+                android.os.Process.killProcess(android.os.Process.myPid());
+            })
+            .show();
     }
 }

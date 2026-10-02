@@ -25,12 +25,26 @@ struct Settings {
     bool bloom = true;
     bool depth_of_field = true;
     int anisotropy = 4;        // 1, 2, 4, 8, 16
+#ifdef __ANDROID__
+    bool texture_cache = true;  // keep the ETC2 re-encodings of the textures (gles/texcache.cpp)
+#endif
     // Audio (percent)
     int music_volume = 100;
     int effects_volume = 100;
     // Controller (percent multipliers of the defaults)
     bool controller = true;
     int cursor_speed = 100, camera_speed = 100, swipe_size = 100;
+    // Game language: the suffix of the game's text files (INT, FRA, DEU...). [Game] Language is the
+    // player's choice; empty means the phone's language ([Game] PhoneLanguage, written by the launcher).
+    std::string language = "INT";
+    // Cheats ([Cheats], the app's Cheats page; the in-game CHEATS rows change them too, game/devmode.cpp).
+    bool developer_mode = false;    // InGame: a CHEATS section at the top of the in-game Options
+    bool god_mode = false;          // GodMode
+    bool unlimited_super = false;   // UnlimitedSuper: super move and magic always full
+    bool fast_forward = false;      // FastForward: always fast-forward
+    bool fast_wheel = false;        // FastWheel, IB3: the prize wheel's spin is over at once (game/wheel.cpp)
+    bool gem_shop_restock = false;  // GemShopRestock: a gem bought in the gem shop is put back (game/saveedit.cpp)
+    bool all_gems = false;  // AllGems: the gem shop sells every gem, each at its highest level (game/devmode.cpp)
 };
 
 // Directory of the executable (with trailing backslash); on Android, the app's files folder.
@@ -40,6 +54,8 @@ std::wstring path();  // settings.ini
 Settings& get();  // loaded on first use
 void load();
 void save();
+// Changes one [Cheats] switch, in memory and in settings.ini (the in-game CHEATS rows).
+void set_cheat(const char* key, bool on);
 
 // Key bindings: Unreal key name ("S", "LeftShift", ...) for each action id.
 std::string key_for(const char* action, const char* default_key);

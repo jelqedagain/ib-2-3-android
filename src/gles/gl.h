@@ -2,6 +2,7 @@
 #pragma once
 #include "common.h"
 #include <functional>
+#include <vector>
 #include <string>
 #include <windows.h>
 
@@ -46,9 +47,19 @@ void pvrtc_decode(const u8* src, int width, int height, bool two_bpp, u8* rgba_o
 
 // Android: PVRTC textures re-encoded as ETC2 so far (uploads, their size, the RGBA8 size they replace, time).
 struct Etc2Stats {
-    u64 textures, bytes, rgba_bytes, us;
+    u64 textures, bytes, rgba_bytes;
+    u64 converted, converted_us;  // decoded and re-encoded
+    u64 cached, cached_us;        // read from the texture cache
 };
 Etc2Stats etc2_stats();
+
+#ifdef __ANDROID__
+// Texture cache (texcache.cpp): ETC2 encodings of PVRTC textures, by texture_cache_key of the PVRTC data.
+void set_texture_cache_dir(const char* dir);
+u64 texture_cache_key(const void* data, size_t size, u32 format, int w, int h);
+bool texture_cache_get(u64 key, std::vector<u64>& blocks);
+void texture_cache_put(u64 key, const std::vector<u64>& blocks);
+#endif
 
 // Looks up a function of the OpenGL ES library (ANGLE's libGLESv2.dll, or the device's libGLESv2.so).
 void* gl_proc(const char* name);

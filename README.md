@@ -2,6 +2,15 @@
 
 An experimental iOS emulator for Android: a compatibility layer that runs ARM64 iOS apps built on Unreal Engine 3. It is a hobby and research project.
 
+## Download
+
+| App | archive.org | GitHub |
+| --- | --- | --- |
+| **IB2** | [IB2 on archive.org](https://archive.org/details/infinity-blade-2-android) | [IB2 release](https://github.com/jelqedagain/ib-2-3-android/releases/tag/ib2) |
+| **IB3** | [IB3 on archive.org](https://archive.org/details/infinity-blade-3-android) | [IB3 release](https://github.com/jelqedagain/ib-2-3-android/releases/tag/ib3) |
+
+Both places have the same app (Android 11+, ARM64); install the `.apk` on your phone and open it. You also need your own `.ipa` of the game. Installing a new version over an old one keeps your game and saves.
+
 **This repository contains no game files.** It is only the source code of the emulator: a Mach-O loader, and implementations of the parts of iOS the apps call (C library, Objective-C runtime, Foundation, UIKit) on top of Android's OpenGL ES, AAudio and MediaCodec. To run a game you need your own copy of the app as an `.ipa` file; nothing here provides one.
 
 ## How it works
@@ -19,6 +28,39 @@ Phones and iPhones both use ARM64, so on Android the app's code runs directly on
 <summary><b>Click for IB2</b></summary>
 
 **Download:** [IB2 APK](https://github.com/jelqedagain/ib-2-3-android/releases/tag/ib2) · [IB2 on archive.org](https://archive.org/details/infinity-blade-2-android)
+
+**1.7** (2026-10-02)
+
+- New layout, easier to find things: the home screen has Cheats, Saves, Settings and Help. **Cheats** holds Developer mode and every cheat, grouped (Developer mode, Items, Gems, While playing), with a search box; each line says when it takes effect (ALWAYS ON, NEXT PLAY or IN GAME) and where to see it in the game. **Saves** holds Edit save (gold, level, XP, stats), Back up and Restore. **Help** has Report a problem (was Share logs), the home screen icon, and a "Where do I find…" list. Settings keeps only language, graphics, sound and controls.
+- Developer mode moved to the Cheats page (its first switch; Settings has a row that takes you there): it now puts a CHEATS section at the TOP of the game's Options (gear, Options) with god mode, unlimited super and magic, always fast forward and boss attacks (the same switches as the app's Cheats page, kept in step both ways), kill boss, give gold, get every item and gem shop refills, all working at once without restarting; the rest of the game's developer options are below it under DEVELOPER.
+- God mode, unlimited super and magic and always fast forward can now simply be switched on in the app and stay on every time you play.
+- Gem shop, simpler (Cheats, Gems), with the same two switches in the game's Options (Developer mode): **All gems** makes the gem shop sell every gem in the game, each at its highest level, so any gem can be bought again at full power; **Restock after buying** keeps a gem you buy in the store, ready to buy again at once (the store used to drop its row as soon as you bought it).
+- Touch: a finger lifted while another lands no longer makes the game mix up the two (Android reused the lifted finger's ID at once), which could make taps and swipes not register while tapping fast.
+- The community Dev Mod .ipa's "Cheat - Give All Items" row now works (the game loads its item lists only while an inventory menu needs them; they are now loaded while Options is open).
+
+**1.6.1** (2026-10-02)
+
+- Edit save, Give every item now works in IB2 too: it adds every weapon, shield, armor, helmet and magic ring you don't have yet. The game's own cheat for it gave nothing, because the game loads its item lists only while a menu needs them; they are now loaded for it.
+- Edit save no longer lowers XP to 24,999 when you save changes with a save that has more (for example at level 50).
+- Saving changes on the Edit save page while the game is still running closes the app, so the game loads them the next time you press Play (it reads the save only when it starts).
+
+**1.6** (2026-10-01)
+
+- Developer mode: Settings, Game, Developer mode (off by default) adds the game's own hidden developer options to the Options menu inside the game (gear icon, Options, at the bottom): god mode, unlimited super and magic, always fast forward, boss attacks on/off, kill boss, give gold, reload last checkpoint, start next bloodline, rebalance stats, rename character, show FPS, gesture test, demo HUD, shadows, light shafts, tutorial, and dump / load an unencrypted save. They are the game's leftover functions from development; no modified .ipa is needed.
+
+**1.5.2** (2026-10-01)
+
+- Places load much faster after your first visit: the textures the app converts for Android GPUs (since 1.3.5) are now kept, so a level that loaded before is not converted again. Measured on an AYN Odin 2 the texture work at startup went from 4.4 s to 0.15 s; slower phones save more. Settings, Texture cache turns it off and deletes it (it takes a few hundred MB of storage, in the app's own storage, not in save backups).
+
+**1.5** (2026-10-01)
+
+- Language setting: Settings, Language picks the game's language from the ones in your `.ipa` (13 in the usual copy). The default is your phone's language when the `.ipa` has it, otherwise English. Some text inside the levels exists only in English.
+- Home screen icon: this app's own icon is a plain placeholder, and an app cannot change its icon, so the launcher can add a home screen shortcut with the icon from your own `.ipa` (offered after installing, and the Home screen icon button). Installs from this version keep the `.ipa`'s 512 px icon for it; older installs use its 152 px one. The launcher's menu shows the same icon.
+- A damaged `.ipa` (for example "invalid block type" while installing) is now reported as damaged, with a hint to download it again.
+
+**1.4 beta 2** (2026-09-30)
+
+- Fixed a black screen after the final scene with game copies that include the Logo movie. When a movie's sound ended a few frames before its picture, the movie never finished and the game waited for it forever. Movies now keep time by the clock once their sound has ended. The same bug could also leave the game on the startup logo on some phones.
 
 **1.4 beta** (2026-09-30)
 
@@ -69,6 +111,45 @@ Phones and iPhones both use ARM64, so on Android the app's code runs directly on
 <summary><b>Click for IB3</b></summary>
 
 **Download:** [IB3 APK](https://github.com/jelqedagain/ib-2-3-android/releases/tag/ib3) · [IB3 on archive.org](https://archive.org/details/infinity-blade-3-android)
+
+**1.7** (2026-10-02)
+
+- New layout, easier to find things: the home screen has Cheats, Saves, Settings and Help. **Cheats** holds Developer mode and every cheat, grouped (Developer mode, Items, Gems, While playing), with a search box; each line says when it takes effect (ALWAYS ON, NEXT PLAY or IN GAME) and where to see it in the game. **Saves** holds Edit save (gold, level, XP, stats), Back up and Restore. **Help** has Report a problem (was Share logs), the home screen icon, and a "Where do I find…" list. Settings keeps only language, graphics, sound and controls.
+- Developer mode moved to the Cheats page (its first switch; Settings has a row that takes you there): it now puts a CHEATS section at the TOP of the game's Options (gear, Options) with god mode, unlimited super and magic, always fast forward and boss attacks (the same switches as the app's Cheats page, kept in step both ways), kill boss, give gold, get every item and gem shop refills, all working at once without restarting; the rest of the game's developer options are below it under DEVELOPER.
+- God mode, unlimited super and magic and always fast forward can now simply be switched on in the app and stay on every time you play.
+- Gem shop, simpler (Cheats, Gems), with the same two switches in the game's Options (Developer mode): **All gems** makes the gem shop sell every gem in the game, each at its highest level, so any gem can be bought again at full power; **Restock after buying** keeps a gem you buy in the store, ready to buy again at once (the store used to drop its row as soon as you bought it). They replace the earlier gem shop choice and Strongest gems.
+- Touch: a finger lifted while another lands no longer makes the game mix up the two (Android reused the lifted finger's ID at once), which could make taps and swipes not register while tapping fast.
+- Fixed a jagged dark outline around characters in cutscenes with depth of field at 1440p, and at 1080p on phones longer than 16:9. The game widens its background blur with the picture's width but keeps only 4 blur samples (enough for the 2048-pixel iPad); on wider pictures the blur lost its samples on one side. It now keeps up to 16, the engine's own default.
+- The community Dev Mod .ipa works: the world was black, because its graphics settings turn on half-float render targets in a form Apple's driver accepted and Android's GPUs reject; they are now made in the form Android supports. Its developer menu now shows in Options: the .ipa itself carries the menu's code but still points the Options list at the Community Patch's version, so the rows never appeared on any device; the app serves the game a repaired copy of that file (your files are not changed, and normal .ipa files are not affected).
+
+**1.6.1** (2026-10-02)
+
+- Fast prize wheel: Settings, Game, Fast prize wheel (off by default). After you spin a prize wheel (Supplies), it lands and gives your prize in about half a second instead of playing the whole animation. The prize is the same: the game picks it before the spin.
+- Edit save, Gems: Add random gems adds new gems like the ones fights give, up to the free space in your gem bag. Gem shop fills the gem shop (Items, Gems, Store) with one of every kind of gem, or only the kind you pick from the game's own list (indoor and outdoor gems are labelled), to buy with gold; Strongest gems in the shop makes them the most powerful versions. These use the game's own developer cheats.
+- Edit save no longer lowers XP to 24,999 when you save changes with a save that has more (for example at level 50).
+- Saving changes on the Edit save page while the game is still running closes the app, so the game loads them the next time you press Play (it reads the save only when it starts).
+
+**1.6** (2026-10-01)
+
+- Developer mode: Settings, Game, Developer mode (off by default) adds the game's own hidden developer options to the Options menu inside the game (gear icon, Options, at the bottom): god mode, unlimited super and magic, always fast forward, boss attacks on/off, kill boss, give gold, reload last checkpoint, start next bloodline, rebalance stats, rename character, show FPS, gesture test, demo HUD, shadows, light shafts, tutorial, and dump an unencrypted save, plus go to the Hideout and set the boss's next weapon. They are the game's leftover functions from development; no modified .ipa is needed.
+- Fixed items being invisible in the inventory with Anti-aliasing set to MSAA 4x: the game drew the item models into a framebuffer Android GPUs reject (multisampled colour with a single-sampled depth texture); it now gets a matching multisampled depth buffer.
+- The Origins recap at the start of a new game (about 2.5 minutes) can be skipped with a tap, like the game's other skippable movies.
+
+**1.5.2** (2026-10-01)
+
+- Places load much faster after your first visit: the textures the app converts for Android GPUs (since 1.3.5) are now kept, so a level that loaded before is not converted again. Measured on an AYN Odin 2 loading into the Hideout: about 12 s before, about 5 s with the cache filled; slower phones save more. Settings, Texture cache turns it off and deletes it (it takes a few hundred MB of storage, in the app's own storage, not in save backups).
+
+**1.5.1** (2026-10-01)
+
+- Fixed the world not being drawn on phones with a PowerVR GPU (Pixel 10 series): only the HUD and movies showed. The game draws its 3D world into BGRA textures, which these GPUs can read but not draw into. On GPUs like that they are now made RGBA; other phones are unchanged. On PowerVR the log also records graphics diagnostics for the first seconds.
+- End credits: hold a finger on the screen to scroll them 8 times faster. The end credits cannot be skipped and take a few minutes; they still end the same way, just sooner.
+
+**1.5** (2026-10-01)
+
+- Language setting: Settings, Language picks the game's language from the ones in your `.ipa` (16 in the usual copy). The default is your phone's language when the `.ipa` has it, otherwise English. Some text inside the levels exists only in English.
+- Home screen icon: this app's own icon is a plain placeholder, and an app cannot change its icon, so the launcher can add a home screen shortcut with the icon from your own `.ipa` (offered after installing, and the Home screen icon button). Installs from this version keep the `.ipa`'s 512 px icon for it; older installs use its 152 px one. The launcher's menu shows the same icon.
+- A damaged `.ipa` (for example "invalid block type" while installing) is now reported as damaged, with a hint to download it again.
+- Fixed a black screen with the music repeating after the final fight (the end movie never finished). The movie's sound is a few milliseconds shorter than its picture once Android decodes it, and movies kept time by their sound, so the last frame was never due. Movies now keep time by the clock once their sound has ended (the IB2 1.4 beta 2 fix). The opening movie had the same risk.
 
 **1.4 beta** (2026-09-30)
 

@@ -5,8 +5,18 @@ import android.app.AlertDialog;
 import android.content.ClipData;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.content.pm.ShortcutInfo;
+import android.content.pm.ShortcutManager;
 import android.database.Cursor;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
+import android.graphics.Paint;
+import android.graphics.PorterDuff;
+import android.graphics.PorterDuffXfermode;
+import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
+import android.graphics.drawable.Icon;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -58,6 +68,7 @@ import java.util.zip.ZipOutputStream;
 public class LauncherActivity extends Activity {
     private static final int PICK_IPA = 1, PICK_BACKUP = 2, PICK_RESTORE = 3;
     private static final String APP_PREFIX = "Payload/SwordGame.app/";
+    private static final String ARTWORK = "iTunesArtwork";  // the .ipa's 512 px App Store icon, kept in game/
     private static final String MARKER = "ib-port-saves.txt";  // in backups: which game they are from
     private static final long FILE_LOG_LIMIT = 4L << 20;  // bytes of each log in a shared file (a Discord upload is 10 MB)
     private static final long CLIP_LOG_LIMIT = 96L << 10;  // and in the clipboard, which holds well under 1 MB
@@ -119,9 +130,98 @@ public class LauncherActivity extends Activity {
     }
 
     private void startGame() {
+        Languages.savePhoneLanguage(this, filesDir());
         startActivity(new Intent(this, GameActivity.class));
         overridePendingTransition(0, 0);
         finish();
+    }
+
+    // This app's own icon is a plain placeholder: the game's artwork is not part of this app, and an
+    // app cannot change its icon. Instead the icon from the player's own .ipa can be put on the home
+    // screen as a shortcut that opens this app.
+    private boolean canPinIcon() {
+        ShortcutManager sm = getSystemService(ShortcutManager.class);
+        return sm != null && sm.isRequestPinShortcutSupported() && gameIconFile() != null;
+    }
+
+    // The game's square icon: the .ipa's App Store artwork (installs from this version on), else the
+    // largest icon in the game's folder.
+    private Bitmap gameIconFile() {
+        Bitmap best = BitmapFactory.decodeFile(new File(filesDir(), "game/" + ARTWORK).getPath());
+        if (best == null || best.getWidth() != best.getHeight()) {
+            best = null;
+            File[] files = new File(filesDir(), "game/" + APP_PREFIX).listFiles();
+            if (files == null) return null;
+            int bestSize = 0;
+            for (File f : files) {
+                String n = f.getName().toLowerCase(Locale.ROOT);
+                if (!n.endsWith(".png") || !n.startsWith("icon")) continue;
+                BitmapFactory.Options o = new BitmapFactory.Options();
+                o.inJustDecodeBounds = true;
+                BitmapFactory.decodeFile(f.getPath(), o);
+                if (o.outWidth < 100 || o.outWidth != o.outHeight || o.outWidth > 1024 || o.outWidth <= bestSize) continue;
+                Bitmap b = BitmapFactory.decodeFile(f.getPath());
+                if (b != null) {
+                    best = b;
+                    bestSize = o.outWidth;
+                }
+            }
+        }
+        return best;
+    }
+
+    // The game's icon with the rounded corners iOS draws (for this app's own screens).
+    private Bitmap gameIcon() {
+        Bitmap best = gameIconFile();
+        if (best == null) return null;
+        int px = Math.min(best.getWidth(), 432);
+        Bitmap out = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888);
+        Canvas c = new Canvas(out);
+        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+        c.drawRoundRect(new RectF(0, 0, px, px), px * 0.2237f, px * 0.2237f, paint);
+        paint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.SRC_IN));
+        c.drawBitmap(Bitmap.createScaledBitmap(best, px, px, true), 0, 0, paint);
+        return out;
+    }
+
+    private void pinHomeIcon() {
+        try {
+            ShortcutManager sm = getSystemService(ShortcutManager.class);
+            Bitmap src = gameIconFile();
+            if (sm == null || src == null) return;
+            // An adaptive icon, so the home screen gives it its own shape like any app icon (a plain bitmap is
+            // shrunk onto a white disc). The visible part is the middle 72 of 108 units; the icon covers 80, so
+            // every mask shape is filled and only its corners are cut.
+            int size = 432, art = size * 80 / 108;
+            Bitmap icon = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
+            Canvas c = new Canvas(icon);
+            c.drawColor(src.getPixel(src.getWidth() / 2, 1) | 0xFF000000);
+            int at = (size - art) / 2;
+            c.drawBitmap(Bitmap.createScaledBitmap(src, art, art, true), at, at, new Paint(Paint.FILTER_BITMAP_FLAG));
+            Intent open = new Intent(this, LauncherActivity.class).setAction(Intent.ACTION_MAIN);
+            sm.requestPinShortcut(new ShortcutInfo.Builder(this, "game-icon").setShortLabel(gameName)
+                    .setIcon(Icon.createWithAdaptiveBitmap(icon)).setIntent(open).build(), null);
+        } catch (RuntimeException e) {
+            if (status != null) status.setText("Your home screen app does not allow adding icons.");
+        }
+    }
+
+    // After installing the game: ask whether to put its icon on the home screen, then start.
+    private void offerHomeIcon() {
+        if (!canPinIcon()) {
+            startGame();
+            return;
+        }
+        new AlertDialog.Builder(this)
+                .setTitle("Add the game's icon?")
+                .setMessage("This app's own icon is a plain placeholder. Put the icon from your .ipa on the home screen?")
+                .setCancelable(false)
+                .setNegativeButton("Not now", (d, w) -> startGame())
+                .setPositiveButton("Add icon", (d, w) -> {
+                    buildMenuScreen();
+                    pinHomeIcon();  // Android asks to confirm: stay on the menu so its prompt stays visible
+                })
+                .show();
     }
 
     private int dp(float v) {
@@ -143,8 +243,13 @@ public class LauncherActivity extends Activity {
         panel.setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
 
         ImageView icon = new ImageView(this);
-        Drawable d = getApplicationInfo().loadIcon(getPackageManager());
-        icon.setImageDrawable(d);
+        Bitmap game = installed(filesDir()) ? gameIcon() : null;
+        if (game != null) {
+            icon.setImageBitmap(game);
+        } else {
+            Drawable d = getApplicationInfo().loadIcon(getPackageManager());
+            icon.setImageDrawable(d);
+        }
         icon.setBackground(Ui.rounded(this, 0xFF000000, 20, 0));
         icon.setClipToOutline(true);
         icon.setElevation(dp(6));
@@ -243,16 +348,80 @@ public class LauncherActivity extends Activity {
         left.addView(makeStatus(), new LinearLayout.LayoutParams(dp(320), LinearLayout.LayoutParams.WRAP_CONTENT));
 
         LinearLayout card = Ui.card(this);
-        addMenuRow(card, "Settings", "Frame rate, screen, graphics, sound", v -> showSettings());
-        addMenuRow(card, "Edit save", "Gold, level, stats, items", v -> showSaveEditor());
+        addMenuRow(card, "Cheats", "Developer mode, items, gems, god mode", v -> showCheats());
+        addMenuRow(card, "Saves", "Edit, back up or restore your progress", v -> showSaves());
+        addMenuRow(card, "Settings", "Language, graphics, sound, controls", v -> showSettings());
+        addMenuRow(card, "Help", "Report a problem, home screen icon, where to find things", v -> showHelp());
+        show(left, card);
+    }
+
+    // A page of rows under a title (Saves, Help); Back returns to the menu.
+    private void showPage(String title, View... cards) {
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        Ui.screenBackground(root);
+        root.addView(Ui.pageHeader(this, title, null, null, this::buildMenuScreen));
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(28), dp(8), dp(28), dp(28));
+        for (View c : cards) content.addView(c);
+        LinearLayout center = new LinearLayout(this);
+        center.setGravity(Gravity.CENTER_HORIZONTAL);
+        center.addView(content, new LinearLayout.LayoutParams(Math.min(dp(760), getResources().getDisplayMetrics().widthPixels),
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+        ScrollView scroll = new ScrollView(this);
+        scroll.setVerticalScrollBarEnabled(false);
+        scroll.addView(center);
+        root.addView(scroll, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1));
+        setContentView(root);
+        showingSettings = true;
+        backTarget = this::buildMenuScreen;
+        hideSystemBars();
+    }
+
+    private void showSaves() {
+        menuButtons.clear();
+        LinearLayout card = Ui.card(this);
+        addMenuRow(card, "Edit save", "Gold, level, XP, stats, bloodline. Changes happen the next time you press Play.", v -> showSaveEditor());
         addMenuRow(card, "Back up saves", "Save your progress to a .zip file", v -> pickBackupFile());
         addMenuRow(card, "Restore saves", "Load your progress from a backup", v -> pickRestoreFile());
-        addMenuRow(card, "Share logs", "Copies the log for bug reports. Hold to send it as a file.", v -> copyLogs())
+        showPage("Saves", Ui.sectionHeader(this, "Your progress"), card, makeStatus());
+    }
+
+    private void showHelp() {
+        menuButtons.clear();
+        LinearLayout card = Ui.card(this);
+        addMenuRow(card, "Report a problem", "Copies the log to paste in Discord. Hold to send it as a file.", v -> copyLogs())
             .setOnLongClickListener(v -> {
                 shareLogFile();
                 return true;
             });
-        show(left, card);
+        if (canPinIcon()) addMenuRow(card, "Home screen icon", "Adds the icon from your .ipa to the home screen", v -> pinHomeIcon());
+        LinearLayout where = Ui.card(this);
+        where.setPadding(dp(18), dp(14), dp(18), dp(14));
+        String store = isIb2() ? "Menu › Character › Items › Store, then › until Supplies" : "Menu › Items, the gem tab, then Store";
+        String[][] faq = {
+            {"Developer mode (dev mode)", "Cheats › Developer mode, the first switch. Then in the game: Menu › gear › Options, at the top"},
+            {"Gold, level, stats, bloodline", "Saves › Edit save"},
+            {"Get every item, god mode, gem shop", "Cheats"},
+            {"The gem shop in the game", store},
+            {"Graphics, language, sound, controller", "Settings"},
+            {"Back up or restore saves", "Saves"},
+        };
+        for (int i = 0; i < faq.length; i++) {
+            TextView q = Ui.text(this, faq[i][0], 15, Ui.TEXT, true);
+            q.setPadding(0, i == 0 ? 0 : dp(12), 0, 0);
+            where.addView(q);
+            where.addView(Ui.text(this, "→ " + faq[i][1], 13.5f, Ui.SUBTEXT, false));
+        }
+        showPage("Help", Ui.sectionHeader(this, "Help"), card, Ui.sectionHeader(this, "Where do I find…"), where, makeStatus());
+    }
+
+    private void showCheats() {
+        setContentView(CheatsScreen.build(this, filesDir(), isIb2(), this::buildMenuScreen));
+        showingSettings = true;
+        backTarget = this::buildMenuScreen;
+        hideSystemBars();
     }
 
     private View addMenuRow(LinearLayout card, String title, String subtitle, View.OnClickListener click) {
@@ -263,27 +432,31 @@ public class LauncherActivity extends Activity {
         return row;
     }
 
-    private boolean showingSettings;  // a page opened from the menu (Settings, Edit save): Back returns to the menu
+    private boolean showingSettings;  // a page opened from the menu: Back returns to backTarget
+    private Runnable backTarget = this::buildMenuScreen;
 
     private boolean isIb2() {
         return getPackageName().equals("com.ib2port.game");
     }
 
     private void showSettings() {
-        setContentView(SettingsScreen.build(this, new File(filesDir(), "settings.ini"), isIb2(), GameActivity.started, this::buildMenuScreen));
+        setContentView(SettingsScreen.build(this, new File(filesDir(), "settings.ini"), isIb2(), GameActivity.started, this::buildMenuScreen,
+                this::showCheats));
         showingSettings = true;
+        backTarget = this::buildMenuScreen;
         hideSystemBars();
     }
 
     private void showSaveEditor() {
-        setContentView(SaveEditorScreen.build(this, filesDir(), isIb2(), GameActivity.started, this::buildMenuScreen));
+        setContentView(SaveEditorScreen.build(this, filesDir(), isIb2(), GameActivity.started, this::showSaves));
         showingSettings = true;
+        backTarget = this::showSaves;
         hideSystemBars();
     }
 
     @Override
     public void onBackPressed() {
-        if (showingSettings) buildMenuScreen();
+        if (showingSettings) backTarget.run();
         else super.onBackPressed();
     }
 
@@ -360,7 +533,7 @@ public class LauncherActivity extends Activity {
                 getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
                 if (failure == null) {
                     status.setText("Installed. Starting the game...");
-                    startGame();
+                    offerHomeIcon();
                 } else {
                     progress.setVisibility(View.GONE);
                     status.setText(failure);
@@ -438,7 +611,20 @@ public class LauncherActivity extends Activity {
                     }
                 } catch (IOException ex) {
                     deleteTree(staging);
+                    // A ZipException here ("invalid block type", a bad CRC) means the .ipa's data is damaged, usually by an
+                    // interrupted or corrupted download.
+                    if (ex instanceof java.util.zip.ZipException)
+                        throw new IOException("Your .ipa file is damaged: " + z.getName().substring(APP_PREFIX.length())
+                                + " cannot be unpacked (" + ex.getMessage() + "). Download the .ipa again and choose the new copy.");
                     throw new IOException("Extracting " + z.getName() + " failed: " + ex.getMessage());
+                }
+            }
+            ZipEntry artwork = zip.getEntry(ARTWORK);
+            if (artwork != null && artwork.getSize() < (4L << 20)) {
+                try (InputStream in = zip.getInputStream(artwork); OutputStream out = new FileOutputStream(new File(staging, ARTWORK))) {
+                    for (int n; (n = in.read(buf)) > 0; ) out.write(buf, 0, n);
+                } catch (IOException ex) {
+                    // only the home screen icon uses it (the game's own icons are the fallback)
                 }
             }
             File game = new File(files, "game");

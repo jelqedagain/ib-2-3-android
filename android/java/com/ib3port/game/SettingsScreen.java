@@ -1,6 +1,7 @@
 package com.ib3port.game;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.res.ColorStateList;
 import android.view.Gravity;
 import android.view.View;
@@ -13,15 +14,17 @@ import android.widget.Toast;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.List;
 
 /**
  * The settings page: writes settings.ini (src/settings.cpp reads it when the game starts). The two apps
  * show only what their game uses: IB3 takes all of its renderer's options; IB2 only the shadow
- * resolution and frame rate (src/game/config.cpp), plus its full-screen layout.
+ * resolution and frame rate (src/game/config.cpp), plus its full-screen layout. Both choose the game's language.
  */
 final class SettingsScreen {
     private final Activity a;
     private final IniFile ini;
+    private Runnable openCheats;  // the Developer mode signpost
     private final boolean ib2;
 
     private SettingsScreen(Activity a, File iniFile, boolean ib2) {
@@ -30,8 +33,10 @@ final class SettingsScreen {
         this.ib2 = ib2;
     }
 
-    static View build(Activity a, File iniFile, boolean ib2, boolean gameRunning, Runnable back) {
-        return new SettingsScreen(a, iniFile, ib2).build(gameRunning, back);
+    static View build(Activity a, File iniFile, boolean ib2, boolean gameRunning, Runnable back, Runnable openCheats) {
+        SettingsScreen screen = new SettingsScreen(a, iniFile, ib2);
+        screen.openCheats = openCheats;
+        return screen.build(gameRunning, back);
     }
 
     private int dp(float v) {
@@ -66,6 +71,14 @@ final class SettingsScreen {
         content.setOrientation(LinearLayout.VERTICAL);
         content.setPadding(dp(28), 0, dp(28), dp(28));
 
+        content.addView(Ui.sectionHeader(a, "Game"));
+        LinearLayout game = Ui.card(a);
+        addRow(game, languageRow());
+        // Developer mode lived here until 1.6: a signpost to where it is now.
+        addRow(game, Ui.actionRow(a, "Developer mode", "Moved to the Cheats page, together with god mode, gems and items.",
+                v -> openCheats.run()));
+        content.addView(game);
+
         content.addView(Ui.sectionHeader(a, "Display"));
         LinearLayout display = Ui.card(a);
         if (ib2) {
@@ -96,6 +109,8 @@ final class SettingsScreen {
             addRow(graphics, choice("Texture filtering", "Sharper textures at an angle.",
                     "Graphics", "Anisotropy", 4, new int[] {1, 4, 8, 16}, new String[] {"Off", "4x", "8x", "16x"}));
         }
+        addRow(graphics, toggle("Texture cache", "Keeps the game's converted textures so places load much faster after your first visit."
+                + " Uses a few hundred MB of storage; turning it off deletes it.", "Graphics", "TextureCache", 1));
         content.addView(graphics);
 
         content.addView(Ui.sectionHeader(a, "Sound"));
@@ -130,6 +145,10 @@ final class SettingsScreen {
     }
 
     private void store(String section, String key, int value) {
+        store(section, key, Integer.toString(value));
+    }
+
+    private void store(String section, String key, String value) {
         ini.set(section, key, value);
         try {
             ini.save();
@@ -184,6 +203,33 @@ final class SettingsScreen {
         };
         refresh[0].run();
         return row(title, subtitle, group);
+    }
+
+    // The game's language: "Phone language" (the default) or one of the languages the installed game has.
+    private View languageRow() {
+        List<String> available = Languages.available(ini.file().getParentFile());
+        String phone = Languages.phone(a, available);
+        String[] labels = new String[available.size() + 1];
+        labels[0] = "Phone language (" + Languages.name(phone) + ")";
+        for (int i = 0; i < available.size(); i++) labels[i + 1] = Languages.name(available.get(i));
+        String current = ini.get("Game", "Language", "");
+        int[] selected = {available.indexOf(current) + 1};  // 0: the phone's language (also for one the game lacks)
+        TextView value = Ui.text(a, labels[selected[0]] + "  ▾", 14, Ui.TEXT, true);
+        value.setPadding(dp(14), dp(8), dp(14), dp(8));
+        value.setBackground(Ui.pressable(a, Ui.rounded(a, 0xFF11131A, 10, Ui.CARD_LINE), 10));
+        value.setClickable(true);
+        value.setOnClickListener(v -> new AlertDialog.Builder(a)
+                .setTitle("Language")
+                .setSingleChoiceItems(labels, selected[0], (d, which) -> {
+                    selected[0] = which;
+                    store("Game", "Language", which == 0 ? "" : available.get(which - 1));
+                    value.setText(labels[which] + "  ▾");
+                    d.dismiss();
+                })
+                .setNegativeButton("Cancel", null)
+                .show());
+        return row("Language", available.size() > 1 ? "The game's text. Your .ipa has " + available.size() + " languages."
+                                                   : "Your .ipa has only English.", value);
     }
 
     private View toggle(String title, String subtitle, String section, String key, int def) {

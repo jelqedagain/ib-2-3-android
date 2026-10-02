@@ -41,23 +41,35 @@ final class IniFile {
         return eq > 0 && !line.trim().startsWith(";") ? line.substring(0, eq).trim() : null;
     }
 
+    File file() {
+        return file;
+    }
+
     int get(String section, String key, int def) {
+        try {
+            return Integer.parseInt(get(section, key, Integer.toString(def)));
+        } catch (NumberFormatException e) {
+            return def;
+        }
+    }
+
+    String get(String section, String key, String def) {
         boolean in = false;
         for (String line : lines) {
             if (line.trim().startsWith("[")) {
                 in = isSection(line, section);
             } else if (in && key.equalsIgnoreCase(keyOf(line))) {
-                try {
-                    return Integer.parseInt(line.substring(line.indexOf('=') + 1).trim());
-                } catch (NumberFormatException e) {
-                    return def;
-                }
+                return line.substring(line.indexOf('=') + 1).trim();
             }
         }
         return def;
     }
 
     void set(String section, String key, int value) {
+        set(section, key, Integer.toString(value));
+    }
+
+    void set(String section, String key, String value) {
         String entry = key + "=" + value;
         int sectionAt = -1, end = lines.size();
         for (int i = 0; i < lines.size(); i++) {

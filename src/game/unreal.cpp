@@ -13,6 +13,7 @@ GuestAddr g_name_tostring = 0;  // FName::ToString() const -> FString (x8)
 GuestAddr g_app_free = 0;       // appFree(void*)
 GuestAddr g_find_property = 0;  // FindField<UProperty>(UStruct*, const wchar_t*)
 GuestAddr g_find_function = 0;  // UObject::FindFunction(FName, UBOOL) const
+GuestAddr g_app_malloc = 0;
 GuestAddr g_engine = 0;         // &GEngine
 
 // UProperty::Offset, located at runtime (see locate_offset_field).
@@ -66,6 +67,7 @@ bool init(const macho::Image& img) {
     g_app_free = img.find("__Z7appFreePv");
     g_find_property = img.find("__Z9FindFieldI9UPropertyEPT_P7UStructPKw");
     g_find_function = img.find("__ZNK7UObject12FindFunctionE5FNamej");
+    g_app_malloc = img.find("__Z9appMallocjj");
     g_engine = img.find("_GEngine");
     bool ok = g_fname_ctor && g_name_tostring && g_app_free && g_find_property && g_find_function && g_engine;
     if (!ok)
@@ -136,11 +138,71 @@ int property_offset(cpu::Thread& t, GuestAddr obj, const char* name) {
     return g_offsets[key] = off;
 }
 
+// UBoolProperty::BitMask: script bools share a 32-bit word, each a bit of it. Its place in the property
+// object is found once from two of Actor's bools that share a word (bStatic, bHidden): the first field
+// after the offset where both hold a single, different bit.
+int g_bitmask_field = -1;
+
+bool bool_property(cpu::Thread& t, GuestAddr obj, const char* name, int& offset, u32& mask) {
+    GuestAddr cls = obj ? *gptr<u64>(obj + kObjClass) : 0;
+    if (!cls || (g_offset_field < 0 && !locate_offset_field(t, cls))) return false;
+    if (g_bitmask_field < 0) {
+        GuestAddr a = find_property(t, cls, "bStatic"), b = find_property(t, cls, "bHidden");
+        if (!a || !b || *gptr<u32>(a + g_offset_field) != *gptr<u32>(b + g_offset_field)) return false;
+        auto bit = [](u32 v) { return v && !(v & (v - 1)); };
+        for (int off = g_offset_field + 4; off < g_offset_field + 0x80; off += 4) {
+            u32 ma = *gptr<u32>(a + off), mb = *gptr<u32>(b + off);
+            if (bit(ma) && bit(mb) && ma != mb) {
+                g_bitmask_field = off;
+                LOG_INFO("unreal: UBoolProperty::BitMask at +0x%x", off);
+                break;
+            }
+        }
+        if (g_bitmask_field < 0) {
+            LOG_WARN("unreal: could not locate UBoolProperty::BitMask");
+            return false;
+        }
+    }
+    GuestAddr prop = find_property(t, cls, name);
+    if (!prop) return false;
+    offset = (int)*gptr<u32>(prop + g_offset_field);
+    mask = *gptr<u32>(prop + g_bitmask_field);
+    return mask != 0;
+}
+
+bool read_bool(cpu::Thread& t, GuestAddr obj, const char* name, bool& out) {
+    int off;
+    u32 mask;
+    if (!bool_property(t, obj, name, off, mask)) return false;
+    out = (*gptr<u32>(obj + off) & mask) != 0;
+    return true;
+}
+
+bool write_bool(cpu::Thread& t, GuestAddr obj, const char* name, bool value) {
+    int off;
+    u32 mask;
+    if (!bool_property(t, obj, name, off, mask)) return false;
+    u32& word = *gptr<u32>(obj + off);
+    word = value ? word | mask : word & ~mask;
+    return true;
+}
+
 int param_offset(cpu::Thread& t, GuestAddr obj, const std::string& func, const char* param) {
     GuestAddr fn = t.call(g_find_function, {obj, fname(t, func), 0});
-    if (!fn || (g_offset_field < 0 && !locate_offset_field(t, *gptr<u64>(obj + kObjClass)))) return -1;
+    if (!fn) return -1;
+    if (g_offset_field < 0 && !locate_offset_field(t, *gptr<u64>(obj + kObjClass))) return -1;
     GuestAddr prop = find_property(t, fn, param);
     return prop ? (int)*gptr<u32>(prop + g_offset_field) : -1;
+}
+
+FString make_fstring(cpu::Thread& t, const std::string& s) {
+    FString out{0, (s32)s.size() + 1, (s32)s.size() + 1};
+    if (!g_app_malloc) return {};
+    out.data = t.call(g_app_malloc, {(u64)out.num * 4, 8});
+    u32* w = gptr<u32>(out.data);
+    for (size_t i = 0; i < s.size(); i++) w[i] = (unsigned char)s[i];
+    w[s.size()] = 0;
+    return out;
 }
 
 bool call_event(cpu::Thread& t, GuestAddr obj, const std::string& func, void* params) {

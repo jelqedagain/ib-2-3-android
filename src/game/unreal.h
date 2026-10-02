@@ -47,11 +47,18 @@ bool read_property(cpu::Thread& t, GuestAddr obj, const char* name, T& out) {
     return true;
 }
 
+// Script bools (one bit of a 32-bit word): read or set `obj`'s bool property `name`.
+bool read_bool(cpu::Thread& t, GuestAddr obj, const char* name, bool& out);
+bool write_bool(cpu::Thread& t, GuestAddr obj, const char* name, bool value);
+
 // Byte offset in `obj` of member `member` of its struct property `struct_prop`, or -1.
 int struct_member_offset(cpu::Thread& t, GuestAddr obj, const char* struct_prop, const char* member);
 
-// Byte offset of parameter `param` in the parameter block of `obj`'s script function `func`, or -1.
+// Byte offset of parameter `param` in the parameter block of script function `func` of `obj`, or -1.
 int param_offset(cpu::Thread& t, GuestAddr obj, const std::string& func, const char* param);
+
+// An FString whose text is allocated by the game (appMalloc), so the game may free or resize it.
+FString make_fstring(cpu::Thread& t, const std::string& s);
 
 // Calls script function `func` on `obj` with a parameter block (UObject::ProcessEvent).
 bool call_event(cpu::Thread& t, GuestAddr obj, const std::string& func, void* params);
