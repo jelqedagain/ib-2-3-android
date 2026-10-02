@@ -5,8 +5,12 @@
 // are sections named after the event with ".1", ".2"...: each stage takes the event's lines, with its own in place of
 // the same keys (a stage with reward lines replaces all of the event's). The server's own keys:
 //   Type=ClashMob   Trial, ClashMob or Tournament
-//   Days=7          how long the event runs (Hours= for less); it then starts again, everyone's progress reset.
-//                   A tournament's stages share it equally
+//   Days=7          how often the event starts again, everyone's progress reset (Hours= for less). A ClashMob or
+//                   Trial runs all of it
+//   Start=2026-10-03T18:00:00   (UTC) when the event first starts; it is shown as coming soon until then. Without
+//                   it, the event starts with the period (at 00:00 UTC for whole days)
+//   StageHours=24   tournaments: how long each stage lasts (else the stages share the period equally). The
+//                   tournament is over after the last stage, until it starts again
 //   Goal=100        ClashMob: the goal for the whole mob (each stage has its own). Reaching it clears the stage
 //   Score=Total     what a player's score counts: Total (all their plays together; ClashMobs) or Best (their best
 //                   play; Trials and tournaments)
@@ -108,7 +112,9 @@ QuestMapPin=MapPin_Monastary_A
 
 [aegis]
 Type=Tournament
-Days=5
+Days=7
+Start=2026-10-03T18:00:00
+StageHours=24
 Score=Best
 TopPercent=50
 Title=Aegis Tournament

@@ -62,7 +62,7 @@ function ensureSchema(db) {
 
 // ---- the events ----
 
-const SERVER_KEYS = ["Type", "Mode", "Days", "Hours", "Goal", "Score", "MaxScore", "TopPercent"];
+const SERVER_KEYS = ["Type", "Mode", "Days", "Hours", "Start", "StageHours", "Goal", "Score", "MaxScore", "TopPercent"];
 const KINDS = { trial: "Trial", solo: "Trial", clashmob: "ClashMob", coop: "ClashMob", tournament: "Tournament", comp: "Tournament" };
 
 function parseIni(text) {
@@ -122,20 +122,27 @@ export function parseEvents(text, now) {
     if (!kind) throw new Error(`[${ev.name}] Type must be Trial, ClashMob or Tournament`);
     const hours = parseFloat(k.Hours) || (parseFloat(k.Days) || 7) * 24;
     const period = Math.max(Math.round(hours * 3600), 60);
-    const start = now - (now % period), end = start + period;
-    const id = `cm-${ev.name}-${Math.floor(start / 60)}`;
     const stages = sections
       .filter((s) => s.name.startsWith(ev.name + "."))
       .sort((a, b) => parseInt(a.name.split(".")[1]) - parseInt(b.name.split(".")[1]));
     if (kind === "Trial" && stages.length) throw new Error(`[${ev.name}] a Trial has no stages`);
+    // The event starts again every period, from Start= (a UTC date and time) or else from 1970-01-01. Before Start it
+    // is shown as coming soon.
+    const anchor = k.Start ? Date.parse(k.Start.endsWith("Z") ? k.Start : k.Start + "Z") / 1000 : 0;
+    if (Number.isNaN(anchor)) throw new Error(`[${ev.name}] Start must be a date and time like 2026-10-03T18:00:00`);
+    const start = now < anchor ? anchor : anchor + Math.floor((now - anchor) / period) * period;
+    // A tournament's stages last StageHours each (else they share the period), and it is over after the last one
+    const stageLen = kind === "Tournament" && stages.length
+      ? Math.min(Math.round((parseFloat(k.StageHours) || hours / stages.length) * 3600), Math.floor(period / stages.length)) : 0;
+    const end = stageLen ? start + stageLen * stages.length : start + period;
+    const id = `cm-${ev.name}-${Math.floor(start / 60)}`;
     if (!stages.length) {
       out.push(challenge({ id, name: ev.name, kind, role: "single", start, end, eventStart: start, eventEnd: end }, k, ev.lines));
       continue;
     }
     const parent = challenge({ id, name: ev.name, kind, role: "parent", start, end, eventStart: start, eventEnd: end }, k, ev.lines);
     parent.children = stages.map((s, i) => {
-      const len = Math.floor(period / stages.length);
-      const [cs, ce] = kind === "Tournament" ? [start + i * len, i === stages.length - 1 ? end : start + (i + 1) * len] : [start, end];
+      const [cs, ce] = stageLen ? [start + i * stageLen, start + (i + 1) * stageLen] : [start, end];
       const c = challenge({ id: `${id}-s${i + 1}`, name: s.name, kind, role: "child", index: i, start: cs, end: ce, eventStart: start, eventEnd: end },
         { ...k, ...s.keys }, mergeLines(ev.lines, s.lines));
       c.parent = parent;
