@@ -37,8 +37,11 @@ fi
 package_app() {
     local OUT=build-android/apk-$1
     mkdir -p "$OUT"
+    # Internet access is for IB3's ClashMob server only (src/game/clashmob.cpp): IB2 does not ask for it
+    local drop='^$'
+    [ "$1" = ib2 ] && drop='ClashMob server\|android.permission.INTERNET'
     sed -e "s|@LABEL@|$2|" -e "s|@PACKAGE@|$3|" -e "s|@BUNDLE_ID@|$4|" -e "s|@IPA_VERSION@|$5|" -e "s|@SIZE@|$6|" \
-        android/AndroidManifest.xml > "$OUT/AndroidManifest.xml"
+        -e "/$drop/d" android/AndroidManifest.xml > "$OUT/AndroidManifest.xml"
     "$BT/aapt2.exe" compile --dir "android/res-$1" -o "$OUT/icon.zip"
     "$BT/aapt2.exe" link -o "$OUT/unsigned.apk" -I "$JAR" --manifest "$OUT/AndroidManifest.xml" \
         --min-sdk-version 30 --target-sdk-version 35 "$COMMON/res.zip" "$OUT/icon.zip"

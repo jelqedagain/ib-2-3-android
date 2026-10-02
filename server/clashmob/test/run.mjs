@@ -121,9 +121,12 @@ MaxPlays=2
 .RewardData=
 .RewardGoal=100
 `;
-  const put = await admin("PUT", "/admin/events", ini);
-  check("admin: upload events", put.status === 200, put.text.trim());
-  check("admin: a Trial with stages refused", (await admin("PUT", "/admin/events", "[t]\nType=Trial\n[t.1]\nGoal=1\n")).status === 400);
+  const put = await admin("PUT", "/admin/api/events", ini);
+  check("admin: upload events", put.status === 200 && JSON.parse(put.text).saved, put.text.slice(0, 100));
+  check("admin: a Trial with stages refused", (await admin("PUT", "/admin/api/events", "[t]\nType=Trial\n[t.1]\nGoal=1\n")).status === 400);
+  const chk = JSON.parse((await admin("POST", "/admin/api/check", ini + "\n[mob2]\nType=ClashMob\nHours=2\nBossObj=x\nQuestMapPin=P\n[mob2.1]\nGoal=1\n")).text);
+  check("admin: check finds problems without saving", chk.ok && !chk.saved && chk.warnings.some((w) => w.includes("mob2.1 has no reward")),
+    chk.warnings.join("; "));
 
   // ClashMob: the mob clears stage 1, stage 2 opens; everyone (late joiners too) is in the stage being played
   const P = [newPlayer("a"), newPlayer("b"), newPlayer("c")];
@@ -191,11 +194,13 @@ MaxPlays=2
   const r = (await call("POST", `${C}/${tr.challengeId}/users//saveSlots/0/updateReward?rewardValue=1`, X)).json;
   check("reward recorded", r.userAwardGiven === 1);
 
-  const stats = await admin("GET", "/admin/stats");
-  check("admin: stats", stats.status === 200 && JSON.parse(stats.text).challenges.length === 7);
-  check("admin: reset events", (await admin("DELETE", "/admin/events")).status === 200);
+  const stats = JSON.parse((await admin("GET", "/admin/api/state")).text);
+  check("admin: state", stats.events.length === 3 && stats.events[0].stages.length === 2, `${stats.events.length} events`);
+  check("admin: reset events", (await admin("DELETE", "/admin/api/events")).status === 200);
   clock = 0;
-  check("admin: wrong key hidden", (await fetch(BASE + "/admin/stats", { headers: { Authorization: "Bearer nope" } })).status === 404);
+  check("admin: wrong password refused", (await fetch(BASE + "/admin/api/state", { headers: { Authorization: "Bearer nope" } })).status === 401);
+  const pub = await (await fetch(BASE + "/status")).json();
+  check("public status: the live events", pub.events.length >= 1 && "title" in pub.events[0]);
 } else {
   console.log("(no ADMIN_KEY / TIME_TRAVEL=1 in .dev.vars: the tests over time are skipped)");
 }

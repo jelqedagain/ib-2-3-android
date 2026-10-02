@@ -16,9 +16,12 @@
 // Players: the game has no online account (see clashmob.cpp), so the port sends its own player id and secret key in
 // X-ClashMob-Player / X-ClashMob-Key. The first request with an id ties it to that key; later ones must match.
 //
-// Admin (when the ADMIN_KEY secret is set; "Authorization: Bearer <key>"): GET/PUT/DELETE /admin/events (the events
-// ini), GET /admin/stats. For tests only, TIME_TRAVEL=1 lets requests set the server's clock (X-ClashMob-Now).
+// Pages: / shows the live events to anyone (from /status); /admin is the admin page (public.html, admin.html). The admin
+// API (/admin/api/...) needs the ADMIN_KEY secret as the password ("Authorization: Bearer <password>"). For tests only,
+// TIME_TRAVEL=1 lets requests set the server's clock (X-ClashMob-Now).
 import DEFAULT_EVENTS from "./events.js";
+import PUBLIC_PAGE from "./public.html";
+import ADMIN_PAGE from "./admin.html";
 
 const DAY = 86400;
 const GRACE = 600;  // a play that started before a stage or event ended still counts this long after
@@ -49,11 +52,32 @@ const SCHEMA = [
      PRIMARY KEY (challenge, player))`,
   `CREATE TABLE IF NOT EXISTS won (challenge TEXT PRIMARY KEY, at INTEGER NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS config (key TEXT PRIMARY KEY, value TEXT NOT NULL)`,
+  // Each challenge's numbers, kept up to date as players join and play, so a request reads one row per challenge
+  // instead of adding up every player's (D1's free plan counts every row read)
+  `CREATE TABLE IF NOT EXISTS totals (
+     challenge TEXT PRIMARY KEY, total INTEGER NOT NULL DEFAULT 0, players INTEGER NOT NULL DEFAULT 0,
+     scorers INTEGER NOT NULL DEFAULT 0)`,
+  // Ranks count the players above one: these keep that to an index range
+  `CREATE INDEX IF NOT EXISTS progress_rank_total ON progress (challenge, complete, progress)`,
+  `CREATE INDEX IF NOT EXISTS progress_rank_best ON progress (challenge, complete, high)`,
+  `CREATE TABLE IF NOT EXISTS admin_failures (ip TEXT PRIMARY KEY, count INTEGER NOT NULL, since INTEGER NOT NULL)`,
 ];
+const SCHEMA_VERSION = "2";
 
 let schemaReady = null;
 function ensureSchema(db) {
-  schemaReady ??= db.batch(SCHEMA.map((s) => db.prepare(s))).catch((e) => {
+  schemaReady ??= (async () => {
+    await db.batch(SCHEMA.map((s) => db.prepare(s)));
+    const v = await db.prepare("SELECT value FROM config WHERE key = 'schema'").first();
+    if (v?.value !== SCHEMA_VERSION) {
+      // totals for the progress made before they were kept (version 1)
+      await db.batch([
+        db.prepare(`INSERT OR REPLACE INTO totals (challenge, total, players, scorers)
+                    SELECT challenge, SUM(progress), COUNT(*), SUM(successful > 0) FROM progress GROUP BY challenge`),
+        db.prepare("INSERT OR REPLACE INTO config (key, value) VALUES ('schema', ?)").bind(SCHEMA_VERSION),
+      ]);
+    }
+  })().catch((e) => {
     schemaReady = null;
     throw e;
   });
@@ -167,11 +191,10 @@ async function community(env, all) {
   if (!all.length) return out;
   const marks = all.map(() => "?").join(","), ids = all.map((c) => c.id);
   const [sums, won] = await env.DB.batch([
-    env.DB.prepare(`SELECT challenge, COUNT(*) AS players, SUM(progress) AS total, SUM(successful > 0) AS scorers
-                    FROM progress WHERE challenge IN (${marks}) GROUP BY challenge`).bind(...ids),
+    env.DB.prepare(`SELECT challenge, total, players, scorers FROM totals WHERE challenge IN (${marks})`).bind(...ids),
     env.DB.prepare(`SELECT challenge, at FROM won WHERE challenge IN (${marks})`).bind(...ids),
   ]);
-  for (const r of sums.results) Object.assign(out[r.challenge], { total: r.total || 0, players: r.players, scorers: r.scorers || 0 });
+  for (const r of sums.results) Object.assign(out[r.challenge], { total: r.total, players: r.players, scorers: r.scorers });
   for (const r of won.results) out[r.challenge].wonAt = r.at;
   return out;
 }
@@ -322,11 +345,19 @@ async function statusFor(env, c, player) {
 
 // ---- joining ----
 
-const join = (env, c, player, slot, now) =>
-  env.DB.prepare(
-    `INSERT INTO progress (challenge, player, slot, accept_time, update_time) VALUES (?1, ?2, ?3, ?4, ?4)
-     ON CONFLICT (challenge, player) DO UPDATE SET slot = excluded.slot, update_time = excluded.update_time`)
+async function join(env, c, player, slot, now) {
+  const r = await env.DB.prepare(
+    "INSERT OR IGNORE INTO progress (challenge, player, slot, accept_time, update_time) VALUES (?1, ?2, ?3, ?4, ?4)")
     .bind(c.id, player, slot, now).run();
+  if (r.meta.changes) {
+    await env.DB.prepare(
+      "INSERT INTO totals (challenge, players) VALUES (?1, 1) ON CONFLICT (challenge) DO UPDATE SET players = players + 1")
+      .bind(c.id).run();
+  } else {
+    await env.DB.prepare("UPDATE progress SET slot = ?3 WHERE challenge = ?1 AND player = ?2 AND slot <> ?3")
+      .bind(c.id, player, slot).run();
+  }
+}
 
 // A player who joined a staged event is in the stage being played: in a ClashMob always (late joiners too), in a
 // tournament's first stage always and in a later one only after qualifying in the stage before.
@@ -358,7 +389,7 @@ async function authenticate(request, env, now) {
   if (!/^[A-Za-z0-9_-]{4,64}$/.test(id || "") || !/^[0-9a-f]{32,128}$/.test(key || ""))
     return json({ error: "bad player id or key" }, 400);
   const h = await sha256(key);
-  const row = await env.DB.prepare("SELECT key_hash FROM players WHERE id = ?").bind(id).first();
+  const row = await env.DB.prepare("SELECT key_hash, seen FROM players WHERE id = ?").bind(id).first();
   if (!row) {
     await env.DB.prepare("INSERT OR IGNORE INTO players (id, key_hash, created, seen) VALUES (?, ?, ?, ?)")
       .bind(id, h, now, now).run();
@@ -366,7 +397,7 @@ async function authenticate(request, env, now) {
     if (!again || again.key_hash !== h) return json({ error: "wrong key for this player" }, 403);
   } else if (row.key_hash !== h) {
     return json({ error: "wrong key for this player" }, 403);
-  } else {
+  } else if (now - row.seen > 3600) {  // (at most hourly: D1's free plan also counts rows written)
     await env.DB.prepare("UPDATE players SET seen = ? WHERE id = ?").bind(now, id).run();
   }
   return id;
@@ -393,9 +424,13 @@ async function updateProgress(env, c, player, q, com, now) {
      high = MAX(high, ?4), complete = MAX(complete, ?5), update_time = ?6,
      last_play = CASE WHEN ?4 > 0 THEN ?6 ELSE last_play END WHERE challenge = ?1 AND player = ?2`)
     .bind(c.id, player, add > 0 ? 1 : 0, add, done, now).run();
-  if (add > 0 && c.kind === "ClashMob") {
-    const after = (await community(env, [c]))[c.id];
-    if (after.total >= c.goal) await env.DB.prepare("INSERT OR IGNORE INTO won (challenge, at) VALUES (?, ?)").bind(c.id, now).run();
+  if (add > 0) {
+    const t = await env.DB.prepare(
+      `INSERT INTO totals (challenge, total, scorers) VALUES (?1, ?2, ?3)
+       ON CONFLICT (challenge) DO UPDATE SET total = total + ?2, scorers = scorers + ?3 RETURNING total`)
+      .bind(c.id, add, s.successful === 0 ? 1 : 0).first();
+    if (c.kind === "ClashMob" && t.total >= c.goal)
+      await env.DB.prepare("INSERT OR IGNORE INTO won (challenge, at) VALUES (?, ?)").bind(c.id, now).run();
   }
 }
 
@@ -457,54 +492,138 @@ async function handleChallenges(request, env, p, url, now) {
   return json({}, 404);
 }
 
-async function handleAdmin(request, env, p, now) {
-  if (!env.ADMIN_KEY || request.headers.get("Authorization") !== `Bearer ${env.ADMIN_KEY}`) return json({}, 404);
-  if (p[1] === "events") {
-    if (request.method === "GET") return text(await eventsText(env));
-    if (request.method === "DELETE") {
-      await env.DB.prepare("DELETE FROM config WHERE key = 'events'").run();
-      return text("events reset to the defaults\n");
+// ---- the pages: the public one (/) and the admin one (/admin) ----
+
+// What the pages show of each event (a staged event with its stages), and the best players.
+async function overview(env, all, now, topCount) {
+  const com = await community(env, all);
+  const tops = all.filter((c) => c.role !== "parent").map((c) => env.DB.prepare(
+    `SELECT player, ${scoreCol(c)} AS score FROM progress WHERE challenge = ? AND ${scoreCol(c)} > 0
+     ORDER BY ${scoreCol(c)} DESC LIMIT ?`).bind(c.id, topCount));
+  const results = tops.length ? await env.DB.batch(tops) : [];
+  const top = {};
+  all.filter((c) => c.role !== "parent").forEach((c, i) => (top[c.id] = results[i].results));
+  const describe = (c) => {
+    const st = standing(c, com, now), n = com[c.id];
+    const line = (k) => (c.file || c.children?.[0]?.file || "").match(new RegExp(`^${k}=(.*)$`, "m"))?.[1] || "";
+    const reward = (c.file || "").match(/^\.RewardType=(.*)$/gm)?.map((l) => l.slice(12)) || [];
+    return {
+      id: c.id, name: c.name, kind: c.kind, title: line("Title"), desc: line("Desc"), boss: line("BossObj"),
+      start: c.start, end: c.end, status: now < c.start ? "upcoming" : now >= c.end || st.completed ? "ended" : "live",
+      won: st.won, goal: c.goal, total: n.total, players: n.players, scorers: n.scorers, score: c.total ? "Total" : "Best",
+      rewards: reward, top: top[c.id] || [],
+      ...(c.role === "parent" ? { activeStage: st.active, stages: c.children.map(describe) } : {}),
+    };
+  };
+  return all.filter((c) => c.role !== "child").map(describe);
+}
+
+// Problems with an events file that still parses: these do not stop a save, but the admin page shows them.
+function warnings(all, previous) {
+  const out = [];
+  const top = all.filter((c) => c.role !== "child");
+  const pins = {};
+  for (const c of top) {
+    const file = c.file || c.children[0].file;
+    const pin = file.match(/^QuestMapPin=(.*)$/m)?.[1];
+    const overlap = (pins[pin] || []).find((o) => o.start < c.end && c.start < o.end);
+    if (pin && overlap) out.push(`${c.name} and ${overlap.name} are on the same map pin (${pin}) at the same time`);
+    (pins[pin] ||= []).push(c);
+    if (!file.match(/^BossObj=/m)) out.push(`${c.name} has no boss (BossObj)`);
+    for (const x of c.children || [c]) {
+      if (!x.file.match(/^\.RewardType=/m)) out.push(`${x.name} has no reward`);
+      if (x.file.match(/^\.RewardType=TRA_(Item|Gem)_Fixed$/m) && x.file.match(/^\.RewardData=$/m))
+        out.push(`${x.name}: an item or gem reward needs the item's name (RewardData)`);
     }
-    if (request.method === "PUT" || request.method === "POST") {
-      const ini = await request.text();
-      let all;
-      try {
-        all = parseEvents(ini, now);
-      } catch (err) {
-        return text(`${err.message}\n`, 400);
-      }
-      if (!all.length) return text("no events in that file\n", 400);
+    const before = previous.find((o) => o.name === c.name && o.role !== "child");
+    if (before && before.id !== c.id) out.push(`${c.name} starts over with this change: its players lose their progress in it`);
+  }
+  for (const o of previous.filter((o) => o.role !== "child"))
+    if (!top.some((c) => c.name === o.name)) out.push(`${o.name} is removed: its players lose their progress in it`);
+  return out;
+}
+
+const timingSafeEqual = async (a, b) => (await sha256(a)) === (await sha256(b));
+
+// Admin requests carry the password ("Authorization: Bearer <password>"). An address that gets it wrong 10 times in an
+// hour is turned away for the rest of that hour.
+async function adminAllowed(request, env, now) {
+  if (!env.ADMIN_KEY) return json({ error: "no admin password is set on this server" }, 404);
+  const ip = request.headers.get("CF-Connecting-IP") || "local";
+  const f = await env.DB.prepare("SELECT count, since FROM admin_failures WHERE ip = ?").bind(ip).first();
+  const recent = f && now - f.since < 3600;
+  if (recent && f.count >= 10) return json({ error: "too many wrong passwords: try again later" }, 429);
+  const given = (request.headers.get("Authorization") || "").replace(/^Bearer /, "");
+  if (given && (await timingSafeEqual(given, env.ADMIN_KEY))) return null;
+  await env.DB.prepare(
+    `INSERT INTO admin_failures (ip, count, since) VALUES (?1, 1, ?2)
+     ON CONFLICT (ip) DO UPDATE SET count = CASE WHEN ?2 - since < 3600 THEN count + 1 ELSE 1 END,
+     since = CASE WHEN ?2 - since < 3600 THEN since ELSE ?2 END`).bind(ip, now).run();
+  return json({ error: "wrong password" }, 401);
+}
+
+async function handleAdmin(request, env, p, now) {
+  if (p.length === 1 || (p.length === 2 && p[1] === "")) return page(ADMIN_PAGE);
+  if (p[1] !== "api") return json({}, 404);
+  const denied = await adminAllowed(request, env, now);
+  if (denied) return denied;
+  const current = await eventsText(env);
+  const isDefault = current === DEFAULT_EVENTS;
+  // GET /admin/api/state: the events file and how every event stands
+  if (p[2] === "state" && request.method === "GET") {
+    const all = parseEvents(current, now);
+    const players = await env.DB.prepare("SELECT COUNT(*) AS n FROM players").first();
+    return json({ now, ini: current, isDefault, defaults: DEFAULT_EVENTS, players: players.n, events: await overview(env, all, now, 10) });
+  }
+  // POST /admin/api/check: what an events file would do, without saving it
+  // PUT /admin/api/events: save it (it goes live at once); DELETE: back to the server's own events
+  if ((p[2] === "check" && request.method === "POST") || (p[2] === "events" && request.method === "PUT")) {
+    const ini = await request.text();
+    let all;
+    try {
+      all = parseEvents(ini, now);
+      if (!all.length) throw new Error("there are no events in it");
+    } catch (err) {
+      return json({ ok: false, error: err.message }, 400);
+    }
+    const warn = warnings(all, parseEvents(current, now));
+    if (p[2] === "events")
       await env.DB.prepare("INSERT INTO config (key, value) VALUES ('events', ?1) ON CONFLICT (key) DO UPDATE SET value = ?1")
         .bind(ini).run();
-      const top = all.filter((c) => c.role !== "child");
-      return text(`saved ${top.length} event(s): ${top.map((c) => `${c.id} (${c.kind}${c.children ? `, ${c.children.length} stages` : ""})`).join(", ")}\n`);
-    }
+    const schedule = all.filter((c) => c.role !== "child").map((c) => ({
+      name: c.name, kind: c.kind, id: c.id, start: c.start, end: c.end,
+      stages: (c.children || []).map((k) => ({ name: k.name, start: k.start, end: k.end, goal: k.goal })),
+    }));
+    return json({ ok: true, saved: p[2] === "events", warnings: warn, schedule });
   }
-  if (p[1] === "stats" && request.method === "GET") {
-    const all = parseEvents(await eventsText(env), now);
-    const com = await community(env, all);
-    const out = [];
-    for (const c of all) {
-      const top = await env.DB.prepare(
-        `SELECT player, ${scoreCol(c)} AS score, attempts FROM progress WHERE challenge = ? ORDER BY ${scoreCol(c)} DESC LIMIT 10`).bind(c.id).all();
-      const st = standing(c, com, now);
-      out.push({ id: c.id, kind: c.kind, role: c.role, start: iso(c.start), end: iso(c.end), goal: c.goal, ...com[c.id],
-        won: st.won, completed: st.completed, ...(c.role === "parent" ? { activeStage: st.active + 1 } : {}), top: top.results });
-    }
-    const players = await env.DB.prepare("SELECT COUNT(*) AS n FROM players").first();
-    return json({ players: players.n, challenges: out });
+  if (p[2] === "events" && request.method === "DELETE") {
+    await env.DB.prepare("DELETE FROM config WHERE key = 'events'").run();
+    return json({ ok: true });
   }
   return json({}, 404);
 }
 
+const page = (html) => new Response(html, {
+  headers: {
+    "Content-Type": "text/html; charset=utf-8",
+    "Content-Security-Policy": "default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; frame-ancestors 'none'",
+    "Cache-Control": "no-store",
+  },
+});
+
 async function handle(request, env) {
   const url = new URL(request.url);
-  if (url.pathname === "/" || url.pathname === "/health") return text("ClashMob server\n");
+  if (url.pathname === "/health") return text("ClashMob server\n");
+  if (url.pathname === "/favicon.ico") return new Response(null, { status: 204 });
   // "/sword/api/x" -> ["sword", "api", "x"]; empty parts stay (the game asks for ".../users//saveSlots/0")
   const p = url.pathname.slice(1).split("/").map(decodeURIComponent);
   let now = Math.floor(Date.now() / 1000);
   if (env.TIME_TRAVEL === "1" && request.headers.get("X-ClashMob-Now")) now = parseInt(request.headers.get("X-ClashMob-Now"));
   await ensureSchema(env.DB);
+  if (url.pathname === "/") return page(PUBLIC_PAGE);
+  // GET /status: the live events for the public page (anyone may read it)
+  if (url.pathname === "/status" && request.method === "GET")
+    return json({ now, events: await overview(env, parseEvents(await eventsText(env), now), now, 10) });
   if (p[0] === "admin") return handleAdmin(request, env, p, now);
   if (p[0] === "sword" && p[1] === "api" && p[2] === "challenges") return handleChallenges(request, env, p, url, now);
   return json({}, 404);

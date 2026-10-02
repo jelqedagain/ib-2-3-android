@@ -11,3 +11,9 @@ MIN_PLAY_SECONDS = "10"  # a player's scoring plays must be at least this far ap
 binding = "DB"
 database_name = "clashmob"
 database_id = "287e01f6-dbb3-4571-aec9-68469861648d"
+
+# The pages (src/public.html, src/admin.html) are bundled as text
+[[rules]]
+type = "Text"
+globs = ["**/*.html"]
+fallthrough = true
