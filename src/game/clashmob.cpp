@@ -1,19 +1,23 @@
-// ClashMobs offline (Infinity Blade III): the port answers the game's ClashMob server requests itself
-// (McpClashMobManagerV3: /sword/api/challenges...), with events defined locally, so ClashMobs can be played
-// without Epic's servers. Every other online request stays offline.
+// ClashMobs (Infinity Blade III): the game's ClashMob server requests (McpClashMobManagerV3:
+// /sword/api/challenges...) go to the community ClashMob server when one is set ([ClashMob] Server, see "the
+// community server" below), and are answered by the port itself otherwise (offline ClashMobs, with events defined
+// locally and progress kept in clashmob-state.ini next to the saves). Every other online request stays offline.
 //
-// The game needs an MCP account id for everything about the player (joining, progress, rewards). It only
-// makes one through Facebook / Google+ / Game Center, so the port gives it a local one (clashmob_tick).
-// Progress is kept in clashmob-state.ini next to the saves.
+// The game itself never gets an online account (an MCP id): its saves are encrypted with a key tied to the account,
+// so with one it could not read the player's save. The ClashMob code is told the player has one instead
+// (clashmob_script_call), and the port identifies the player to the server itself.
 #include "game/game.h"
 #include "game/unreal.h"
 #include "foundation/foundation.h"
 #include "libc/vfs.h"
 #include "macho.h"
+#include "settings.h"
 #include <windows.h>
 #ifdef __ANDROID__
+#include "port/android/android_app.h"
 #include <sys/system_properties.h>
 #endif
+#include <cstring>
 #include <cstdlib>
 #include <ctime>
 #include <fstream>
@@ -233,7 +237,7 @@ void save_state() {
           << "\nUpdateTime=" << (long long)s.update_time << "\n";
 }
 
-// The local player's MCP id, made once.
+// The local player's id, made once. (Requests are served on threads of their own: see identity.)
 const std::string& player_id() {
     static std::string id;
     if (!id.empty()) return id;
@@ -347,6 +351,95 @@ std::string status_json(const Event& e, const Status& s) {
         .done();
 }
 
+// ---- the community server ----
+//
+// [ClashMob] Server in settings.ini (for testing also adb shell setprop debug.ibport.clashmobserver <url>, or "off")
+// is the address of a ClashMob server (server/clashmob). The game's ClashMob requests then go there as they are, with
+// the player's id and secret key in headers (X-ClashMob-Player / X-ClashMob-Key: the server ties the id to the key
+// the first time it sees it). The events are the server's, played by everyone together. When the server cannot be
+// reached for the event list, the port's own events are played instead; their ids start with "port-", and their
+// requests never leave the phone.
+
+constexpr const char* kKeyFile = "clashmob-key";
+constexpr int kServerTimeoutMs = 8000;
+
+std::string server_url() {
+    std::string url;
+#ifdef __ANDROID__
+    char v[PROP_VALUE_MAX] = "";
+    if (__system_property_get("debug.ibport.clashmobserver", v) > 0) url = strcmp(v, "off") == 0 ? "" : v;
+    else
+#endif
+        url = settings::get().clashmob_server;
+    while (!url.empty() && (url.back() == '/' || url.back() == ' ')) url.pop_back();
+    return url;
+}
+
+// The player's id and secret key (made once, kept next to the saves).
+void identity(std::string& id, std::string& key) {
+    static std::mutex mutex;
+    static std::string k;
+    std::lock_guard lock(mutex);
+    id = player_id();
+    if (k.empty()) {
+        std::ifstream(kKeyFile) >> k;
+        if (k.size() < 32) {
+            std::random_device rd;
+            char buf[9];
+            k.clear();
+            for (int i = 0; i < 4; i++) {
+                snprintf(buf, sizeof buf, "%08x", rd());
+                k += buf;
+            }
+            std::ofstream(kKeyFile) << k;
+        }
+    }
+    key = k;
+}
+
+// Sends the game's request to the server (through GameActivity.httpRequest). False when the server could not be
+// reached; any answer it gives, errors too, is the server's.
+bool ask_server(const std::string& url, const ns::HttpRequest& req, ns::HttpResponse& resp) {
+#ifdef __ANDROID__
+    ANativeActivity* a = android::activity();
+    JNIEnv* env = android::env();
+    if (!a || !env) return false;
+    std::string id, key;
+    identity(id, key);
+    std::string headers = "X-ClashMob-Player: " + id + "\nX-ClashMob-Key: " + key + "\nX-ClashMob-Game: ib3\n";
+    for (auto& [k, v] : req.headers)
+        if (_stricmp(k.c_str(), "Content-Type") == 0) headers += k + ": " + v + "\n";
+    jclass cls = env->GetObjectClass(a->clazz);
+    jmethodID fn = env->GetStaticMethodID(cls, "httpRequest", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;[BI)[B");
+    if (!fn) {
+        env->ExceptionClear();
+        env->DeleteLocalRef(cls);
+        return false;
+    }
+    jstring jmethod = env->NewStringUTF(req.method.c_str()), jurl = env->NewStringUTF(url.c_str()),
+            jheaders = env->NewStringUTF(headers.c_str());
+    jbyteArray jbody = env->NewByteArray((jsize)req.body.size());
+    env->SetByteArrayRegion(jbody, 0, (jsize)req.body.size(), reinterpret_cast<const jbyte*>(req.body.data()));
+    auto out = static_cast<jbyteArray>(env->CallStaticObjectMethod(cls, fn, jmethod, jurl, jheaders, jbody, (jint)kServerTimeoutMs));
+    if (env->ExceptionCheck()) {
+        env->ExceptionClear();
+        out = nullptr;
+    }
+    for (jobject o : {(jobject)jmethod, (jobject)jurl, (jobject)jheaders, (jobject)jbody, (jobject)cls}) env->DeleteLocalRef(o);
+    if (!out) return false;
+    std::vector<u8> bytes(env->GetArrayLength(out));
+    env->GetByteArrayRegion(out, 0, (jsize)bytes.size(), reinterpret_cast<jbyte*>(bytes.data()));
+    env->DeleteLocalRef(out);
+    if (bytes.size() < 4) return false;
+    resp.status = (int)((u32)bytes[0] << 24 | (u32)bytes[1] << 16 | (u32)bytes[2] << 8 | bytes[3]);
+    resp.body.assign(bytes.begin() + 4, bytes.end());
+    return true;
+#else
+    (void)url, (void)req, (void)resp;
+    return false;
+#endif
+}
+
 // ---- requests ----
 
 void split_url(const std::string& url, std::string& path, std::string& query) {
@@ -390,6 +483,22 @@ bool serve(const ns::HttpRequest& req, ns::HttpResponse& resp) {
 
     auto p = split_path(path);
     if (p.size() < 3 || p[0] != "sword" || p[1] != "api" || p[2] != "challenges") return false;  // offline
+
+    // The community server's events: everything but the port's own events
+    std::string server = server_url();
+    bool list = p.size() == 3, own_event = !list && p[3].rfind("port-", 0) == 0;
+    if (!server.empty() && !own_event) {
+        bool answered = ask_server(server + path + (query.empty() ? "" : "?" + query), req, resp);
+        if (answered && !(list && resp.status >= 500)) {
+            LOG_INFO("clashmob: server: %d %s", resp.status, resp.body.substr(0, 400).c_str());
+            return true;
+        }
+        std::string why = answered ? "answered " + std::to_string(resp.status) : "cannot be reached";
+        LOG_WARN("clashmob: the ClashMob server %s %s%s", server.c_str(), why.c_str(), list ? "; playing the offline ClashMobs" : "");
+        if (!list) return false;  // one of the server's events: fails as offline, as on a phone with no network
+        resp = ns::HttpResponse{};
+    }
+
     std::lock_guard lock(g_mutex);
     load_state();
     auto all = events();
@@ -462,7 +571,9 @@ void install_clashmob(const macho::Image& img) {
     if (is_infinity_blade_2()) return;  // IB3 only for now
     g_dlmalloc = img.find("__Z8dlmallocm");
     ns::set_local_server(serve);
-    LOG_INFO("clashmob: offline ClashMob server on (player %s)", player_id().c_str());
+    std::string server = server_url();
+    LOG_INFO("clashmob: ClashMobs on (player %s; %s%s)", player_id().c_str(), server.empty() ? "offline" : "server ",
+             server.c_str());
 }
 
 // Fills an FString with a copy of `s` made with the game's allocator (the game may free or regrow it).

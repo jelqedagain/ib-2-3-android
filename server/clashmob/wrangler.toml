@@ -1,0 +1,13 @@
+# ClashMob server (README.md). `npm run dev` runs it on this PC with a local database; `npm run deploy` puts it
+# on Cloudflare once database_id below is the one `npx wrangler d1 create clashmob` printed.
+name = "clashmob"
+main = "src/index.js"
+compatibility_date = "2025-06-01"
+
+[vars]
+MIN_PLAY_SECONDS = "10"  # a player's scoring plays must be at least this far apart
+
+[[d1_databases]]
+binding = "DB"
+database_name = "clashmob"
+database_id = "00000000-0000-0000-0000-000000000000"

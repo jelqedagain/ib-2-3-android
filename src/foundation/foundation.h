@@ -80,7 +80,8 @@ struct HttpResponse {
     std::string content_type = "application/json";
     std::string body;
 };
-// Returns true and fills the response for requests it serves. Called on the requesting thread.
+// Returns true and fills the response for requests it serves. Called on a thread of its own for asynchronous
+// requests (it may wait on the network), on the requesting thread for synchronous ones.
 void set_local_server(std::function<bool(const HttpRequest&, HttpResponse&)> server);
 
 void install_string();

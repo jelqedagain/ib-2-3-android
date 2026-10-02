@@ -37,6 +37,48 @@ public class GameActivity extends NativeActivity {
         super.onCreate(state);
     }
 
+    /**
+     * An HTTP request for the ClashMob server (src/game/clashmob.cpp), made on the calling thread (not the UI
+     * thread). headers: "Name: value" lines. Returns the status as 4 big-endian bytes followed by the body, or
+     * null when the server could not be reached.
+     */
+    static byte[] httpRequest(String method, String url, String headers, byte[] body, int timeoutMs) {
+        java.net.HttpURLConnection c = null;
+        try {
+            c = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
+            c.setRequestMethod(method);
+            c.setConnectTimeout(timeoutMs);
+            c.setReadTimeout(timeoutMs);
+            c.setUseCaches(false);
+            for (String line : headers.split("\n")) {
+                int colon = line.indexOf(':');
+                if (colon > 0) c.setRequestProperty(line.substring(0, colon).trim(), line.substring(colon + 1).trim());
+            }
+            if (body != null && body.length > 0) {
+                c.setDoOutput(true);
+                c.setFixedLengthStreamingMode(body.length);
+                try (java.io.OutputStream out = c.getOutputStream()) {
+                    out.write(body);
+                }
+            }
+            int status = c.getResponseCode();
+            java.io.InputStream in = status >= 400 ? c.getErrorStream() : c.getInputStream();
+            java.io.ByteArrayOutputStream all = new java.io.ByteArrayOutputStream();
+            all.write(new byte[] {(byte) (status >> 24), (byte) (status >> 16), (byte) (status >> 8), (byte) status});
+            if (in != null) {
+                try (java.io.InputStream s = in) {
+                    byte[] buf = new byte[16384];
+                    for (int n; (n = s.read(buf)) > 0;) all.write(buf, 0, n);
+                }
+            }
+            return all.toByteArray();
+        } catch (Exception e) {
+            return null;
+        } finally {
+            if (c != null) c.disconnect();
+        }
+    }
+
     /** Reports the button chosen (and the text typed, for text prompts) for alert `id`. */
     static native void nativeAlertResult(int id, int button, String text);
 

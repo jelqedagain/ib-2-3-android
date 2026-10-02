@@ -7,6 +7,8 @@
     android:versionName="1.7">
 
     <uses-feature android:glEsVersion="0x00030000" android:required="true" />
+    <!-- ClashMobs: the community ClashMob server (src/game/clashmob.cpp); nothing else goes online. -->
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <application
         android:label="@LABEL@"
@@ -14,7 +16,8 @@
         android:extractNativeLibs="true"
         android:isGame="true"
         android:appCategory="game"
-        android:allowBackup="false">
+        android:allowBackup="false"
+        android:networkSecurityConfig="@xml/network_security_config">
         <!-- The .ipa this app installs from: its bundle id, the version to ask for, the space it needs. -->
         <meta-data android:name="ib.bundleId" android:value="@BUNDLE_ID@" />
         <meta-data android:name="ib.ipaVersion" android:value="@IPA_VERSION@" />

@@ -1,5 +1,5 @@
 // NSCondition, NSConditionLock, NSOperation/NSOperationQueue, NSCache, NSURLConnection & friends
-// (always offline), NSKeyedArchiver, NSJSONSerialization, formatters.
+// (offline, but for the requests the port serves: ClashMobs), NSKeyedArchiver, NSJSONSerialization, formatters.
 #include "foundation/foundation.h"
 #include "foundation/runloop.h"
 #include "libc/pthread.h"
@@ -7,6 +7,7 @@
 #include <condition_variable>
 #include <memory>
 #include <mutex>
+#include <thread>
 #include <windows.h>
 
 namespace ns {
@@ -58,18 +59,43 @@ void set_header(RequestData& d, const std::string& name, const std::string& valu
     d.headers.push_back({name, value});
 }
 
-// The response for a request the port serves itself, or false (the request fails as offline).
-bool serve(id req, HttpResponse& out) {
+// The request as the port's server sees it; false if there is no server (the request fails as offline).
+bool to_request(id req, HttpRequest& r) {
     if (!g_local_server || !req) return false;
     auto* d = objc::get<RequestData>(req);
     if (!d) return false;
-    HttpRequest r{d->method, utf8(objc::send(d->url, "absoluteString")), d->headers, d->body};
+    r = HttpRequest{d->method, utf8(objc::send(d->url, "absoluteString")), d->headers, d->body};
+    return true;
+}
+
+// The response for a request the port serves itself, or false (the request fails as offline). May wait on the
+// network (the ClashMob server), so the asynchronous calls run it on a thread of its own (serve_async).
+bool serve(const HttpRequest& r, HttpResponse& out) {
     if (!g_local_server(r, out)) {
         LOG_DEBUG("http: %s %s -> offline", r.method.c_str(), r.url.c_str());
         return false;
     }
     LOG_INFO("http: %s %s -> %d (%zu bytes, served by the port)", r.method.c_str(), r.url.c_str(), out.status, out.body.size());
     return true;
+}
+
+bool serve(id req, HttpResponse& out) {
+    HttpRequest r;
+    return to_request(req, r) && serve(r, out);
+}
+
+// Serves `req` on another thread, then calls done(served) with the response filled in, through `post`.
+void serve_async(id req, std::shared_ptr<HttpResponse> out, std::function<void(std::function<void()>)> post,
+                 std::function<void(bool)> done) {
+    HttpRequest r;
+    if (!to_request(req, r)) {
+        post([done] { done(false); });
+        return;
+    }
+    std::thread([r = std::move(r), out, post, done] {
+        bool served = serve(r, *out);
+        post([done, served] { done(served); });
+    }).detach();
 }
 
 id make_response(id req, const HttpResponse& r) {
@@ -312,9 +338,10 @@ void install_misc() {
         if (cd.started) return;
         cd.started = true;
         auto response = std::make_shared<HttpResponse>();
-        bool served = serve(cd.request, *response);
         objc::retain(conn);
-        RunLoop::current().post([conn, response, served] {
+        RunLoop* loop = &RunLoop::current();
+        auto post = [loop](std::function<void()> fn) { loop->post(std::move(fn)); };
+        serve_async(cd.request, response, post, [conn, response](bool served) {
             auto& d = objc::ensure<ConnData>(conn);
             auto has = [&](const char* s) { return d.delegate && objc::responds_to(d.delegate, objc::sel(s)); };
             if (!d.cancelled && served) {
@@ -365,9 +392,8 @@ void install_misc() {
     class_method(CONN, "sendAsynchronousRequest:queue:completionHandler:", [](Class, SEL, id req, id, GuestAddr block) {
         GuestAddr b = objc::block_copy(block);
         auto r = std::make_shared<HttpResponse>();
-        bool served = serve(req, *r);
         objc::retain(req);
-        post_to_main([b, r, served, req] {
+        serve_async(req, r, post_to_main, [b, r, req](bool served) {
             if (served) objc::call_block(b, {make_response(req, *r), data_with(r->body.data(), r->body.size()), 0});
             else objc::call_block(b, {0, 0, offline_error()});
             objc::block_release(b);
