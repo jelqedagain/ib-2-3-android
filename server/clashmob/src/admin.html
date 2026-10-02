@@ -5,90 +5,78 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <title>ClashMob Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
 <style>
-  :root {
-    --bg: #f4f1ea; --card: #ffffff; --ink: #1d1b17; --muted: #6b665c; --line: #e2ddd2; --field: #fbfaf7;
-    --gold: #9a6b10; --gold-soft: #f3e6c8; --bar: #e9e3d6; --live: #1f7a3a; --live-soft: #dcefe2;
-    --soon: #2f5f9e; --soon-soft: #e0e9f6; --ended: #77706a; --ended-soft: #ece9e3; --bad: #b3261e; --bad-soft: #f9dedc;
-    --warn: #8a5a00; --warn-soft: #fbefd5;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #12110f; --card: #1c1a17; --ink: #ece7dc; --muted: #a39d92; --line: #2e2b26; --field: #23211d;
-      --gold: #e2b75a; --gold-soft: #3a2f17; --bar: #2b2823; --live: #6fd08d; --live-soft: #173323;
-      --soon: #8fb6ec; --soon-soft: #1a2638; --ended: #a39d92; --ended-soft: #26231f; --bad: #f2b8b5; --bad-soft: #3b1715;
-      --warn: #f0c46a; --warn-soft: #3a2c10;
-    }
-  }
-  * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-  main { max-width: 980px; margin: 0 auto; padding: 22px 16px 120px; }
-  h1 { margin: 0; font-size: 22px; }
-  h2 { margin: 0; font-size: 17px; }
-  h3 { margin: 14px 0 6px; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
-  .top { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+  main { max-width: 1000px; margin: 0 auto; padding: 24px 16px 130px; }
+  .top { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
   .top .sp { flex: 1; }
-  .muted { color: var(--muted); }
-  .small { font-size: 12px; color: var(--muted); }
-  button { font: inherit; border: 1px solid var(--line); background: var(--card); color: var(--ink); padding: 6px 12px; border-radius: 8px; cursor: pointer; }
-  button:hover { border-color: var(--gold); }
-  button.primary { background: var(--gold); border-color: var(--gold); color: var(--card); font-weight: 600; }
+  button { font: inherit; font-size: 14px; color: var(--ink); background: linear-gradient(180deg, #232934, #181c23); border: 1px solid #3a414c;
+    border-radius: 4px; padding: 7px 14px; cursor: pointer; }
+  button:hover { border-color: var(--gold-dim); }
+  button.primary { color: #1b1408; font-weight: 700; border-color: #8a6a2c; background: linear-gradient(180deg, var(--gold2), var(--gold) 55%, #a9802f);
+    font-family: "Cinzel", Georgia, serif; letter-spacing: .08em; }
+  button.link { background: none; border: 0; padding: 3px 6px; color: var(--muted); }
+  button.link:hover { color: var(--gold2); }
   button.danger { color: var(--bad); }
-  button.link { border: 0; background: none; padding: 2px 4px; color: var(--muted); }
-  button.link:hover { color: var(--ink); }
-  button:disabled { opacity: .5; cursor: default; }
-  input, select, textarea { font: inherit; color: var(--ink); background: var(--field); border: 1px solid var(--line); border-radius: 7px; padding: 6px 8px; width: 100%; }
-  textarea { resize: vertical; min-height: 60px; }
-  textarea.raw { font: 12px/1.5 ui-monospace, Consolas, monospace; min-height: 420px; }
-  label { display: block; font-size: 12px; color: var(--muted); }
-  label > input, label > select, label > textarea { margin-top: 3px; }
-  .tabs { display: flex; gap: 4px; margin: 18px 0 14px; border-bottom: 1px solid var(--line); }
-  .tabs button { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; padding: 8px 12px; color: var(--muted); }
-  .tabs button.on { color: var(--ink); border-bottom-color: var(--gold); font-weight: 600; }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin-bottom: 12px; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
+  button:disabled { opacity: .45; cursor: default; }
+  input, select, textarea { font: inherit; font-size: 14px; color: var(--ink); background: var(--field); border: 1px solid #323843; border-radius: 4px;
+    padding: 7px 9px; width: 100%; }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 2px rgba(217, 177, 95, .18); }
+  select option { background: #12161c; }
+  textarea { resize: vertical; min-height: 56px; }
+  textarea.raw { font: 12.5px/1.5 ui-monospace, Consolas, monospace; min-height: 440px; }
+  label { display: block; font-size: 12.5px; color: var(--muted); }
+  label > input, label > select, label > textarea, label > .pair, label > .prize { margin-top: 4px; }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 3px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px 14px; }
   .grid .wide { grid-column: 1 / -1; }
-  .row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-  .kind { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--gold); }
-  .chip { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
-  .live { color: var(--live); background: var(--live-soft); }
-  .upcoming { color: var(--soon); background: var(--soon-soft); }
-  .ended { color: var(--ended); background: var(--ended-soft); }
-  .bar { height: 8px; background: var(--bar); border-radius: 999px; overflow: hidden; margin: 6px 0 4px; }
-  .bar > div { height: 100%; background: var(--gold); }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th, td { text-align: left; padding: 5px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
-  th { font-weight: 600; color: var(--muted); font-size: 12px; }
-  td.n { text-align: right; font-variant-numeric: tabular-nums; }
-  .stage { border: 1px dashed var(--line); border-radius: 10px; padding: 10px 12px; margin: 8px 0; }
-  .reward { display: grid; grid-template-columns: 2fr 2fr 1fr auto; gap: 6px; align-items: end; margin: 4px 0; }
-  @media (max-width: 560px) { .reward { grid-template-columns: 1fr 1fr; } }
-  .msg { border-radius: 8px; padding: 8px 10px; margin: 6px 0; font-size: 13px; }
-  .msg.bad { background: var(--bad-soft); color: var(--bad); }
-  .msg.warn { background: var(--warn-soft); color: var(--warn); }
-  .msg.ok { background: var(--live-soft); color: var(--live); }
-  .dock { position: fixed; left: 0; right: 0; bottom: 0; background: var(--card); border-top: 1px solid var(--line); padding: 10px 16px; }
-  .dock > div { max-width: 980px; margin: 0 auto; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-  .dock .sp { flex: 1; }
-  .login { max-width: 380px; margin: 12vh auto; }
-  .hidden { display: none !important; }
-  details > summary { cursor: pointer; color: var(--muted); font-size: 12px; margin-top: 8px; }
-  details.event > summary { list-style: none; margin: 0; color: var(--ink); font-size: 14px; }
+  .grid .span2 { grid-column: span 2; }
+  @media (max-width: 640px) { .grid .span2 { grid-column: auto; } }
+  .pair { display: grid; grid-template-columns: 1fr 110px; gap: 6px; }
+  .tabs { display: flex; gap: 2px; margin: 18px 0 16px; border-bottom: 1px solid var(--line); overflow-x: auto; }
+  .tabs button { background: none; border: 0; border-bottom: 2px solid transparent; border-radius: 0; padding: 9px 14px; color: var(--muted);
+    font-family: "Cinzel", Georgia, serif; letter-spacing: .08em; white-space: nowrap; }
+  .tabs button.on { color: var(--gold2); border-bottom-color: var(--gold); }
+  details.event { padding: 0; }
+  details.event > summary { list-style: none; padding: 14px 18px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; color: var(--ink); }
   details.event > summary::-webkit-details-marker { display: none; }
-  details.event > summary::before { content: "▸"; color: var(--muted); width: 12px; }
+  details.event > summary::before { content: "▸"; color: var(--gold); font-size: 13px; }
   details.event[open] > summary::before { content: "▾"; }
-  details.event[open] > summary { margin-bottom: 10px; }
+  details.event[open] > summary { border-bottom: 1px solid #262c35; }
+  .body { padding: 6px 18px 18px; }
+  .stage { border: 1px solid #2a3039; border-left: 3px solid var(--gold-dim); border-radius: 4px; padding: 10px 12px; margin: 8px 0; background: rgba(0, 0, 0, .15); }
+  .stagehead { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .stagehead b { font-family: "Cinzel", Georgia, serif; color: var(--gold); letter-spacing: .08em; }
+  .stagehead .sp { flex: 1; }
+  .tier { display: grid; grid-template-columns: 90px 190px 1fr auto; gap: 10px; align-items: end; padding: 8px 0; border-bottom: 1px dashed #262c35; }
+  .tier .medal { font-family: "Cinzel", Georgia, serif; font-weight: 700; letter-spacing: .06em; padding-bottom: 8px; }
+  .bronze { color: #d29a6a; } .silver { color: #c9d1da; } .goldm { color: var(--gold2); }
+  .prize { display: grid; grid-template-columns: minmax(150px, 1.2fr) minmax(110px, 1fr); gap: 6px; }
+  @media (max-width: 640px) { .tier { grid-template-columns: 1fr; } .tier .medal { padding: 0; } .prize { grid-template-columns: 1fr; } }
+  .msg { border-radius: 4px; padding: 9px 12px; margin: 8px 0; font-size: 13.5px; }
+  .msg.bad { background: var(--bad-bg); color: var(--bad); }
+  .msg.warn { background: var(--warn-bg); color: var(--warn); }
+  .msg.ok { background: var(--live-bg); color: var(--live); }
+  .dock { position: fixed; left: 0; right: 0; bottom: 0; background: linear-gradient(180deg, #161a21, #0e1115); border-top: 1px solid var(--bronze);
+    padding: 10px 16px; box-shadow: 0 -8px 24px rgba(0, 0, 0, .4); }
+  .dock > div { max-width: 1000px; margin: 0 auto; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .dock .sp { flex: 1; }
+  .login { max-width: 400px; margin: 14vh auto; text-align: center; }
+  .login input { margin: 14px 0 6px; text-align: center; }
+  .hidden { display: none !important; }
 </style>
 </head>
 <body>
 <main>
-  <div id="login" class="card login hidden">
+  <div id="login" class="panel login hidden">
     <h1>ClashMob Admin</h1>
-    <p class="muted">Enter the admin password.</p>
     <form id="loginForm">
-      <input id="password" type="password" autocomplete="current-password" placeholder="Password">
+      <input id="password" type="password" autocomplete="current-password" placeholder="Admin password">
       <div id="loginMsg"></div>
-      <p><button class="primary" type="submit">Log in</button></p>
+      <p><button class="primary" type="submit">Enter</button></p>
     </form>
   </div>
 
@@ -97,21 +85,29 @@
       <h1>ClashMob Admin</h1>
       <span class="sp"></span>
       <span class="small" id="clock"></span>
+      <a class="small" href="/" target="_blank" style="color:var(--gold)">Public page ↗</a>
       <button class="link" id="refresh">Refresh</button>
       <button class="link" id="logout">Log out</button>
     </div>
     <div class="tabs">
       <button data-tab="live" class="on">Live</button>
-      <button data-tab="edit">Edit events</button>
+      <button data-tab="edit">Events</button>
+      <button data-tab="players">Players</button>
       <button data-tab="raw">Events file</button>
     </div>
     <section id="tab-live"></section>
     <section id="tab-edit" class="hidden"></section>
+    <section id="tab-players" class="hidden">
+      <div class="panel">
+        <div class="row"><input id="playerSearch" placeholder="Search by name or id" style="max-width:320px"><span class="small" id="playerCount"></span></div>
+        <div id="playerList" style="margin-top:10px"></div>
+      </div>
+    </section>
     <section id="tab-raw" class="hidden">
-      <div class="card">
-        <p class="muted">The events as the server keeps them. Edit here if you prefer text, then <b>Use this text</b> to load it into the editor.</p>
+      <div class="panel">
+        <p class="muted" style="margin-top:0">All the events as one text file. Edit it here if you prefer, then <b>Use this text</b> to load it into the Events tab.</p>
         <textarea class="raw" id="raw" spellcheck="false"></textarea>
-        <p class="row"><button id="useRaw">Use this text</button><button id="showDefaults" class="link">Load the server's default events</button></p>
+        <p class="row"><button id="useRaw">Use this text</button><button id="showDefaults" class="link">Show the server's default events</button></p>
       </div>
     </section>
     <div id="result"></div>
@@ -126,124 +122,117 @@
   <button id="publish" class="primary">Publish</button>
 </div></div>
 
-<datalist id="bosses">
-  <option value="10ft_SnS_BlackKnight">Dark Knight</option>
-  <option value="20ft_B_MX-Goliath">MX-Goliath</option>
-  <option value="10ft_SnS_LavaLord">Ember Knight</option>
-  <option value="10ft_SnS_Ashimar">Ashimar</option>
-</datalist>
-<datalist id="scenery">
-  <option value="cm_obelisk_art">Obelisk</option>
-  <option value="cm_dunes_art">Dunes</option>
-  <option value="C01_CM_Monastery_Art">Monastery</option>
-</datalist>
-<datalist id="pins">
-  <option value="MapPin_Obelisk_A">Obelisk</option>
-  <option value="MapPin_Dunes_A">Dunes</option>
-  <option value="MapPin_Monastary_A">Monastery</option>
-  <option value="MapPin_ThePit">The Pit</option>
-  <option value="MapPin_Lake_A">Lake</option>
-  <option value="MapPin_Lake_B">Lake 2</option>
-  <option value="MapPin_SlotCanyon">Slot Canyon</option>
-  <option value="MapPin_Lookout">Lookout</option>
-</datalist>
-<datalist id="rewardTypes">
-  <option value="TRA_Gold_Small">Gold (small)</option>
-  <option value="TRA_Gold_Medium">Gold (medium)</option>
-  <option value="TRA_Gold_Large">Gold (large)</option>
-  <option value="TRA_Chips_Small">Battle chips (small)</option>
-  <option value="TRA_Chips_Medium">Battle chips (medium)</option>
-  <option value="TRA_Chips_Large">Battle chips (large)</option>
-  <option value="TRA_GrabBag_Small">Prize wheel (small)</option>
-  <option value="TRA_GrabBag_Medium">Prize wheel (medium)</option>
-  <option value="TRA_GrabBag_Large">Prize wheel (large)</option>
-  <option value="TRA_GrabBag_SmallGem">Gem wheel (small)</option>
-  <option value="TRA_GrabBag_MediumGem">Gem wheel (medium)</option>
-  <option value="TRA_GrabBag_LargeGem">Rare gem wheel</option>
-  <option value="TRA_GrabBag_Uber">ClashMob prize wheel</option>
-  <option value="TRA_Item_Fixed">A specific item (name it)</option>
-  <option value="TRA_Gem_Fixed">A specific gem (name it)</option>
-</datalist>
-<datalist id="items">
-  <option value="Sword_222">Anarchax (Siris, heavy weapon)</option>
-  <option value="Magic_149">Squee (Isa, ring)</option>
-  <option value="Helmet_134">Radian (Siris, helmet)</option>
-  <option value="Helmet_150">Serk (Siris, helmet)</option>
-  <option value="Helmet_111">Colossal Helm (Isa, helmet)</option>
-</datalist>
-
 <script>
 "use strict";
-// ---- storage (a per-browser convenience; the page works without it) ----
 const store = {
   get(k) { try { return sessionStorage.getItem(k); } catch { return null; } },
   set(k, v) { try { v == null ? sessionStorage.removeItem(k) : sessionStorage.setItem(k, v); } catch {} },
 };
-
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const num = (n) => Number(n || 0).toLocaleString();
+
+// ---- what the game's names mean ----
 const KIND = { Trial: "Trial", ClashMob: "ClashMob", Tournament: "Aegis Tournament" };
-const REWARD_NAMES = Object.fromEntries([...document.querySelectorAll("#rewardTypes option")].map((o) => [o.value, o.textContent]));
-const ITEM_NAMES = Object.fromEntries([...document.querySelectorAll("#items option")].map((o) => [o.value, o.textContent]));
-const openEvents = new Set();  // the events folded open in the editor
-const BATTLE = {
-  BT_KillNBosses: "Kill bosses (1 point per kill)",
-  BT_Kill1Boss: "Damage (points = damage to one boss)",
-  BT_TimeSurvival: "Survival (points = seconds alive)",
-  BT_TreasureCollection: "Treasure (points = bags collected)",
-  BT_BattleChallengeTrigger: "Skill moves (advanced)",
+const KIND_HELP = {
+  Trial: "Solo. Each player's best fight earns bronze, silver and gold prizes.",
+  ClashMob: "Co-op. Everyone's fights add up toward one goal per stage; when the mob reaches it, everyone who played gets the stage prize.",
+  Tournament: "Competitive. Timed stages: each ranks the players' best fights, and only the top players go on to the next stage.",
 };
+const BOSSES = { "10ft_SnS_BlackKnight": "Dark Knight", "20ft_B_MX-Goliath": "MX-Goliath", "10ft_SnS_LavaLord": "Ember Knight", "10ft_SnS_Ashimar": "Ashimar" };
+const PINS = { MapPin_Obelisk_A: "Obelisk", MapPin_Dunes_A: "Dunes", MapPin_Monastary_A: "Monastery", MapPin_ThePit: "The Pit",
+  MapPin_Lake_A: "Lake", MapPin_SlotCanyon: "Slot Canyon", MapPin_Lookout: "Lookout" };
+const SCENERY = { cm_obelisk_art: "Obelisk", cm_dunes_art: "Dunes", C01_CM_Monastery_Art: "Monastery" };
+const SCORING = {
+  BT_KillNBosses: ["Kills", "Each boss killed is 1 point (one boss per fight).", "kills"],
+  BT_Kill1Boss: ["Damage", "Points are the damage done to the boss in the fight.", "damage"],
+  BT_TimeSurvival: ["Survival", "Points are the seconds the player stays alive (give the boss a huge health).", "seconds"],
+  BT_TreasureCollection: ["Treasure", "Points are the treasure bags collected.", "bags"],
+  BT_BattleChallengeTrigger: ["Skill moves", "Advanced: points for set moves (parries, blocks...).", "moves"],
+};
+const PRIZES = [
+  ["gold", "Gold"], ["chips", "Battle chips"],
+  ["TRA_GrabBag_Uber", "ClashMob prize wheel"], ["TRA_GrabBag_Large", "Prize wheel (large)"], ["TRA_GrabBag_Medium", "Prize wheel (medium)"],
+  ["TRA_GrabBag_Small", "Prize wheel (small)"], ["TRA_GrabBag_LargeGem", "Rare gem wheel"], ["TRA_GrabBag_MediumGem", "Gem wheel (medium)"],
+  ["TRA_GrabBag_SmallGem", "Gem wheel (small)"], ["TRA_Item_Fixed", "An item"], ["TRA_Gem_Fixed", "A gem"],
+  ["TRA_Gold_Large", "Gold by bloodline (large)"], ["TRA_Gold_Medium", "Gold by bloodline (medium)"], ["TRA_Gold_Small", "Gold by bloodline (small)"],
+  ["other", "Something else (advanced)"],
+];
+const PRIZE_LABEL = Object.fromEntries(PRIZES);
+const ITEMS = { Sword_222: "Anarchax (Siris, heavy weapon)", Magic_149: "Squee (Isa, ring)", Helmet_134: "Radian (Siris, helmet)",
+  Helmet_150: "Serk (Siris, helmet)", Helmet_111: "Colossal Helm (Isa, helmet)" };
+const BLOODLINE = { TRA_Gold_Large: "bloodline × 500, at most 100,000", TRA_Gold_Medium: "bloodline × 250, at most 75,000", TRA_Gold_Small: "bloodline × 100, at most 5,000" };
+
+function prizeKind(r) {
+  if (!r) return "gold";
+  if (r.type === "TRA_Random_Gold") return /^chips\./i.test(r.data) ? "chips" : "gold";
+  return PRIZE_LABEL[r.type] ? r.type : "other";
+}
+function prizeText(r) {
+  if (!r) return "none";
+  const k = prizeKind(r), n = parseInt((r.data || "").split(".")[1]);
+  if (k === "gold") return `${num(n)} gold`;
+  if (k === "chips") return `${num(n)} battle chips`;
+  if (k === "TRA_Item_Fixed") return (ITEMS[r.data] || r.data || "an item").split(" (")[0];
+  if (k === "TRA_Gem_Fixed") return `the gem ${r.data || "?"}`;
+  if (BLOODLINE[k]) return `gold (${BLOODLINE[k]})`;
+  return k === "other" ? `${r.type} ${r.data}` : PRIZE_LABEL[k];
+}
+
+// ---- time: the events file keeps UTC; the page shows the admin's own time ----
+const pad2 = (n) => String(n).padStart(2, "0");
+function utcToInput(s) {
+  if (!s) return "";
+  const d = new Date(s.endsWith("Z") ? s : s + "Z");
+  return Number.isNaN(+d) ? "" : `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+const inputToUtc = (v) => (v ? new Date(v).toISOString().slice(0, 19) : "");
+const when = (t) => new Date(t * 1000).toLocaleString([], { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+const utcText = (t) => new Date(t * 1000).toISOString().slice(0, 16).replace("T", " ") + " UTC";
 function span(secs) {
   secs = Math.max(0, secs);
   const d = Math.floor(secs / 86400), h = Math.floor((secs % 86400) / 3600), m = Math.floor((secs % 3600) / 60);
   return d ? `${d}d ${h}h` : h ? `${h}h ${m}m` : `${m}m`;
 }
-const when = (t) => new Date(t * 1000).toLocaleString([], { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
-const utc = (t) => new Date(t * 1000).toISOString().slice(0, 16).replace("T", " ") + " UTC";
 
 // ---- the server ----
 let password = store.get("cmAdmin") || "";
-let state = null;      // the last /admin/api/state
-let model = [];        // the events being edited
-let savedIni = "";     // what the server has (to tell when there are changes)
+let state = null, model = [], savedIni = "";
+const openEvents = new Set();   // the events folded open
+const typing = new Set();       // pickers switched to "Other…" (a typed name), by model path
 
-async function api(method, path, body) {
-  const r = await fetch(path, { method, headers: { Authorization: "Bearer " + password }, body, cache: "no-store" });
+async function api(method, path, body, json) {
+  const headers = { Authorization: "Bearer " + password };
+  if (json) headers["Content-Type"] = "application/json";
+  const r = await fetch(path, { method, headers, body, cache: "no-store" });
   let d = null;
   try { d = await r.json(); } catch {}
   if (r.status === 401 || r.status === 429) {
-    showLogin(d?.error || "Wrong password");
+    showLogin(d?.error === "wrong password" ? "That's not the password." : d?.error || "Not allowed");
     throw new Error("auth");
   }
   return { status: r.status, data: d };
 }
-
 function showLogin(msg) {
-  $("app").classList.add("hidden");
-  $("dock").classList.add("hidden");
+  for (const id of ["app", "dock"]) $(id).classList.add("hidden");
   $("login").classList.remove("hidden");
   $("loginMsg").innerHTML = msg ? `<div class="msg bad">${esc(msg)}</div>` : "";
   $("password").focus();
 }
-
 $("loginForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   password = $("password").value;
-  try {
-    await load();
-    store.set("cmAdmin", password);
-  } catch {}
+  try { await load(); store.set("cmAdmin", password); } catch {}
 });
 $("logout").addEventListener("click", () => { password = ""; store.set("cmAdmin", null); showLogin(""); });
-$("refresh").addEventListener("click", () => load(true));
+$("refresh").addEventListener("click", () => load(true).then(() => currentTab === "players" && loadPlayers()).catch(() => {}));
 
 async function load(keepEdits) {
   const { data } = await api("GET", "/admin/api/state");
   state = data;
   $("login").classList.add("hidden");
   $("app").classList.remove("hidden");
-  $("clock").textContent = `Server time ${utc(state.now)} · ${num(state.players)} players`;
+  $("clock").textContent = `${num(state.players)} players · server time ${utcText(state.now)}`;
   renderLive();
   if (!keepEdits || !isDirty()) {
     savedIni = state.ini;
@@ -255,38 +244,64 @@ async function load(keepEdits) {
 }
 
 // ---- Live ----
+const who = (r) => r.name || "Player " + String(r.player).replace(/^port-/, "").slice(0, 6);
 function renderLive() {
-  const now = state.now;
-  const order = { live: 0, upcoming: 1, ended: 2 };
+  const now = state.now, order = { live: 0, upcoming: 1, ended: 2 };
   const events = [...state.events].sort((a, b) => order[a.status] - order[b.status]);
   $("tab-live").innerHTML = events.map((e) => {
     const status = e.status === "live" ? "Live" : e.status === "upcoming" ? "Coming soon" : "Ended";
     const time = e.status === "live" ? `${span(e.end - now)} left · ends ${when(e.end)}` : e.status === "upcoming" ? `starts ${when(e.start)}` : `ended ${when(e.end)}`;
-    const parts = e.stages || [e];
+    const parts = e.stages || [e], cur = e.stages ? e.stages[e.activeStage] : e;
     const rows = parts.map((s, i) => {
-      const active = e.stages ? i === e.activeStage : true;
-      const progress = e.kind === "ClashMob" ? `${num(Math.min(s.total, s.goal))} / ${num(s.goal)}${s.won ? " ✓" : ""}` : "";
-      const best = s.top[0] ? `${num(s.top[0].score)} (${esc(s.top[0].player.replace(/^port-/, "").slice(0, 6))})` : "–";
-      return `<tr${active && e.stages ? ' style="font-weight:600"' : ""}><td>${e.stages ? `Stage ${i + 1}` : "Event"}</td>
-        <td>${e.kind === "Tournament" && e.stages ? `${when(s.start)} → ${when(s.end)}` : ""}</td>
-        <td class="n">${progress}</td><td class="n">${num(s.players)}</td><td class="n">${num(s.scorers)}</td><td class="n">${best}</td></tr>`;
+      const active = e.stages && i === e.activeStage;
+      const prog = e.kind === "ClashMob" ? `${num(Math.min(s.total, s.goal))} / ${num(s.goal)}${s.won ? " ✓" : ""}` : "";
+      const prize = e.kind === "Trial" ? s.rewards.map(prizeText).join(" · ") : prizeText(s.rewards[0]);
+      return `<tr${active ? ' style="color:var(--gold2)"' : ""}><td>${e.stages ? `Stage ${i + 1}` : "Event"}</td>
+        <td>${e.kind === "Tournament" && e.stages ? `${when(s.start)} → ${when(s.end)}` : ""}</td><td class="n">${prog}</td>
+        <td class="n">${num(s.players)}</td><td class="n">${num(s.scorers)}</td><td>${esc(prize)}</td></tr>`;
     }).join("");
-    const cur = e.stages ? e.stages[e.activeStage] : e;
     const bar = e.kind === "ClashMob" ? `<div class="bar"><div style="width:${Math.min(100, (100 * cur.total) / cur.goal)}%"></div></div>` : "";
-    return `<div class="card">
+    const top = cur.top.length ? `<details><summary>Top ${cur.top.length}${e.stages ? ` in stage ${e.activeStage + 1}` : ""}</summary><table>${cur.top.map((r, i) =>
+      `<tr${i ? "" : ' class="rank1"'}><td>${i + 1}</td><td>${esc(who(r))}</td><td class="small">${esc(r.player)}</td><td class="n">${num(r.score)}</td></tr>`).join("")}</table></details>` : "";
+    return `<div class="panel">
       <div class="row"><span class="kind">${esc(KIND[e.kind])}</span><span class="chip ${e.status}">${status}</span><span class="small">${time}</span></div>
-      <div class="row" style="margin-top:4px"><h2>${esc(e.title || e.name)}</h2><span class="small">${esc(e.name)} · ${esc(e.boss)}</span></div>
+      <h2 style="margin:8px 0 2px">${esc(e.title || e.name)}</h2>
       ${bar}
-      <table><tr><th></th><th>${e.kind === "Tournament" && e.stages ? "Runs" : ""}</th><th class="n">${e.kind === "ClashMob" ? "Mob progress" : ""}</th>
-      <th class="n">Joined</th><th class="n">Scored</th><th class="n">Best</th></tr>${rows}</table>
-      ${cur.top.length ? `<details><summary>Top ${cur.top.length} ${e.stages ? `in stage ${e.activeStage + 1}` : ""}</summary><table>${cur.top.map((r, i) =>
-        `<tr><td>${i + 1}</td><td>${esc(r.player)}</td><td class="n">${num(r.score)}</td></tr>`).join("")}</table></details>` : ""}
-    </div>`;
+      <table style="margin-top:8px"><tr><th></th><th>${e.kind === "Tournament" && e.stages ? "Runs" : ""}</th><th class="n">${e.kind === "ClashMob" ? "Mob progress" : ""}</th>
+        <th class="n">Joined</th><th class="n">Played</th><th>Prize</th></tr>${rows}</table>${top}</div>`;
   }).join("") || `<p class="muted">No events.</p>`;
 }
 
-// ---- the events file <-> the editor's model ----
-const SERVER_KEYS = ["Type", "Mode", "Days", "Hours", "Start", "StageHours", "Goal", "Score", "MaxScore", "TopPercent"];
+// ---- Players ----
+let playerTimer = 0;
+async function loadPlayers() {
+  const q = $("playerSearch").value.trim();
+  const { data } = await api("GET", "/admin/api/players?q=" + encodeURIComponent(q));
+  $("playerCount").textContent = `${data.players.length}${data.players.length === 200 ? "+" : ""} shown, most recently seen first`;
+  $("playerList").innerHTML = data.players.length ? `<table><tr><th>Name</th><th>Id</th><th class="n">Fights</th><th>Last seen</th><th></th></tr>${data.players.map((p) =>
+    `<tr><td>${p.name ? esc(p.name) : '<span class="muted">no name</span>'}</td><td class="small">${esc(p.id)}</td><td class="n">${num(p.plays)}</td>
+      <td class="small">${when(p.seen)}</td><td style="white-space:nowrap"><button class="link" data-rename="${esc(p.id)}" data-name="${esc(p.name || "")}">Rename</button>
+      ${p.name ? `<button class="link danger" data-clear="${esc(p.id)}">Remove name</button>` : ""}</td></tr>`).join("")}</table>` : `<p class="muted">No players found.</p>`;
+}
+$("playerSearch").addEventListener("input", () => { clearTimeout(playerTimer); playerTimer = setTimeout(() => loadPlayers().catch(() => {}), 300); });
+$("playerList").addEventListener("click", async (e) => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  const id = b.dataset.rename || b.dataset.clear;
+  let name = "";
+  if (b.dataset.rename) {
+    name = prompt("New name (3 to 16 letters, numbers and spaces):", b.dataset.name);
+    if (name === null) return;
+  } else if (!confirm("Remove this player's name? They show as \"Player …\" until they pick a new one.")) return;
+  try {
+    const { data } = await api("POST", "/admin/api/players/name", JSON.stringify({ id, name }), true);
+    if (!data.ok) alert(data.error);
+    loadPlayers();
+  } catch {}
+});
+
+// ---- the events file <-> the editor ----
+const SERVER_KEYS = ["Type", "Mode", "Days", "Hours", "Start", "Repeat", "StageHours", "Goal", "Score", "MaxScore", "TopPercent"];
 const EVENT_FIELDS = ["Title", "Desc", "BattleType", "BossObj", "BossLevel", "BossScaledLevel", "BossHealth", "EndTime", "MaxPlays", "MapName", "SubMapName", "QuestMapPin"];
 const STAGE_FIELDS = ["Desc", "BossObj", "BossLevel", "BossScaledLevel", "BossHealth", "EndTime"];
 
@@ -309,211 +324,313 @@ function parseIni(text) {
     }
     if (!cur) continue;
     const eq = line.indexOf("="), key = eq < 0 ? line : line.slice(0, eq), value = eq < 0 ? "" : line.slice(eq + 1);
+    const stage = "n" in cur;
     if (key === ".RewardType") cur.rewards.push({ type: value, data: "", goal: "" });
     else if (key === ".RewardData" && cur.rewards.length) cur.rewards[cur.rewards.length - 1].data = value;
     else if (key === ".RewardGoal" && cur.rewards.length) cur.rewards[cur.rewards.length - 1].goal = value;
-    else if (SERVER_KEYS.includes(key) && !("n" in cur && !["Goal", "MaxScore"].includes(key))) cur.keys[key === "Mode" ? "Type" : key] = value;
-    else if ((("n" in cur) ? STAGE_FIELDS : EVENT_FIELDS).includes(key)) cur.fields[key] = value;
+    else if (SERVER_KEYS.includes(key) && (!stage || ["Goal", "MaxScore"].includes(key))) cur.keys[key === "Mode" ? "Type" : key] = value;
+    else if ((stage ? STAGE_FIELDS : EVENT_FIELDS).includes(key)) cur.fields[key] = value;
     else cur.other.push(line);
   }
-  for (const e of events) e.stages.sort((a, b) => a.n - b.n);
+  for (const e of events) {
+    e.stages.sort((a, b) => a.n - b.n);
+    const t = (e.keys.Type || "ClashMob").toLowerCase();
+    e.keys.Type = t.startsWith("tr") || t === "solo" ? "Trial" : t.startsWith("to") || t === "comp" ? "Tournament" : "ClashMob";
+  }
   return events;
 }
 
 function toIni(events) {
   const out = [];
-  const put = (k, v) => { if (v !== undefined && v !== "") out.push(`${k}=${v}`); };
-  const rewards = (list) => list.forEach((r) => { out.push(`.RewardType=${r.type}`, `.RewardData=${r.data || ""}`, `.RewardGoal=${r.goal || 1}`); });
+  const put = (k, v) => { if (v !== undefined && v !== null && v !== "") out.push(`${k}=${v}`); };
+  const rewards = (list) => list.forEach((r) => out.push(`.RewardType=${r.type}`, `.RewardData=${r.data || ""}`, `.RewardGoal=${r.goal || 1}`));
   for (const e of events) {
-    const k = e.keys, f = e.fields, type = k.Type || "ClashMob";
+    const k = e.keys, f = e.fields, type = k.Type;
     out.push(`[${e.name}]`);
     put("Type", type);
-    put("Days", k.Days); put("Hours", k.Hours); put("Start", k.Start);
+    put("Days", k.Days); put("Hours", k.Hours); put("Start", k.Start); put("Repeat", k.Repeat);
     if (type === "Tournament") { put("StageHours", k.StageHours); put("TopPercent", k.TopPercent); }
     if (!e.stages.length) put("Goal", k.Goal);
     put("Score", k.Score); put("MaxScore", k.MaxScore);
     for (const key of EVENT_FIELDS) if (!["MapName", "SubMapName", "QuestMapPin"].includes(key)) put(key, f[key]);
     if (!e.stages.length) rewards(e.rewards);
     put("MapName", f.MapName || "00_ClashMob_BaseScripting"); put("SubMapName", f.SubMapName); put("QuestMapPin", f.QuestMapPin);
-    out.push(...e.other.filter((l) => l.trim()));
-    out.push("");
+    out.push(...e.other.filter((l) => l.trim()), "");
     e.stages.forEach((s, i) => {
       out.push(`[${e.name}.${i + 1}]`);
       if (type === "ClashMob") put("Goal", s.keys.Goal);
       put("MaxScore", s.keys.MaxScore);
       for (const key of STAGE_FIELDS) put(key, s.fields[key]);
       rewards(s.rewards);
-      out.push(...s.other.filter((l) => l.trim()));
-      out.push("");
+      out.push(...s.other.filter((l) => l.trim()), "");
     });
   }
   return "\n" + out.join("\n");
 }
-
 const isDirty = () => toIni(model).trim() !== toIni(parseIni(savedIni)).trim();
 function updateDirty() {
   const d = isDirty();
-  $("dirty").textContent = d ? "Unsaved changes" : "No changes";
+  $("dirty").textContent = d ? "You have unpublished changes" : "No changes";
   $("dirty").style.color = d ? "var(--warn)" : "";
-  $("publish").disabled = !d;
-  $("discard").disabled = !d;
+  $("publish").disabled = $("discard").disabled = !d;
 }
 
-// ---- Edit ----
-function field(label, path, value, attrs = "") {
-  return `<label>${label}<input data-path="${path}" value="${esc(value)}" ${attrs}></label>`;
+// ---- Events: the editor ----
+const opt = (map, value, other) => Object.entries(map).map(([v, t]) => `<option value="${esc(v)}"${v === value ? " selected" : ""}>${esc(t)}</option>`).join("") +
+  (other ? `<option value="__other"${other === "selected" ? " selected" : ""}>Other…</option>` : "");
+const inp = (label, path, value, attrs = "", hint = "") =>
+  `<label>${label}<input data-path="${path}" value="${esc(value ?? "")}" ${attrs}>${hint ? `<div class="hint">${hint}</div>` : ""}</label>`;
+
+// A choice from a list, with "Other…" for any other name the game has (bosses, map spots, scenery)
+function pick(label, path, value, map, hint = "") {
+  const custom = typing.has(path) || (value && !(value in map));
+  return `<label>${label}<select data-pick="${path}">${!value && !custom ? `<option value="" selected>Choose…</option>` : ""}${opt(map, custom ? null : value, custom ? "selected" : "other")}</select>
+    ${custom ? `<input data-path="${path}" value="${esc(value)}" style="margin-top:6px" placeholder="the game's name for it">` : ""}${hint ? `<div class="hint">${hint}</div>` : ""}</label>`;
 }
-function select(label, path, value, options) {
-  return `<label>${label}<select data-path="${path}">${Object.entries(options).map(([v, t]) =>
-    `<option value="${esc(v)}"${v === value ? " selected" : ""}>${esc(t)}</option>`).join("")}</select></label>`;
+
+function prizeInput(path, r) {
+  const k = prizeKind(r), amount = parseInt(((r && r.data) || "").split(".")[1]) || "";
+  let second = `<span></span>`;
+  if (k === "gold" || k === "chips") second = `<input type="number" min="1" data-amount="${path}" value="${amount}" placeholder="how many">`;
+  else if (k === "TRA_Item_Fixed") {
+    const custom = typing.has(path) || (r.data && !(r.data in ITEMS));
+    second = `<div><select data-item="${path}">${opt(ITEMS, custom ? null : r.data, custom ? "selected" : "other")}</select>` +
+      (custom ? `<input data-path="${path}.data" value="${esc(r.data)}" placeholder="the game's item name, like Sword_222" style="margin-top:6px">` : "") + `</div>`;
+  } else if (k === "TRA_Gem_Fixed") second = `<input data-path="${path}.data" value="${esc(r.data)}" placeholder="the game's gem name">`;
+  else if (BLOODLINE[k]) second = `<div class="hint" style="align-self:center">${BLOODLINE[k]}</div>`;
+  else if (k === "other") second = `<div><input data-path="${path}.type" value="${esc(r.type)}" placeholder="reward type">` +
+    `<input data-path="${path}.data" value="${esc(r.data)}" placeholder="its data" style="margin-top:6px"></div>`;
+  return `<div class="prize"><select data-prize="${path}">${PRIZES.map(([v, t]) => `<option value="${v}"${v === k ? " selected" : ""}>${t}</option>`).join("")}</select>${second}</div>`;
 }
-function rewardRows(list, path, single) {
-  return list.map((r, i) => `<div class="reward">
-      <label>Reward${REWARD_NAMES[r.type] ? `: <b>${esc(REWARD_NAMES[r.type])}</b>` : ""}<input list="rewardTypes" data-path="${path}.${i}.type" value="${esc(r.type)}"></label>
-      <label>${/_Fixed$/.test(r.type) ? `Item or gem${ITEM_NAMES[r.data] ? `: <b>${esc(ITEM_NAMES[r.data])}</b>` : ""}` : "Item or gem (not needed)"}<input list="items" data-path="${path}.${i}.data" value="${esc(r.data)}"></label>
-      <label>Score needed<input type="number" min="1" data-path="${path}.${i}.goal" value="${esc(r.goal)}"></label>
-      <button class="link danger" data-act="delReward" data-path="${path}" data-i="${i}" title="Remove">✕</button>
-    </div>`).join("") + (single && list.length >= 1 ? "" : `<button class="link" data-act="addReward" data-path="${path}">+ Add a reward</button>`);
+
+function whenHtml(e, p) {
+  const k = e.keys, type = k.Type, repeat = !/^(0|no|false|never)$/i.test(k.Repeat || "");
+  const unit = k.Hours ? "hours" : "days", amount = k.Hours || k.Days || "7";
+  const startHint = k.Start ? `= ${k.Start.replace("T", " ").slice(0, 16)} UTC` : "Blank: midnight UTC, at the start of each run.";
+  let html = `<div class="grid">
+    <label>Starts (your time)<input type="datetime-local" data-start="${p}" value="${utcToInput(k.Start)}"><div class="hint">${startHint}</div></label>`;
+  if (type === "Tournament") {
+    const days = Math.round((((parseFloat(k.StageHours) || 24) * e.stages.length) / 24) * 10) / 10;
+    html += inp("Each stage lasts (hours)", `${p}.keys.StageHours`, k.StageHours || "24", 'type="number" min="1"',
+      `${e.stages.length} stages: the tournament lasts ${days} day${days === 1 ? "" : "s"}.`);
+  } else {
+    html += `<label>Runs for<div class="pair"><input type="number" min="1" data-dur="${p}" value="${esc(amount)}">
+      <select data-unit="${p}"><option${unit === "days" ? " selected" : ""}>days</option><option${unit === "hours" ? " selected" : ""}>hours</option></select></div></label>`;
+  }
+  html += `<label>When it ends<select data-repeat="${p}"><option value="1"${repeat ? " selected" : ""}>It starts again</option>
+    <option value="0"${repeat ? "" : " selected"}>It's over (runs once)</option></select>
+    ${!repeat && !k.Start ? `<div class="hint" style="color:var(--warn)">An event that runs once needs a start time.</div>` : ""}</label>`;
+  if (type === "Tournament" && repeat) html += inp("Starts again every (days)", `${p}.keys.Days`, k.Days || "7", 'type="number" min="1"');
+  return html + `</div>`;
+}
+
+function tiersHtml(e, p) {
+  const unit = (SCORING[e.fields.BattleType] || SCORING.BT_KillNBosses)[2];
+  const medal = ["Bronze", "Silver", "Gold"], cls = ["bronze", "silver", "goldm"];
+  return e.rewards.map((r, i) => `<div class="tier"><span class="medal ${cls[i] || ""}">${medal[i] || `Tier ${i + 1}`}</span>
+      ${inp(`Best fight of at least (${unit})`, `${p}.rewards.${i}.goal`, r.goal, 'type="number" min="1"')}
+      <label>Prize${prizeInput(`${p}.rewards.${i}`, r)}</label>
+      <button class="link danger" data-act="delReward" data-path="${p}.rewards" data-i="${i}" title="Remove">✕</button></div>`).join("") +
+    `<button class="link" data-act="addReward" data-path="${p}.rewards">+ Add a prize</button>`;
+}
+
+function stagesHtml(e, p) {
+  const type = e.keys.Type, unit = (SCORING[e.fields.BattleType] || SCORING.BT_KillNBosses)[2];
+  return e.stages.map((s, i) => `<div class="stage">
+      <div class="stagehead"><b>Stage ${i + 1}</b><span class="small">${type === "Tournament" ? `top ${e.keys.TopPercent || 50}% go on` : ""}</span><span class="sp"></span>
+        <button class="link" data-act="moveStage" data-e="${p}" data-i="${i}" data-d="-1" ${i ? "" : "disabled"} title="Move up">↑</button>
+        <button class="link" data-act="moveStage" data-e="${p}" data-i="${i}" data-d="1" ${i < e.stages.length - 1 ? "" : "disabled"} title="Move down">↓</button>
+        <button class="link danger" data-act="delStage" data-e="${p}" data-i="${i}">Remove</button></div>
+      <div class="grid">
+        ${type === "ClashMob" ? inp(`The mob must reach (${unit}, all players together)`, `${p}.stages.${i}.keys.Goal`, s.keys.Goal, 'type="number" min="1"') : ""}
+        ${inp("Boss level", `${p}.stages.${i}.fields.BossLevel`, s.fields.BossLevel, `type="number" min="1" placeholder="${esc(e.fields.BossLevel || "")}"`, "Blank: the event's.")}
+        <label class="span2">Prize${prizeInput(`${p}.stages.${i}.rewards.0`, s.rewards[0])}</label>
+        <label class="wide">What players read for this stage<textarea data-path="${p}.stages.${i}.fields.Desc">${esc(s.fields.Desc)}</textarea></label>
+      </div></div>`).join("") + `<button data-act="addStage" data-e="${p}">+ Add a stage</button>`;
+}
+
+function eventHtml(e, ei) {
+  const k = e.keys, f = e.fields, type = k.Type, p = String(ei);
+  const repeat = !/^(0|no|false|never)$/i.test(k.Repeat || "");
+  const len = type === "Tournament" ? `${e.stages.length} × ${k.StageHours || 24} h stages` : `${k.Hours ? `${k.Hours} hours` : `${k.Days || 7} days`}`;
+  const summary = `${len}${k.Start ? ` · from ${when(Date.parse(k.Start + "Z") / 1000)}` : ""} · ${repeat ? "repeats" : "runs once"}`;
+  const scoring = SCORING[f.BattleType] || SCORING.BT_KillNBosses;
+  return `<details class="panel event" data-name="${esc(e.name)}"${openEvents.has(e.name) ? " open" : ""}>
+    <summary><span class="kind">${esc(KIND[type])}</span><h2 class="title">${esc(f.Title || e.name)}</h2><span class="small">${esc(summary)}</span>
+      <span style="flex:1"></span>
+      <button class="link" data-act="moveEvent" data-e="${ei}" data-d="-1" ${ei ? "" : "disabled"} title="Move up">↑</button>
+      <button class="link" data-act="moveEvent" data-e="${ei}" data-d="1" ${ei < model.length - 1 ? "" : "disabled"} title="Move down">↓</button>
+      <button class="link" data-act="dupEvent" data-e="${ei}">Duplicate</button>
+      <button class="link danger" data-act="delEvent" data-e="${ei}">Delete</button></summary>
+    <div class="body">
+      <div class="rule">The event</div>
+      <div class="grid">
+        ${inp("Name players see", `${p}.fields.Title`, f.Title)}
+        <label>Kind<select data-path="${p}.keys.Type">${opt(KIND, type)}</select><div class="hint">${KIND_HELP[type]}</div></label>
+        ${e.stages.length ? "" : `<label class="wide">What players read<textarea data-path="${p}.fields.Desc">${esc(f.Desc)}</textarea></label>`}
+      </div>
+      <div class="rule">When</div>${whenHtml(e, p)}
+      <div class="rule">The fight</div>
+      <div class="grid">
+        ${pick("Boss", `${p}.fields.BossObj`, f.BossObj, BOSSES)}
+        ${inp("Boss level", `${p}.fields.BossLevel`, f.BossLevel, 'type="number" min="1"', "The lowest it can be.")}
+        ${inp("Boss keeps up with the player", `${p}.fields.BossScaledLevel`, f.BossScaledLevel, 'type="number" min="0" step="0.1"',
+          "× the player's level, when that is higher (1 = same level, blank = off).")}
+        <label>Points come from<select data-path="${p}.fields.BattleType">${opt(Object.fromEntries(Object.entries(SCORING).map(([key, v]) => [key, v[0]])), f.BattleType || "BT_KillNBosses")}</select>
+          <div class="hint">${esc(scoring[1])}</div></label>
+        ${inp("Boss health", `${p}.fields.BossHealth`, f.BossHealth, 'type="number" min="1" placeholder="normal"')}
+        ${inp("Fight time (seconds)", `${p}.fields.EndTime`, f.EndTime, 'type="number" min="5" placeholder="30"')}
+        ${inp(type === "Trial" ? "Fights per player" : "Fights per player per stage", `${p}.fields.MaxPlays`, f.MaxPlays, 'type="number" min="1" placeholder="no limit"')}
+      </div>
+      <div class="rule">${type === "Trial" ? "Prizes" : e.stages.length ? "Stages" : "Goal and prize"}</div>
+      ${type === "Trial" ? tiersHtml(e, p) : e.stages.length ? stagesHtml(e, p) : `<div class="grid">
+          ${type === "ClashMob" ? inp(`The mob must reach (${scoring[2]}, all players together)`, `${p}.keys.Goal`, k.Goal, 'type="number" min="1"') : ""}
+          <label>Prize${prizeInput(`${p}.rewards.0`, e.rewards[0])}</label></div>
+        <p><button data-act="addStage" data-e="${p}">Split into stages</button></p>`}
+      ${type === "Tournament" ? `<div class="grid" style="margin-top:10px">${inp("Who goes on to the next stage (top %)", `${p}.keys.TopPercent`, k.TopPercent || "50", 'type="number" min="1" max="100"')}</div>` : ""}
+      <div class="rule">On the map</div>
+      <div class="grid">
+        ${pick("Where it shows on the world map", `${p}.fields.QuestMapPin`, f.QuestMapPin, PINS)}
+        ${pick("Where the fight takes place", `${p}.fields.SubMapName`, f.SubMapName, SCENERY)}
+      </div>
+      <details style="margin-top:14px"><summary>Advanced</summary><div class="grid" style="margin-top:10px">
+        ${inp("Id", `${p}.name`, e.name, 'pattern="[A-Za-z0-9_-]{1,40}"', "Letters, digits, - and _. Changing it starts the event over.")}
+        <label>A player's points<select data-path="${p}.keys.Score">${opt({ Total: "All their fights added up", Best: "Their best fight" }, k.Score || (type === "ClashMob" ? "Total" : "Best"))}</select></label>
+        ${inp("Most points from one fight", `${p}.keys.MaxScore`, k.MaxScore, 'type="number" min="1" placeholder="automatic"', "Fights claiming more are capped (against cheating).")}
+        <label class="wide">Other settings (Key=Value, one per line)<textarea data-path="${p}.other" data-lines="1">${esc(e.other.join("\n"))}</textarea></label>
+      </div></details>
+    </div></details>`;
 }
 
 function renderEdit() {
-  const html = model.map((e, ei) => {
-    const k = e.keys, f = e.fields, type = k.Type || "ClashMob", p = `${ei}`;
-    const days = k.Hours ? "" : k.Days || "7";
-    const startLocal = k.Start ? k.Start.slice(0, 16) : "";
-    const stages = e.stages.map((s, si) => `<div class="stage">
-        <div class="row"><b>Stage ${si + 1}</b><span class="sp" style="flex:1"></span>
-          <button class="link" data-act="moveStage" data-e="${ei}" data-i="${si}" data-d="-1" ${si ? "" : "disabled"}>↑</button>
-          <button class="link" data-act="moveStage" data-e="${ei}" data-i="${si}" data-d="1" ${si < e.stages.length - 1 ? "" : "disabled"}>↓</button>
-          <button class="link danger" data-act="delStage" data-e="${ei}" data-i="${si}">Remove stage</button></div>
-        <div class="grid">
-          ${type === "ClashMob" ? field("Mob goal (everyone together)", `${p}.stages.${si}.keys.Goal`, s.keys.Goal, 'type="number" min="1"') : ""}
-          ${field("Boss level (blank = event's)", `${p}.stages.${si}.fields.BossLevel`, s.fields.BossLevel, 'type="number" min="1"')}
-          ${field("Level scaling (blank = event's)", `${p}.stages.${si}.fields.BossScaledLevel`, s.fields.BossScaledLevel)}
-          ${field("Boss (blank = event's)", `${p}.stages.${si}.fields.BossObj`, s.fields.BossObj, 'list="bosses"')}
-          <label class="wide">Description<textarea data-path="${p}.stages.${si}.fields.Desc">${esc(s.fields.Desc)}</textarea></label>
-        </div>
-        <h3>Reward for this stage</h3>${rewardRows(s.rewards, `${p}.stages.${si}.rewards`, true)}
-        ${s.other.length ? `<details><summary>Other lines (${s.other.length})</summary><textarea data-path="${p}.stages.${si}.other" data-lines="1">${esc(s.other.join("\n"))}</textarea></details>` : ""}
-      </div>`).join("");
-    return `<details class="card event" data-name="${esc(e.name)}"${openEvents.has(e.name) ? " open" : ""}>
-      <summary class="row"><span class="kind">${esc(KIND[type] || type)}</span><h2>${esc(f.Title || e.name)}</h2>
-        <span class="small">${e.stages.length ? `${e.stages.length} stages · ` : ""}every ${esc(k.Hours ? `${k.Hours} h` : `${k.Days || 7} days`)}${k.Start ? ` from ${esc(k.Start.replace("T", " ").slice(0, 16))} UTC` : ""}</span>
-        <span class="sp" style="flex:1"></span>
-        <button class="link" data-act="moveEvent" data-e="${ei}" data-d="-1" ${ei ? "" : "disabled"}>↑</button>
-        <button class="link" data-act="moveEvent" data-e="${ei}" data-d="1" ${ei < model.length - 1 ? "" : "disabled"}>↓</button>
-        <button class="link" data-act="dupEvent" data-e="${ei}">Duplicate</button>
-        <button class="link danger" data-act="delEvent" data-e="${ei}">Delete</button></summary>
-      <div class="grid">
-        ${field("Id (letters, digits, - and _)", `${p}.name`, e.name, 'pattern="[A-Za-z0-9_-]{1,40}"')}
-        ${select("Type", `${p}.keys.Type`, type, { Trial: "Trial (solo)", ClashMob: "ClashMob (co-op)", Tournament: "Aegis Tournament" })}
-        ${field("Title", `${p}.fields.Title`, f.Title)}
-        <label class="wide">Description${e.stages.length ? " (stages have their own)" : ""}<textarea data-path="${p}.fields.Desc">${esc(f.Desc)}</textarea></label>
-      </div>
-      <h3>Schedule</h3>
-      <div class="grid">
-        ${field("Repeats every (days)", `${p}.keys.Days`, days, 'type="number" min="1"')}
-        ${field("First start (UTC, blank = with the period)", `${p}.keys.Start`, startLocal, 'type="datetime-local"')}
-        ${type === "Tournament" ? field("Each stage lasts (hours)", `${p}.keys.StageHours`, k.StageHours, 'type="number" min="1"') : ""}
-        ${type === "Tournament" ? field("Top % who go on", `${p}.keys.TopPercent`, k.TopPercent || "50", 'type="number" min="1" max="100"') : ""}
-      </div>
-      <p class="small">${schedulePreview(e)}</p>
-      <h3>Fight</h3>
-      <div class="grid">
-        ${select("What scores", `${p}.fields.BattleType`, f.BattleType || "BT_KillNBosses", BATTLE)}
-        ${field("Boss", `${p}.fields.BossObj`, f.BossObj, 'list="bosses"')}
-        ${field("Boss level", `${p}.fields.BossLevel`, f.BossLevel, 'type="number" min="1"')}
-        ${field("Level scaling (× player level)", `${p}.fields.BossScaledLevel`, f.BossScaledLevel)}
-        ${field("Boss health (blank = normal)", `${p}.fields.BossHealth`, f.BossHealth, 'type="number" min="1"')}
-        ${field("Fight length (seconds, blank = 30)", `${p}.fields.EndTime`, f.EndTime, 'type="number" min="5"')}
-        ${field("Plays allowed (blank = no limit)", `${p}.fields.MaxPlays`, f.MaxPlays, 'type="number" min="1"')}
-        ${select("A player's score", `${p}.keys.Score`, k.Score || (type === "ClashMob" ? "Total" : "Best"), { Total: "All their plays added up", Best: "Their best play" })}
-        ${!e.stages.length && type === "ClashMob" ? field("Mob goal (everyone together)", `${p}.keys.Goal`, k.Goal, 'type="number" min="1"') : ""}
-      </div>
-      <h3>Map</h3>
-      <div class="grid">
-        ${field("Where it shows on the map", `${p}.fields.QuestMapPin`, f.QuestMapPin, 'list="pins"')}
-        ${field("Scenery", `${p}.fields.SubMapName`, f.SubMapName, 'list="scenery"')}
-      </div>
-      ${e.stages.length ? `<h3>Stages</h3>${stages}` : `<h3>Rewards${type === "Trial" ? " (bronze, silver, gold)" : ""}</h3>${rewardRows(e.rewards, `${p}.rewards`, false)}`}
-      ${type !== "Trial" ? `<p><button data-act="addStage" data-e="${ei}">+ Add a stage</button></p>` : ""}
-      <details><summary>Other lines (${e.other.length})</summary><p class="small">Any other event settings, one per line (Key=Value).</p>
-        <textarea data-path="${p}.other" data-lines="1">${esc(e.other.join("\n"))}</textarea></details>
-    </details>`;
-  }).join("");
-  $("tab-edit").innerHTML = `<p class="small">Click an event to open it.</p>` + html + `<div class="card"><div class="row"><b>Add an event:</b>
-      <button data-act="addEvent" data-type="Trial">Trial</button>
-      <button data-act="addEvent" data-type="ClashMob">ClashMob with stages</button>
-      <button data-act="addEvent" data-type="Tournament">Aegis Tournament</button>
-      <span class="sp" style="flex:1"></span><button class="link danger" data-act="reset">Reset to the server's defaults</button></div></div>`;
+  // keep open what is open on screen now (the toggle events come a moment later)
+  document.querySelectorAll("#tab-edit details.event").forEach((d) => d.open ? openEvents.add(d.dataset.name) : openEvents.delete(d.dataset.name));
+  $("tab-edit").innerHTML = `<p class="small" style="margin-top:0">Click an event to open it. Nothing changes for players until you <b>Publish</b>.</p>` +
+    model.map(eventHtml).join("") + `<div class="panel"><div class="row"><span class="carved" style="color:var(--gold)">New event</span>
+      <button data-act="addEvent" data-type="Trial">Trial</button><button data-act="addEvent" data-type="ClashMob">ClashMob</button>
+      <button data-act="addEvent" data-type="Tournament">Aegis Tournament</button><span style="flex:1"></span>
+      <button class="link danger" data-act="reset">Go back to the server's default events</button></div></div>`;
 }
 
-function schedulePreview(e) {
-  const days = parseFloat(e.keys.Days) || (parseFloat(e.keys.Hours) || 168) / 24;
-  const start = e.keys.Start ? `first starts ${e.keys.Start.replace("T", " ").slice(0, 16)} UTC, then` : "starts at 00:00 UTC and";
-  const stage = (e.keys.Type === "Tournament" && e.stages.length)
-    ? ` Each of its ${e.stages.length} stages lasts ${e.keys.StageHours || Math.floor((days * 24) / e.stages.length)} h.` : "";
-  return `Runs ${days} day${days === 1 ? "" : "s"}: ${start} starts over every ${days} day${days === 1 ? "" : "s"} with progress reset.${stage}`;
-}
-
+// model paths: "0.stages.1.keys.Goal" -> [the object holding it, "Goal"]; missing objects and arrays are made
 function at(path) {
   const parts = path.split(".");
   let o = model;
-  for (const k of parts.slice(0, -1)) o = o[k];
+  for (let i = 0; i < parts.length - 1; i++) {
+    if (o[parts[i]] === undefined) o[parts[i]] = /^\d+$/.test(parts[i + 1]) ? [] : {};
+    o = o[parts[i]];
+  }
   return [o, parts[parts.length - 1]];
 }
+function reward(path) {
+  const [o, k] = at(path);
+  if (!o[k]) o[k] = { type: "TRA_Random_Gold", data: "GOLD.10000", goal: "1" };
+  return o[k];
+}
+const changed = (rerender) => { if (rerender) renderEdit(); updateDirty(); $("raw").value = toIni(model); };
 
 $("tab-edit").addEventListener("toggle", (ev) => {
   const d = ev.target;
   if (d.classList?.contains("event")) d.open ? openEvents.add(d.dataset.name) : openEvents.delete(d.dataset.name);
 }, true);
+
 $("tab-edit").addEventListener("input", (ev) => {
-  const el = ev.target, path = el.dataset.path;
-  if (!path) return;
-  const [o, k] = at(path);
-  let v = el.value;
-  if (el.dataset.lines) v = v.split("\n");
-  if (path.endsWith(".keys.Start") && v) v = v.length === 16 ? v + ":00" : v;
-  if (path.endsWith(".keys.Days")) { const [ko] = at(path); delete ko.Hours; }
-  if (/^\d+\.name$/.test(path) && openEvents.delete(o[k])) openEvents.add(v);
-  o[k] = v;
-  if (/^\d+\.fields\.Title$/.test(path)) el.closest("details.event").querySelector("summary h2").textContent = v || model[+path.split(".")[0]].name;
-  if (/^\d+\.name$/.test(path)) el.closest("details.event").dataset.name = v;
-  updateDirty();
-  $("raw").value = toIni(model);
+  const el = ev.target, ds = el.dataset;
+  if (ds.path) {
+    const [o, k] = at(ds.path);
+    const v = ds.lines ? el.value.split("\n") : el.value;
+    if (/^\d+\.name$/.test(ds.path)) { if (openEvents.delete(o[k])) openEvents.add(v); el.closest("details.event").dataset.name = v; }
+    o[k] = v;
+    if (/^\d+\.fields\.Title$/.test(ds.path)) el.closest("details.event").querySelector("summary .title").textContent = v || o.name;
+    return changed(false);
+  }
+  if (ds.amount) {
+    const r = reward(ds.amount);
+    r.data = `${prizeKind(r) === "chips" ? "CHIPS" : "GOLD"}.${parseInt(el.value) || 0}`;
+    return changed(false);
+  }
+  if (ds.dur) {
+    const k = model[+ds.dur].keys, unit = el.closest(".pair").querySelector("select").value;
+    if (unit === "hours") { k.Hours = el.value; delete k.Days; } else { k.Days = el.value; delete k.Hours; }
+    return changed(false);
+  }
 });
+
 $("tab-edit").addEventListener("change", (ev) => {
-  if (ev.target.dataset.path && /\.(keys\.Type|rewards\.\d+\.(type|data)|keys\.Days|keys\.Start|keys\.StageHours)$/.test(ev.target.dataset.path)) renderEdit();
+  const el = ev.target, ds = el.dataset;
+  if (ds.prize) {
+    const r = reward(ds.prize), kind = el.value, old = prizeKind(r);
+    const amount = parseInt((r.data || "").split(".")[1]);
+    const money = old === "gold" || old === "chips";
+    if (kind === "gold") Object.assign(r, { type: "TRA_Random_Gold", data: `GOLD.${money ? amount : 10000}` });
+    else if (kind === "chips") Object.assign(r, { type: "TRA_Random_Gold", data: `CHIPS.${money ? Math.min(amount, 100) : 10}` });
+    else if (kind === "TRA_Item_Fixed") Object.assign(r, { type: kind, data: "Sword_222" });
+    else if (kind !== "other") Object.assign(r, { type: kind, data: "" });
+    typing.delete(ds.prize);
+    return changed(true);
+  }
+  if (ds.item) {
+    const r = reward(ds.item);
+    if (el.value === "__other") { typing.add(ds.item); r.data = ""; } else { typing.delete(ds.item); r.data = el.value; }
+    return changed(true);
+  }
+  if (ds.pick) {
+    const [o, k] = at(ds.pick);
+    if (el.value === "__other") { typing.add(ds.pick); o[k] = ""; } else { typing.delete(ds.pick); o[k] = el.value; }
+    return changed(true);
+  }
+  if (ds.start) { model[+ds.start].keys.Start = inputToUtc(el.value); return changed(true); }
+  if (ds.repeat) { const k = model[+ds.repeat].keys; if (el.value === "1") delete k.Repeat; else k.Repeat = "0"; return changed(true); }
+  if (ds.unit) {
+    const k = model[+ds.unit].keys, v = k.Hours || k.Days || "7";
+    if (el.value === "hours") { k.Hours = String(k.Hours ? v : (parseFloat(v) || 7) * 24); delete k.Days; }
+    else { k.Days = String(k.Days ? v : Math.max(1, Math.round((parseFloat(v) || 168) / 24))); delete k.Hours; }
+    return changed(true);
+  }
+  if (ds.path && /\.(keys\.Type|fields\.BattleType|keys\.StageHours|keys\.TopPercent|keys\.Days)$/.test(ds.path)) return changed(true);
 });
 
 const TEMPLATES = {
-  Trial: () => ({ name: "newtrial", keys: { Type: "Trial", Days: "7", Score: "Best" },
-    fields: { Title: "New Trial", Desc: "", BattleType: "BT_Kill1Boss", BossObj: "20ft_B_MX-Goliath", BossLevel: "10", BossScaledLevel: "1.0", BossHealth: "100000", MaxPlays: "10", SubMapName: "cm_dunes_art", QuestMapPin: "MapPin_Dunes_A" },
-    rewards: [{ type: "TRA_Gold_Medium", data: "", goal: "500" }, { type: "TRA_GrabBag_LargeGem", data: "", goal: "2000" }, { type: "TRA_GrabBag_Uber", data: "", goal: "5000" }], other: [], stages: [] }),
-  ClashMob: () => ({ name: "newmob", keys: { Type: "ClashMob", Days: "7" },
-    fields: { Title: "New ClashMob", BattleType: "BT_KillNBosses", BossObj: "10ft_SnS_BlackKnight", BossLevel: "10", BossScaledLevel: "1.0", SubMapName: "cm_obelisk_art", QuestMapPin: "MapPin_Obelisk_A" },
-    rewards: [], other: [], stages: [1, 2, 3].map((i) => ({ n: String(i), keys: { Goal: String(i * 50) }, fields: { Desc: `Stage ${i}: ` }, rewards: [{ type: "TRA_Gold_Large", data: "", goal: "1" }], other: [] })) }),
-  Tournament: () => ({ name: "newcup", keys: { Type: "Tournament", Days: "7", StageHours: "24", TopPercent: "50", Score: "Best" },
-    fields: { Title: "Aegis Tournament", BattleType: "BT_Kill1Boss", BossObj: "10ft_SnS_Ashimar", BossLevel: "20", BossScaledLevel: "1.2", BossHealth: "1000000", EndTime: "30", MaxPlays: "5", SubMapName: "cm_obelisk_art", QuestMapPin: "MapPin_ThePit" },
-    rewards: [], other: [], stages: [1, 2, 3, 4, 5].map((i) => ({ n: String(i), keys: {}, fields: { Desc: `Stage ${i} of 5: ` }, rewards: [{ type: i < 5 ? "TRA_Chips_Small" : "TRA_Item_Fixed", data: i < 5 ? "" : "Sword_222", goal: "1" }], other: [] })) }),
+  Trial: () => ({ name: "trial", keys: { Type: "Trial", Days: "7", Score: "Best" },
+    fields: { Title: "New Trial", Desc: "Do as much damage as you can in 30 seconds!", BattleType: "BT_Kill1Boss", BossObj: "20ft_B_MX-Goliath", BossLevel: "10",
+      BossScaledLevel: "1.0", BossHealth: "100000", MaxPlays: "10", SubMapName: "cm_dunes_art", QuestMapPin: "MapPin_Dunes_A" },
+    rewards: [{ type: "TRA_Random_Gold", data: "GOLD.10000", goal: "500" }, { type: "TRA_GrabBag_LargeGem", data: "", goal: "2000" },
+      { type: "TRA_GrabBag_Uber", data: "", goal: "5000" }], other: [], stages: [] }),
+  ClashMob: () => ({ name: "clashmob", keys: { Type: "ClashMob", Days: "7" },
+    fields: { Title: "New ClashMob", BattleType: "BT_KillNBosses", BossObj: "10ft_SnS_BlackKnight", BossLevel: "10", BossScaledLevel: "1.0",
+      SubMapName: "cm_obelisk_art", QuestMapPin: "MapPin_Obelisk_A" },
+    rewards: [], other: [], stages: [1, 2, 3].map((i) => ({ n: String(i), keys: { Goal: String(i * 50) },
+      fields: { Desc: `Stage ${i}: the mob must kill ${i * 50}. Kill one to earn the prize.` },
+      rewards: [{ type: i < 3 ? "TRA_Random_Gold" : "TRA_GrabBag_Uber", data: i < 3 ? `GOLD.${i * 15000}` : "", goal: "1" }], other: [] })) }),
+  Tournament: () => ({ name: "tournament", keys: { Type: "Tournament", Days: "7", StageHours: "24", TopPercent: "50", Score: "Best" },
+    fields: { Title: "Aegis Tournament", BattleType: "BT_Kill1Boss", BossObj: "10ft_SnS_Ashimar", BossLevel: "20", BossScaledLevel: "1.2", BossHealth: "1000000",
+      EndTime: "30", MaxPlays: "5", SubMapName: "cm_obelisk_art", QuestMapPin: "MapPin_ThePit" },
+    rewards: [], other: [], stages: [1, 2, 3, 4, 5].map((i) => ({ n: String(i), keys: {}, fields: { Desc: `Stage ${i} of 5: do as much damage as you can. The top half go on.` },
+      rewards: [i < 5 ? { type: "TRA_Random_Gold", data: `CHIPS.${i * 10}`, goal: "1" } : { type: "TRA_Item_Fixed", data: "Sword_222", goal: "1" }], other: [] })) }),
 };
 const uniqueName = (base) => { let n = base, i = 2; while (model.some((e) => e.name === n)) n = base + i++; return n; };
 
 $("tab-edit").addEventListener("click", async (ev) => {
   const b = ev.target.closest("button[data-act]");
   if (!b) return;
-  ev.preventDefault();  // (buttons in an event's header must not fold it)
+  ev.preventDefault();
   const act = b.dataset.act, e = model[b.dataset.e];
-  if (act === "addReward") at(b.dataset.path + ".x")[0].push({ type: "TRA_Gold_Large", data: "", goal: "1" });
-  else if (act === "delReward") at(b.dataset.path + ".x")[0].splice(+b.dataset.i, 1);
+  if (act === "addReward") {
+    const list = at(b.dataset.path + ".x")[0], last = list[list.length - 1];
+    list.push({ type: "TRA_Random_Gold", data: "GOLD.10000", goal: String(last ? (parseInt(last.goal) || 1) * 2 : 1) });
+  } else if (act === "delReward") at(b.dataset.path + ".x")[0].splice(+b.dataset.i, 1);
   else if (act === "addStage") {
-    const last = e.stages[e.stages.length - 1];
-    if (!e.stages.length) { e.stages.push({ n: "1", keys: {}, fields: { Desc: e.fields.Desc || "" }, rewards: e.rewards.slice(0, 1), other: [] }); e.rewards = []; }
-    e.stages.push(last ? structuredClone(last) : { n: "2", keys: {}, fields: {}, rewards: [{ type: "TRA_Gold_Large", data: "", goal: "1" }], other: [] });
+    if (!e.stages.length) {
+      e.stages.push({ n: "1", keys: { Goal: e.keys.Goal }, fields: { Desc: e.fields.Desc || "" }, rewards: e.rewards.slice(0, 1), other: [] });
+      e.rewards = []; delete e.keys.Goal; delete e.fields.Desc;
+    }
+    const next = structuredClone(e.stages[e.stages.length - 1]);
+    if (next.keys.Goal) next.keys.Goal = String((parseInt(next.keys.Goal) || 50) * 2);
+    e.stages.push(next);
   } else if (act === "delStage") {
     if (!confirm("Remove this stage?")) return;
     e.stages.splice(+b.dataset.i, 1);
-    if (!e.stages.length) e.rewards = [{ type: "TRA_Gold_Large", data: "", goal: "1" }];
+    if (!e.stages.length) e.rewards = [{ type: "TRA_Random_Gold", data: "GOLD.10000", goal: "1" }];
   } else if (act === "moveStage") {
     const i = +b.dataset.i, j = i + +b.dataset.d;
     [e.stages[i], e.stages[j]] = [e.stages[j], e.stages[i]];
@@ -523,10 +640,11 @@ $("tab-edit").addEventListener("click", async (ev) => {
   } else if (act === "dupEvent") {
     const c = structuredClone(e);
     c.name = uniqueName(e.name);
+    c.fields.Title = (c.fields.Title || c.name) + " (copy)";
     openEvents.add(c.name);
     model.splice(+b.dataset.e + 1, 0, c);
   } else if (act === "delEvent") {
-    if (!confirm(`Delete ${e.fields.Title || e.name}? Its players lose their progress in it once you publish.`)) return;
+    if (!confirm(`Delete "${e.fields.Title || e.name}"? Once you publish, its players lose their progress in it.`)) return;
     model.splice(+b.dataset.e, 1);
   } else if (act === "addEvent") {
     const t = TEMPLATES[b.dataset.type]();
@@ -534,42 +652,39 @@ $("tab-edit").addEventListener("click", async (ev) => {
     openEvents.add(t.name);
     model.push(t);
   } else if (act === "reset") {
-    if (!confirm("Go back to the server's own default events? This publishes at once, and players lose their progress in events that change.")) return;
-    await api("DELETE", "/admin/api/events");
-    await load();
-    showResult(`<div class="msg ok">The server's default events are live again.</div>`);
+    if (!confirm("Go back to the server's own default events? This goes live at once, and players lose their progress in events that change.")) return;
+    try {
+      await api("DELETE", "/admin/api/events");
+      await load();
+      showResult(`<div class="panel"><div class="msg ok">The server's default events are live again.</div></div>`);
+    } catch {}
     return;
   }
-  renderEdit();
-  updateDirty();
-  $("raw").value = toIni(model);
+  typing.clear();  // (paths may have moved)
+  changed(true);
 });
 
 // ---- the events file tab ----
-$("useRaw").addEventListener("click", () => {
-  model = parseIni($("raw").value);
-  renderEdit();
-  updateDirty();
-  showTab("edit");
-});
+$("useRaw").addEventListener("click", () => { model = parseIni($("raw").value); typing.clear(); changed(true); showTab("edit"); });
 $("showDefaults").addEventListener("click", () => { $("raw").value = state.defaults; });
 
 // ---- check and publish ----
 function showResult(html) { $("result").innerHTML = html; $("result").scrollIntoView({ behavior: "smooth", block: "nearest" }); }
 function scheduleTable(list) {
-  return `<table><tr><th>Event</th><th>Type</th><th>Starts</th><th>Ends</th></tr>${list.map((c) =>
-    `<tr><td>${esc(c.name)}</td><td>${esc(KIND[c.kind])}</td><td>${when(c.start)}<div class="small">${utc(c.start)}</div></td><td>${when(c.end)}<div class="small">${utc(c.end)}</div></td></tr>` +
-    c.stages.map((s, i) => `<tr class="small"><td>&nbsp;&nbsp;stage ${i + 1}${c.kind === "ClashMob" ? ` · goal ${num(s.goal)}` : ""}</td><td></td><td>${c.kind === "Tournament" ? when(s.start) : ""}</td><td>${c.kind === "Tournament" ? when(s.end) : ""}</td></tr>`).join("")).join("")}</table>`;
+  return `<table><tr><th>Event</th><th>Starts</th><th>Ends</th></tr>${list.map((c) =>
+    `<tr><td><span class="kind">${esc(KIND[c.kind])}</span><br>${esc(model.find((e) => e.name === c.name)?.fields.Title || c.name)}</td>
+      <td>${when(c.start)}<div class="small">${utcText(c.start)}</div></td><td>${when(c.end)}<div class="small">${utcText(c.end)}</div></td></tr>` +
+    c.stages.map((s, i) => `<tr class="small"><td>&nbsp;&nbsp;Stage ${i + 1}${c.kind === "ClashMob" ? ` · mob goal ${num(s.goal)}` : ""}</td>
+      <td>${c.kind === "Tournament" ? when(s.start) : ""}</td><td>${c.kind === "Tournament" ? when(s.end) : ""}</td></tr>`).join("")).join("")}</table>`;
 }
 async function check(save) {
-  const ini = toIni(model);
   const bad = model.find((e) => !/^[A-Za-z0-9_-]{1,40}$/.test(e.name)) || model.find((e, i) => model.findIndex((x) => x.name === e.name) !== i);
-  if (bad) return showResult(`<div class="card"><div class="msg bad">The id "${esc(bad.name)}" is not valid or is used twice. Ids are letters, digits, - and _.</div></div>`);
-  const { data } = await api(save ? "PUT" : "POST", save ? "/admin/api/events" : "/admin/api/check", ini);
-  if (!data.ok) return showResult(`<div class="card"><div class="msg bad">Not saved: ${esc(data.error)}</div></div>`);
+  if (bad) return showResult(`<div class="panel"><div class="msg bad">The id "${esc(bad.name)}" (under Advanced) is not valid or is used twice.</div></div>`);
+  const { data } = await api(save ? "PUT" : "POST", save ? "/admin/api/events" : "/admin/api/check", toIni(model));
+  if (!data.ok) return showResult(`<div class="panel"><div class="msg bad">This can't go live: ${esc(data.error)}</div></div>`);
   const warn = data.warnings.map((w) => `<div class="msg warn">${esc(w)}</div>`).join("");
-  showResult(`<div class="card">${save ? `<div class="msg ok">Published. Players see the change the next time their game refreshes its ClashMobs (when it starts, and every 20 minutes).</div>` : `<div class="msg ok">Looks good. Nothing is saved until you publish.</div>`}
-    ${warn}<h3>Schedule</h3>${scheduleTable(data.schedule)}</div>`);
+  showResult(`<div class="panel">${save ? `<div class="msg ok">Published. Players see it when their game next refreshes its ClashMobs (when it starts, and every 20 minutes).</div>`
+    : `<div class="msg ok">This can go live. Nothing changes until you publish.</div>`}${warn}<div class="rule">Schedule</div>${scheduleTable(data.schedule)}</div>`);
   return data;
 }
 $("check").addEventListener("click", () => check(false).catch(() => {}));
@@ -578,7 +693,7 @@ $("publish").addEventListener("click", async () => {
     const d = await check(false);
     if (!d?.ok) return;
     const extra = d.warnings.length ? `\n\nWarnings:\n- ${d.warnings.join("\n- ")}` : "";
-    if (!confirm(`Publish these events? They go live for everyone at once.${extra}`)) return;
+    if (!confirm(`Publish? The events go live for everyone at once.${extra}`)) return;
     await check(true);
     await load();
   } catch {}
@@ -586,18 +701,20 @@ $("publish").addEventListener("click", async () => {
 $("discard").addEventListener("click", () => {
   if (!confirm("Throw away your changes?")) return;
   model = parseIni(savedIni);
-  $("raw").value = savedIni;
-  renderEdit();
-  updateDirty();
+  typing.clear();
+  changed(true);
   $("result").innerHTML = "";
 });
 
 // ---- tabs ----
+let currentTab = "live";
 function showTab(name) {
+  currentTab = name;
   document.querySelectorAll(".tabs button").forEach((b) => b.classList.toggle("on", b.dataset.tab === name));
-  for (const t of ["live", "edit", "raw"]) $("tab-" + t).classList.toggle("hidden", t !== name);
-  $("dock").classList.toggle("hidden", name === "live");
+  for (const t of ["live", "edit", "players", "raw"]) $("tab-" + t).classList.toggle("hidden", t !== name);
+  $("dock").classList.toggle("hidden", !["edit", "raw"].includes(name));
   if (name === "raw") $("raw").value = toIni(model);
+  if (name === "players") loadPlayers().catch(() => {});
 }
 document.querySelector(".tabs").addEventListener("click", (e) => { if (e.target.dataset.tab) showTab(e.target.dataset.tab); });
 window.addEventListener("beforeunload", (e) => { if (state && isDirty()) e.preventDefault(); });

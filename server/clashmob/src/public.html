@@ -4,62 +4,41 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ClashMobs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
 <style>
-  :root {
-    --bg: #f4f1ea; --card: #ffffff; --ink: #1d1b17; --muted: #6b665c; --line: #e2ddd2;
-    --gold: #9a6b10; --gold-soft: #f3e6c8; --bar: #e9e3d6; --live: #1f7a3a; --live-soft: #dcefe2;
-    --soon: #2f5f9e; --soon-soft: #e0e9f6; --ended: #77706a; --ended-soft: #ece9e3;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #12110f; --card: #1c1a17; --ink: #ece7dc; --muted: #a39d92; --line: #2e2b26;
-      --gold: #e2b75a; --gold-soft: #3a2f17; --bar: #2b2823; --live: #6fd08d; --live-soft: #173323;
-      --soon: #8fb6ec; --soon-soft: #1a2638; --ended: #a39d92; --ended-soft: #26231f;
-    }
-  }
-  * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-  main { max-width: 860px; margin: 0 auto; padding: 28px 16px 48px; }
-  header h1 { margin: 0; font-size: 28px; letter-spacing: .02em; }
-  header p { margin: 4px 0 0; color: var(--muted); }
-  .events { display: grid; gap: 14px; margin-top: 22px; }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; }
-  .row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-  .kind { font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--gold); }
-  .chip { font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px; }
-  .live { color: var(--live); background: var(--live-soft); }
-  .upcoming { color: var(--soon); background: var(--soon-soft); }
-  .ended { color: var(--ended); background: var(--ended-soft); }
-  h2 { margin: 6px 0 4px; font-size: 20px; }
-  .desc { margin: 0 0 10px; color: var(--muted); }
-  .when { margin-left: auto; color: var(--muted); font-size: 13px; }
-  .bar { height: 10px; background: var(--bar); border-radius: 999px; overflow: hidden; margin: 6px 0 4px; }
-  .bar > div { height: 100%; background: var(--gold); border-radius: 999px; }
-  .small { font-size: 13px; color: var(--muted); }
-  .stages { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
-  .stage { font-size: 12px; padding: 3px 8px; border-radius: 6px; border: 1px solid var(--line); color: var(--muted); }
-  .stage.done { background: var(--gold-soft); color: var(--gold); border-color: transparent; }
-  .stage.now { border-color: var(--gold); color: var(--ink); font-weight: 600; }
-  details { margin-top: 8px; }
-  summary { cursor: pointer; font-size: 13px; color: var(--muted); }
-  ol { margin: 6px 0 0; padding-left: 22px; font-size: 13px; }
-  ol li { padding: 1px 0; }
-  ol span { float: right; font-variant-numeric: tabular-nums; }
-  .empty, .error { color: var(--muted); padding: 24px 0; }
-  footer { margin-top: 28px; font-size: 12px; color: var(--muted); }
+  main { max-width: 860px; margin: 0 auto; padding: 34px 16px 56px; }
+  header { text-align: center; margin-bottom: 26px; }
+  header p { margin: 8px 0 0; color: var(--muted); }
+  .panel h2 { margin: 8px 0 4px; font-size: 21px; }
+  .when { margin-left: auto; font-size: 13px; color: var(--muted); }
+  .desc { margin: 4px 0 10px; color: #cfc7b4; }
+  .prize { color: var(--gold2); font-weight: 600; }
+  ol { margin: 6px 0 0; padding-left: 26px; }
+  ol li { padding: 2px 0; }
+  ol li span { float: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+  ol li:first-child { color: var(--gold2); }
+  .empty { text-align: center; color: var(--muted); padding: 30px 0; }
+  footer { margin-top: 26px; text-align: center; font-size: 12px; color: var(--muted); }
 </style>
 </head>
 <body>
 <main>
   <header>
     <h1>ClashMobs</h1>
-    <p>Live community events for the IB3 Android port. Play them from the world map in the game.</p>
+    <p>Live community events for the IB3 Android port. Play them from the world map.</p>
   </header>
-  <div class="events" id="events"><div class="empty">Loading…</div></div>
+  <div id="events"><div class="empty">Loading…</div></div>
   <footer id="updated"></footer>
 </main>
 <script>
 const KIND = { Trial: "Trial", ClashMob: "ClashMob", Tournament: "Aegis Tournament" };
+const ITEMS = { Sword_222: "Anarchax", Magic_149: "Squee", Helmet_134: "Radian", Helmet_150: "Serk", Helmet_111: "Colossal Helm" };
+const WHEELS = { TRA_GrabBag_Uber: "ClashMob prize wheel", TRA_GrabBag_Large: "Large prize wheel", TRA_GrabBag_Medium: "Prize wheel",
+  TRA_GrabBag_Small: "Small prize wheel", TRA_GrabBag_LargeGem: "Rare gem wheel", TRA_GrabBag_MediumGem: "Gem wheel", TRA_GrabBag_SmallGem: "Small gem wheel",
+  TRA_Gold_Large: "Gold", TRA_Gold_Medium: "Gold", TRA_Gold_Small: "Gold", TRA_Chips_Large: "15 battle chips", TRA_Chips_Medium: "10 battle chips", TRA_Chips_Small: "5 battle chips" };
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const num = (n) => Number(n || 0).toLocaleString();
 function span(secs) {
@@ -67,57 +46,57 @@ function span(secs) {
   const d = Math.floor(secs / 86400), h = Math.floor((secs % 86400) / 3600), m = Math.floor((secs % 3600) / 60);
   return d ? `${d}d ${h}h` : h ? `${h}h ${m}m` : `${m}m`;
 }
-const who = (id) => "Player " + String(id).replace(/^port-/, "").slice(0, 6);
-const date = (t) => new Date(t * 1000).toLocaleString([], { weekday: "short", hour: "2-digit", minute: "2-digit", day: "numeric", month: "short" });
-
-function topList(list, unit) {
-  if (!list.length) return "";
-  return `<details><summary>Top players</summary><ol>${list.map((r) => `<li>${esc(who(r.player))}<span>${num(r.score)}${unit}</span></li>`).join("")}</ol></details>`;
+const date = (t) => new Date(t * 1000).toLocaleString([], { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+const who = (r) => r.name || "Player " + String(r.player).replace(/^port-/, "").slice(0, 6);
+function prize(r) {
+  if (!r) return "";
+  const { type, data } = r;
+  if (type === "TRA_Random_Gold") { const [k, n] = data.split("."); return `${num(n)} ${/chips/i.test(k) ? "battle chips" : "gold"}`; }
+  if (type === "TRA_Item_Fixed") return ITEMS[data] || "an item";
+  if (type === "TRA_Gem_Fixed") return "a gem";
+  return WHEELS[type] || "";
 }
-
+function topList(list) {
+  if (!list.length) return "";
+  return `<details><summary>Top players</summary><ol>${list.map((r) => `<li>${esc(who(r))}<span>${num(r.score)}</span></li>`).join("")}</ol></details>`;
+}
 function card(e, now) {
   const status = e.status === "live" ? "Live" : e.status === "upcoming" ? "Coming soon" : "Ended";
   const when = e.status === "live" ? `${span(e.end - now)} left` : e.status === "upcoming" ? `Starts ${date(e.start)}` : `Ended ${date(e.end)}`;
   let body = "";
+  const cur = e.stages ? e.stages[e.activeStage] : e;
   if (e.stages) {
-    const cur = e.stages[e.activeStage];
-    body += `<div class="stages">${e.stages.map((s, i) =>
-      `<span class="stage ${s.won || (e.kind === "Tournament" && now >= s.end) ? "done" : i === e.activeStage && e.status === "live" ? "now" : ""}">Stage ${i + 1}</span>`).join("")}</div>`;
-    if (cur?.desc) body += `<p class="desc">${esc(cur.desc)}</p>`;
-    if (e.kind === "ClashMob" && cur) {
-      const pct = Math.min(100, (100 * cur.total) / cur.goal);
-      body += `<div class="bar"><div style="width:${pct}%"></div></div>
-        <div class="small">Stage ${e.activeStage + 1} of ${e.stages.length}: ${num(Math.min(cur.total, cur.goal))} of ${num(cur.goal)} · mob size ${num(cur.players)}</div>`;
-    } else if (cur) {
-      body += `<div class="small">Stage ${e.activeStage + 1} of ${e.stages.length}${e.status === "live" ? `, ends ${date(cur.end)}` : ""} · ${num(cur.players)} players in this stage</div>`;
-    }
-    body += cur ? topList(cur.top, "") : "";
-  } else {
-    if (e.desc) body += `<p class="desc">${esc(e.desc)}</p>`;
-    if (e.kind === "ClashMob") {
-      const pct = Math.min(100, (100 * e.total) / e.goal);
-      body += `<div class="bar"><div style="width:${pct}%"></div></div><div class="small">${num(Math.min(e.total, e.goal))} of ${num(e.goal)} · mob size ${num(e.players)}</div>`;
-    } else {
-      body += `<div class="small">${num(e.players)} players · best play counts</div>`;
-    }
-    body += topList(e.top, "");
+    body += `<div class="stages">${e.stages.map((s, i) => {
+      const done = s.won || (e.kind === "Tournament" && now >= s.end);
+      return `<span class="stage-pill ${done ? "done" : i === e.activeStage && e.status === "live" ? "now" : ""}">Stage ${i + 1}</span>`;
+    }).join("")}</div>`;
   }
-  return `<section class="card">
+  if (cur.desc) body += `<p class="desc">${esc(cur.desc)}</p>`;
+  if (e.kind === "ClashMob") {
+    body += `<div class="bar"><div style="width:${Math.min(100, (100 * cur.total) / cur.goal)}%"></div></div>
+      <div class="small">${e.stages ? `Stage ${e.activeStage + 1} of ${e.stages.length}: ` : ""}${num(Math.min(cur.total, cur.goal))} of ${num(cur.goal)} · mob size ${num(cur.players)}</div>`;
+  } else if (e.kind === "Tournament") {
+    body += `<div class="small">Stage ${e.activeStage + 1} of ${e.stages?.length || 1}${e.status === "live" ? `, ends ${date(cur.end)}` : ""} · ${num(cur.players)} players in this stage</div>`;
+  } else {
+    body += `<div class="small">${num(e.players)} players · your best fight counts</div>`;
+  }
+  const p = prize(e.kind === "Trial" ? cur.rewards[cur.rewards.length - 1] : cur.rewards[0]);
+  if (p) body += `<div class="small" style="margin-top:4px">${e.kind === "Trial" ? "Top prize" : "Prize"}: <span class="prize">${esc(p)}</span></div>`;
+  body += topList(cur.top);
+  return `<section class="panel">
     <div class="row"><span class="kind">${esc(KIND[e.kind] || e.kind)}</span><span class="chip ${e.status}">${status}</span><span class="when">${when}</span></div>
     <h2>${esc(e.title || e.name)}</h2>${body}</section>`;
 }
-
 async function load() {
   const box = document.getElementById("events");
   try {
-    const r = await fetch("/status", { cache: "no-store" });
-    const d = await r.json();
+    const d = await (await fetch("/status", { cache: "no-store" })).json();
     const order = { live: 0, upcoming: 1, ended: 2 };
     d.events.sort((a, b) => order[a.status] - order[b.status]);
     box.innerHTML = d.events.length ? d.events.map((e) => card(e, d.now)).join("") : `<div class="empty">No events right now.</div>`;
     document.getElementById("updated").textContent = `Updated ${new Date().toLocaleTimeString()} · refreshes every minute`;
   } catch {
-    box.innerHTML = `<div class="error">Could not load the events. Try again in a minute.</div>`;
+    box.innerHTML = `<div class="empty">Could not load the events. Try again in a minute.</div>`;
   }
 }
 load();

@@ -20,8 +20,10 @@
 // API (/admin/api/...) needs the ADMIN_KEY secret as the password ("Authorization: Bearer <password>"). For tests only,
 // TIME_TRAVEL=1 lets requests set the server's clock (X-ClashMob-Now).
 import DEFAULT_EVENTS from "./events.js";
+import { checkName, nameKey } from "./names.js";
 import PUBLIC_PAGE from "./public.html";
 import ADMIN_PAGE from "./admin.html";
+import THEME_CSS from "./theme.css";
 
 const DAY = 86400;
 const GRACE = 600;  // a play that started before a stage or event ended still counts this long after
@@ -62,7 +64,7 @@ const SCHEMA = [
   `CREATE INDEX IF NOT EXISTS progress_rank_best ON progress (challenge, complete, high)`,
   `CREATE TABLE IF NOT EXISTS admin_failures (ip TEXT PRIMARY KEY, count INTEGER NOT NULL, since INTEGER NOT NULL)`,
 ];
-const SCHEMA_VERSION = "2";
+const SCHEMA_VERSION = "3";
 
 let schemaReady = null;
 function ensureSchema(db) {
@@ -70,6 +72,11 @@ function ensureSchema(db) {
     await db.batch(SCHEMA.map((s) => db.prepare(s)));
     const v = await db.prepare("SELECT value FROM config WHERE key = 'schema'").first();
     if (v?.value !== SCHEMA_VERSION) {
+      // player names (version 3): unique by nameKey
+      const cols = (await db.prepare("PRAGMA table_info(players)").all()).results.map((c) => c.name);
+      if (!cols.includes("name")) await db.prepare("ALTER TABLE players ADD COLUMN name TEXT").run();
+      if (!cols.includes("name_key")) await db.prepare("ALTER TABLE players ADD COLUMN name_key TEXT").run();
+      await db.prepare("CREATE UNIQUE INDEX IF NOT EXISTS players_name ON players (name_key) WHERE name_key IS NOT NULL").run();
       // totals for the progress made before they were kept (version 1)
       await db.batch([
         db.prepare(`INSERT OR REPLACE INTO totals (challenge, total, players, scorers)
@@ -86,7 +93,7 @@ function ensureSchema(db) {
 
 // ---- the events ----
 
-const SERVER_KEYS = ["Type", "Mode", "Days", "Hours", "Start", "StageHours", "Goal", "Score", "MaxScore", "TopPercent"];
+const SERVER_KEYS = ["Type", "Mode", "Days", "Hours", "Start", "Repeat", "StageHours", "Goal", "Score", "MaxScore", "TopPercent"];
 const KINDS = { trial: "Trial", solo: "Trial", clashmob: "ClashMob", coop: "ClashMob", tournament: "Tournament", comp: "Tournament" };
 
 function parseIni(text) {
@@ -154,11 +161,15 @@ export function parseEvents(text, now) {
     // is shown as coming soon.
     const anchor = k.Start ? Date.parse(k.Start.endsWith("Z") ? k.Start : k.Start + "Z") / 1000 : 0;
     if (Number.isNaN(anchor)) throw new Error(`[${ev.name}] Start must be a date and time like 2026-10-03T18:00:00`);
-    const start = now < anchor ? anchor : anchor + Math.floor((now - anchor) / period) * period;
+    // Repeat=0: the event runs once, from Start, and is no longer listed a day after it ends
+    const repeat = !/^(0|no|false|never)$/i.test(k.Repeat || "");
+    if (!repeat && !k.Start) throw new Error(`[${ev.name}] an event that does not repeat needs a Start`);
+    const start = !repeat || now < anchor ? anchor : anchor + Math.floor((now - anchor) / period) * period;
     // A tournament's stages last StageHours each (else they share the period), and it is over after the last one
     const stageLen = kind === "Tournament" && stages.length
       ? Math.min(Math.round((parseFloat(k.StageHours) || hours / stages.length) * 3600), Math.floor(period / stages.length)) : 0;
     const end = stageLen ? start + stageLen * stages.length : start + period;
+    if (!repeat && now > end + DAY) continue;
     const id = `cm-${ev.name}-${Math.floor(start / 60)}`;
     if (!stages.length) {
       out.push(challenge({ id, name: ev.name, kind, role: "single", start, end, eventStart: start, eventEnd: end }, k, ev.lines));
@@ -492,26 +503,65 @@ async function handleChallenges(request, env, p, url, now) {
   return json({}, 404);
 }
 
+// ---- player names (the app's launcher sets them: see names.js for the rules) ----
+
+// Gives a player a name; "" clears it. An error message when the name is not allowed or someone else has it.
+async function setName(env, player, raw) {
+  if (raw === "" || raw === null) {
+    await env.DB.prepare("UPDATE players SET name = NULL, name_key = NULL WHERE id = ?").bind(player).run();
+    return { ok: true, name: "" };
+  }
+  const c = checkName(raw);
+  if (c.error) return { ok: false, error: c.error };
+  const key = nameKey(c.name);
+  const other = await env.DB.prepare("SELECT id FROM players WHERE name_key = ? AND id <> ?").bind(key, player).first();
+  if (other) return { ok: false, error: "That name is taken." };
+  try {
+    await env.DB.prepare("UPDATE players SET name = ?, name_key = ? WHERE id = ?").bind(c.name, key, player).run();
+  } catch {
+    return { ok: false, error: "That name is taken." };  // (taken at the same moment)
+  }
+  return { ok: true, name: c.name };
+}
+
+// GET /player: the player's name; POST /player/name with the name as the body: set it
+async function handlePlayer(request, env, p, now) {
+  const player = await authenticate(request, env, now);
+  if (player instanceof Response) return player;
+  if (!player) return json({ error: "no player" }, 401);
+  if (p.length === 1 && request.method === "GET") {
+    const r = await env.DB.prepare("SELECT name FROM players WHERE id = ?").bind(player).first();
+    return json({ id: player, name: r?.name || "" });
+  }
+  if (p[1] === "name" && request.method === "POST") {
+    const r = await setName(env, player, (await request.text()).slice(0, 100));
+    return json(r, r.ok ? 200 : 400);
+  }
+  return json({}, 404);
+}
+
 // ---- the pages: the public one (/) and the admin one (/admin) ----
 
 // What the pages show of each event (a staged event with its stages), and the best players.
 async function overview(env, all, now, topCount) {
   const com = await community(env, all);
   const tops = all.filter((c) => c.role !== "parent").map((c) => env.DB.prepare(
-    `SELECT player, ${scoreCol(c)} AS score FROM progress WHERE challenge = ? AND ${scoreCol(c)} > 0
-     ORDER BY ${scoreCol(c)} DESC LIMIT ?`).bind(c.id, topCount));
+    `SELECT g.player, p.name, g.${scoreCol(c)} AS score FROM progress g LEFT JOIN players p ON p.id = g.player
+     WHERE g.challenge = ? AND g.${scoreCol(c)} > 0 ORDER BY g.${scoreCol(c)} DESC LIMIT ?`).bind(c.id, topCount));
   const results = tops.length ? await env.DB.batch(tops) : [];
   const top = {};
   all.filter((c) => c.role !== "parent").forEach((c, i) => (top[c.id] = results[i].results));
   const describe = (c) => {
     const st = standing(c, com, now), n = com[c.id];
     const line = (k) => (c.file || c.children?.[0]?.file || "").match(new RegExp(`^${k}=(.*)$`, "m"))?.[1] || "";
-    const reward = (c.file || "").match(/^\.RewardType=(.*)$/gm)?.map((l) => l.slice(12)) || [];
+    const field = (k) => [...(c.file || "").matchAll(new RegExp(`^\\.${k}=(.*)$`, "gm"))].map((m) => m[1]);
+    const goals = field("RewardGoal"), datas = field("RewardData");
+    const rewards = field("RewardType").map((type, i) => ({ type, data: datas[i] || "", goal: parseFloat(goals[i]) || 0 }));
     return {
       id: c.id, name: c.name, kind: c.kind, title: line("Title"), desc: line("Desc"), boss: line("BossObj"),
       start: c.start, end: c.end, status: now < c.start ? "upcoming" : now >= c.end || st.completed ? "ended" : "live",
       won: st.won, goal: c.goal, total: n.total, players: n.players, scorers: n.scorers, score: c.total ? "Total" : "Best",
-      rewards: reward, top: top[c.id] || [],
+      rewards, top: top[c.id] || [],
       ...(c.role === "parent" ? { activeStage: st.active, stages: c.children.map(describe) } : {}),
     };
   };
@@ -534,6 +584,12 @@ function warnings(all, previous) {
       if (!x.file.match(/^\.RewardType=/m)) out.push(`${x.name} has no reward`);
       if (x.file.match(/^\.RewardType=TRA_(Item|Gem)_Fixed$/m) && x.file.match(/^\.RewardData=$/m))
         out.push(`${x.name}: an item or gem reward needs the item's name (RewardData)`);
+      const types = [...x.file.matchAll(/^\.RewardType=(.*)$/gm)].map((m) => m[1]);
+      const datas = [...x.file.matchAll(/^\.RewardData=(.*)$/gm)].map((m) => m[1]);
+      types.forEach((t, i) => {
+        if (t === "TRA_Random_Gold" && !/^(GOLD|CHIPS)\.[1-9][0-9]*$/i.test(datas[i] || ""))
+          out.push(`${x.name}: a gold or chips amount needs a number (like GOLD.50000 or CHIPS.20)`);
+      });
     }
     const before = previous.find((o) => o.name === c.name && o.role !== "child");
     if (before && before.id !== c.id) out.push(`${c.name} starts over with this change: its players lose their progress in it`);
@@ -596,6 +652,28 @@ async function handleAdmin(request, env, p, now) {
     }));
     return json({ ok: true, saved: p[2] === "events", warnings: warn, schedule });
   }
+  // GET /admin/api/players?q=: players by name or id (the most recently seen first); POST /admin/api/players/name
+  // {"id", "name"}: rename one ("" clears the name)
+  if (p[2] === "players" && p.length === 3 && request.method === "GET") {
+    const q = (new URL(request.url).searchParams.get("q") || "").trim();
+    const like = `%${q.replace(/[%_]/g, "")}%`;
+    const r = await env.DB.prepare(
+      `SELECT p.id, p.name, p.created, p.seen, (SELECT SUM(attempts) FROM progress WHERE player = p.id) AS plays
+       FROM players p WHERE ?1 = '' OR p.name LIKE ?2 OR p.id LIKE ?2 ORDER BY p.seen DESC LIMIT 200`).bind(q, like).all();
+    return json({ players: r.results });
+  }
+  if (p[2] === "players" && p[3] === "name" && request.method === "POST") {
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return json({ ok: false, error: "bad request" }, 400);
+    }
+    if (!(await env.DB.prepare("SELECT id FROM players WHERE id = ?").bind(String(body.id)).first()))
+      return json({ ok: false, error: "no such player" }, 404);
+    const r = await setName(env, String(body.id), body.name ?? "");
+    return json(r, r.ok ? 200 : 400);
+  }
   if (p[2] === "events" && request.method === "DELETE") {
     await env.DB.prepare("DELETE FROM config WHERE key = 'events'").run();
     return json({ ok: true });
@@ -606,7 +684,8 @@ async function handleAdmin(request, env, p, now) {
 const page = (html) => new Response(html, {
   headers: {
     "Content-Type": "text/html; charset=utf-8",
-    "Content-Security-Policy": "default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; frame-ancestors 'none'",
+    "Content-Security-Policy": "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+      "font-src https://fonts.gstatic.com; script-src 'unsafe-inline'; frame-ancestors 'none'",
     "Cache-Control": "no-store",
   },
 });
@@ -615,6 +694,8 @@ async function handle(request, env) {
   const url = new URL(request.url);
   if (url.pathname === "/health") return text("ClashMob server\n");
   if (url.pathname === "/favicon.ico") return new Response(null, { status: 204 });
+  if (url.pathname === "/theme.css")
+    return new Response(THEME_CSS, { headers: { "Content-Type": "text/css; charset=utf-8", "Cache-Control": "public, max-age=300" } });
   // "/sword/api/x" -> ["sword", "api", "x"]; empty parts stay (the game asks for ".../users//saveSlots/0")
   const p = url.pathname.slice(1).split("/").map(decodeURIComponent);
   let now = Math.floor(Date.now() / 1000);
@@ -625,6 +706,7 @@ async function handle(request, env) {
   if (url.pathname === "/status" && request.method === "GET")
     return json({ now, events: await overview(env, parseEvents(await eventsText(env), now), now, 10) });
   if (p[0] === "admin") return handleAdmin(request, env, p, now);
+  if (p[0] === "player") return handlePlayer(request, env, p, now);
   if (p[0] === "sword" && p[1] === "api" && p[2] === "challenges") return handleChallenges(request, env, p, url, now);
   return json({}, 404);
 }

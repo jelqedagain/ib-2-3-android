@@ -79,6 +79,14 @@ final class SettingsScreen {
                 v -> openCheats.run()));
         content.addView(game);
 
+        if (!ib2) {  // the ClashMob server is IB3's (ClashMobName)
+            content.addView(Ui.sectionHeader(a, "ClashMobs"));
+            LinearLayout clashmobs = Ui.card(a);
+            addRow(clashmobs, clashMobNameRow());
+            addRow(clashmobs, clashMobOnlineRow());
+            content.addView(clashmobs);
+        }
+
         content.addView(Ui.sectionHeader(a, "Display"));
         LinearLayout display = Ui.card(a);
         if (ib2) {
@@ -230,6 +238,38 @@ final class SettingsScreen {
                 .show());
         return row("Language", available.size() > 1 ? "The game's text. Your .ipa has " + available.size() + " languages."
                                                    : "Your .ipa has only English.", value);
+    }
+
+    // The player's name on the ClashMob leaderboards: kept by the server ([ClashMob] Name only remembers it here).
+    private View clashMobNameRow() {
+        TextView value = Ui.text(a, "", 14, Ui.TEXT, true);
+        value.setPadding(dp(14), dp(8), dp(14), dp(8));
+        value.setBackground(Ui.pressable(a, Ui.rounded(a, 0xFF11131A, 10, Ui.CARD_LINE), 10));
+        value.setClickable(true);
+        java.util.function.Consumer<String> show = name -> {
+            value.setText((name.isEmpty() ? "Set a name" : name) + "  ✎");
+            if (!name.equals(ini.get("ClashMob", "Name", ""))) store("ClashMob", "Name", name);
+        };
+        show.accept(ini.get("ClashMob", "Name", ""));
+        ClashMobName.refresh(a, ini, show);  // (an admin may have changed it)
+        value.setOnClickListener(v -> ClashMobName.edit(a, ini, ini.get("ClashMob", "Name", ""), show));
+        return row("ClashMob name", "How you show up on the ClashMob leaderboards. No two players can have the same name.", value);
+    }
+
+    // Online ClashMobs: the community server's events; off, the game plays its offline ClashMobs ([ClashMob] Server=off).
+    private View clashMobOnlineRow() {
+        Switch s = new Switch(a);
+        s.setChecked(ClashMobName.server(ini) != null);
+        ColorStateList thumb = new ColorStateList(new int[][] {{android.R.attr.state_checked}, {}}, new int[] {Ui.ACCENT, 0xFFB8BCC6});
+        ColorStateList track = new ColorStateList(new int[][] {{android.R.attr.state_checked}, {}}, new int[] {0x80E2B155, 0xFF3A3F4C});
+        s.setThumbTintList(thumb);
+        s.setTrackTintList(track);
+        s.setOnCheckedChangeListener((v, on) -> store("ClashMob", "Server", on ? "" : "off"));
+        LinearLayout row = row("Online ClashMobs", "Play the community's live events with everyone. Off: the offline ClashMobs, on your own.", s);
+        row.setClickable(true);
+        row.setBackground(Ui.pressable(a, Ui.rounded(a, 0x00000000, 0, 0), 0));
+        row.setOnClickListener(v -> s.toggle());
+        return row;
     }
 
     private View toggle(String title, String subtitle, String section, String key, int def) {

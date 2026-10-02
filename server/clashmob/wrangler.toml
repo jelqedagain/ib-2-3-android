@@ -15,5 +15,5 @@ database_id = "287e01f6-dbb3-4571-aec9-68469861648d"
 # The pages (src/public.html, src/admin.html) are bundled as text
 [[rules]]
 type = "Text"
-globs = ["**/*.html"]
+globs = ["**/*.html", "**/*.css"]
 fallthrough = true

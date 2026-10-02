@@ -9,6 +9,7 @@
 //                   Trial runs all of it
 //   Start=2026-10-03T18:00:00   (UTC) when the event first starts; it is shown as coming soon until then. Without
 //                   it, the event starts with the period (at 00:00 UTC for whole days)
+//   Repeat=0        the event runs once (from Start) instead of starting again
 //   StageHours=24   tournaments: how long each stage lasts (else the stages share the period equally). The
 //                   tournament is over after the last stage, until it starts again
 //   Goal=100        ClashMob: the goal for the whole mob (each stage has its own). Reaching it clears the stage
@@ -17,8 +18,10 @@
 //   TopPercent=50   tournaments: the share of a stage's players who go on to the next stage
 //   MaxScore=1      the most one play can add (else by BattleType: 1 boss, BossHealth damage, EndTime seconds...)
 // Every other line goes into the event file the game downloads (SwordBattleEvent properties: see clashmob.cpp).
-// Rewards: .RewardType= an eTouchRewardActor (TRA_Gold_Large, TRA_Chips_Small, TRA_GrabBag_Uber = the ClashMob Prize
-// Wheel, TRA_Item_Fixed or TRA_Gem_Fixed with .RewardData= the item or gem), .RewardGoal= the score it needs. A
+// Rewards: .RewardType= an eTouchRewardActor, .RewardData= its detail, .RewardGoal= the score it needs. An exact amount
+// is TRA_Random_Gold with GOLD.50000 or CHIPS.20; TRA_Gold_Small/Medium/Large pay the player's bloodline x 100/250/500
+// gold (at most 5,000/75,000/100,000) and TRA_Chips_Small/Medium/Large 5/10/15 chips; TRA_GrabBag_Uber is the
+// ClashMob Prize Wheel; TRA_Item_Fixed or TRA_Gem_Fixed give the item or gem named in .RewardData. A
 // ClashMob or tournament stage has one reward, given to everyone who played it once the stage is over and won (a
 // tournament stage: to the players who went through).
 export default `
@@ -37,8 +40,8 @@ QuestMapPin=MapPin_Obelisk_A
 [darkknight.1]
 Goal=50
 Desc=A band of DARK KNIGHTS has overrun the Obelisk! In this first stage, the mob must kill 50 of them. Kill one to earn the reward.
-.RewardType=TRA_Gold_Large
-.RewardData=
+.RewardType=TRA_Random_Gold
+.RewardData=GOLD.25000
 .RewardGoal=1
 
 [darkknight.2]
@@ -131,22 +134,22 @@ QuestMapPin=MapPin_ThePit
 
 [aegis.1]
 Desc=Stage 1 of 5: do as much damage to ASHIMAR as you can in 30 seconds. Your best fight counts, and the top half go on to stage 2.
-.RewardType=TRA_Chips_Small
-.RewardData=
+.RewardType=TRA_Random_Gold
+.RewardData=CHIPS.10
 .RewardGoal=1
 
 [aegis.2]
 BossLevel=25
 Desc=Stage 2 of 5: ASHIMAR grows stronger. Only the top half go on.
-.RewardType=TRA_Chips_Medium
-.RewardData=
+.RewardType=TRA_Random_Gold
+.RewardData=CHIPS.20
 .RewardGoal=1
 
 [aegis.3]
 BossLevel=30
 Desc=Stage 3 of 5: the field is thinning. Only the top half go on.
-.RewardType=TRA_Chips_Large
-.RewardData=
+.RewardType=TRA_Random_Gold
+.RewardData=CHIPS.30
 .RewardGoal=1
 
 [aegis.4]
