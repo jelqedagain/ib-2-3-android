@@ -45,8 +45,9 @@ struct Settings {
     bool fast_wheel = false;        // FastWheel, IB3: the prize wheel's spin is over at once (game/wheel.cpp)
     bool gem_shop_restock = false;  // GemShopRestock: a gem bought in the gem shop is put back (game/saveedit.cpp)
     bool all_gems = false;  // AllGems: the gem shop sells every gem, each at its highest level (game/devmode.cpp)
-    // ClashMobs ([ClashMob] Server, IB3): the community ClashMob server's address; empty = offline ClashMobs only
-    std::string clashmob_server;
+    // ClashMobs ([ClashMob] Server, IB3): the community ClashMob server's address (the port's own server unless
+    // set; "off" = offline ClashMobs only)
+    std::string clashmob_server = "https://clashmob.clashmob-server.workers.dev";
 };
 
 // Directory of the executable (with trailing backslash); on Android, the app's files folder.

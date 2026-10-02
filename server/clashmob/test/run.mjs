@@ -1,17 +1,19 @@
 // Plays the game's side of ClashMobs against a running server, as several players, and checks the answers.
 //   npm run dev      (in another terminal; .dev.vars with ADMIN_KEY=... and TIME_TRAVEL=1 also tests stages,
 //                     tournaments and trials over time)
-//   npm test         (BASE=<url> and ADMIN_KEY=<key> to test another server)
+//   npm test         (BASE=<url> to test another server: then only the checks that change nothing run)
 import { readFileSync } from "node:fs";
 import { randomBytes } from "node:crypto";
 
 const BASE = process.env.BASE || "http://127.0.0.1:8787";
+// The tests over time upload their own events and play them: only ever on this PC's server (npm run dev).
+const LOCAL = /^http:\/\/(127\.0\.0\.1|localhost)[:/]/.test(BASE);
 let vars = "";
 try {
   vars = readFileSync(new URL("../.dev.vars", import.meta.url), "utf8");
 } catch {}
-const ADMIN_KEY = process.env.ADMIN_KEY ?? vars.match(/^ADMIN_KEY\s*=\s*"?([^"\r\n]+)/m)?.[1];
-const TIME_TRAVEL = /^TIME_TRAVEL\s*=\s*"?1/m.test(vars);
+const ADMIN_KEY = LOCAL ? vars.match(/^ADMIN_KEY\s*=\s*"?([^"\r\n]+)/m)?.[1] : undefined;
+const TIME_TRAVEL = LOCAL && /^TIME_TRAVEL\s*=\s*"?1/m.test(vars);
 
 let failed = 0;
 function check(what, ok, detail = "") {

@@ -94,7 +94,8 @@ void load() {
     s.gem_shop_restock = read_int(L"Cheats", L"GemShopRestock", read_int(L"Game", L"GemShopRestock", d.gem_shop_restock)) != 0;
     // The 1.7 tests had a gem shop choice (GemShop: empty = the normal shop) instead.
     s.all_gems = read_int(L"Cheats", L"AllGems", !read_string(L"Cheats", L"GemShop").empty()) != 0;
-    s.clashmob_server = read_string(L"ClashMob", L"Server");
+    std::string server = read_string(L"ClashMob", L"Server");
+    if (!server.empty()) s.clashmob_server = _stricmp(server.c_str(), "off") == 0 ? "" : server;
     g_loaded = true;
 }
 
