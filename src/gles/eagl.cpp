@@ -21,6 +21,7 @@ void load_gl_functions();
 void blit_to_window(u32 rb, int w, int h, int dst_w, int dst_h);
 void save_screenshot(u32 rb, int w, int h, const char* path);
 void log_frame_stats(u64 frame);
+void framelog_frame(u64 frame);
 bool draw_movie(int dst_w, int dst_h);
 int g_screenshot_every = 0;
 void (*g_overlay)(int, int) = nullptr;
@@ -386,6 +387,7 @@ void install_eagl() {
         static std::atomic<u64> frames{0};
         u64 n = ++frames;
         if (n <= 5 || n % 120 == 0) log_frame_stats(n);
+        framelog_frame(n);
         if (!draw_movie(sw, sh)) blit_to_window(rb, d.rb_w, d.rb_h, sw, sh);
         if (g_overlay) g_overlay(sw, sh);
 #ifdef __ANDROID__

@@ -9,7 +9,11 @@
 #include "gles/gl.h"
 #include "objc/internal.h"
 #include <atomic>
+#include <deque>
 #include <map>
+#ifdef __ANDROID__
+#include <sys/system_properties.h>
+#endif
 #include <cmath>
 
 namespace libc {
@@ -194,6 +198,54 @@ std::map<int, id> g_touches;
 std::atomic<int> g_touch_count{0};  // g_touches.size(), for other threads
 id g_event = 0;
 
+// UE3 names a touch by the low 32 bits of its UITouch's address and handles the events later, in
+// batches, on the game thread. A touch freed when its finger lifted was often reallocated at the
+// same address for the next finger, so frantic tapping gave two fingers one name in one batch and
+// the game's touch zones could stay stuck for the rest of the fight. Lifted touches stay allocated
+// for the next 64 touches. debug.ibport.touchreuse 1 frees them at once again (tests).
+std::deque<id> g_lifted;
+constexpr size_t kKeepLifted = 64;
+
+bool free_lifted_at_once() {
+#ifdef __ANDROID__
+    static int v = -1;
+    if (v < 0) {
+        char p[PROP_VALUE_MAX] = "";
+        v = __system_property_get("debug.ibport.touchreuse", p) > 0 && p[0] == '1';
+    }
+    return v;
+#else
+    return false;
+#endif
+}
+
+void retire_touch(id touch) {
+    if (free_lifted_at_once()) {
+        objc::release(touch);
+        return;
+    }
+    g_lifted.push_back(touch);
+    if (g_lifted.size() > kKeepLifted) {
+        objc::release(g_lifted.front());
+        g_lifted.pop_front();
+    }
+}
+
+// Test logging: a new touch named like one that lifted less than 200 ms ago.
+std::map<u32, u64> g_lifted_at;  // touch name -> when its finger lifted
+void check_name_reuse(id touch) {
+    static int reported = 0;
+    u64 now = GetTickCount64();
+    auto it = g_lifted_at.find((u32)touch);
+    if (it != g_lifted_at.end() && now - it->second < 200 && reported++ < 50)
+        LOG_INFO("touch: new touch has the name 0x%x of one that lifted %llu ms ago", (u32)touch,
+                 (unsigned long long)(now - it->second));
+}
+void note_lifted(id touch) {
+    if (g_lifted_at.size() > 512) g_lifted_at.clear();
+    g_lifted_at[(u32)touch] = GetTickCount64();
+}
+
 // phase: 0 began, 1 moved, 2 ended
 void deliver_touch(int finger, s64 phase, CGPoint p) {
     if (!g_key_window) return;
@@ -208,6 +260,7 @@ void deliver_touch(int finger, s64 phase, CGPoint p) {
         t.window = objc::retain(g_key_window);
         t.view = objc::retain(hit_test(g_key_window, p));
         t.loc = t.prev = p;
+        check_name_reuse(touch);
         g_touches[finger] = touch;
         g_touch_count = (int)g_touches.size();
     }
@@ -226,7 +279,8 @@ void deliver_touch(int finger, s64 phase, CGPoint p) {
     if (phase == 2) {
         g_touches.erase(finger);
         g_touch_count = (int)g_touches.size();
-        objc::release(touch);
+        note_lifted(touch);
+        retire_touch(touch);
     }
     objc::pool_pop(pool);
 }

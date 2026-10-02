@@ -29,6 +29,15 @@ Phones and iPhones both use ARM64, so on Android the app's code runs directly on
 
 **Download:** [IB2 APK](https://github.com/jelqedagain/ib-2-3-android/releases/tag/ib2) · [IB2 on archive.org](https://archive.org/details/infinity-blade-2-android)
 
+**1.7** (2026-10-02)
+
+- New layout, easier to find things: the home screen has Cheats, Saves, Settings and Help. **Cheats** holds Developer mode and every cheat, grouped (Developer mode, Items, Gems, While playing), with a search box; each line says when it takes effect (ALWAYS ON, NEXT PLAY or IN GAME) and where to see it in the game. **Saves** holds Edit save (gold, level, XP, stats), Back up and Restore. **Help** has Report a problem (was Share logs), the home screen icon, and a "Where do I find…" list. Settings keeps only language, graphics, sound and controls.
+- Developer mode moved to the Cheats page (its first switch; Settings has a row that takes you there): it now puts a CHEATS section at the TOP of the game's Options (gear, Options) with god mode, unlimited super and magic, always fast forward and boss attacks (the same switches as the app's Cheats page, kept in step both ways), kill boss, give gold, get every item and gem shop refills, all working at once without restarting; the rest of the game's developer options are below it under DEVELOPER.
+- God mode, unlimited super and magic and always fast forward can now simply be switched on in the app and stay on every time you play.
+- Gem shop, simpler (Cheats, Gems), with the same two switches in the game's Options (Developer mode): **All gems** makes the gem shop sell every gem in the game, each at its highest level, so any gem can be bought again at full power; **Restock after buying** keeps a gem you buy in the store, ready to buy again at once (the store used to drop its row as soon as you bought it).
+- Touch: a finger lifted while another lands no longer makes the game mix up the two (Android reused the lifted finger's ID at once), which could make taps and swipes not register while tapping fast.
+- The community Dev Mod .ipa's "Cheat - Give All Items" row now works (the game loads its item lists only while an inventory menu needs them; they are now loaded while Options is open).
+
 **1.6.1** (2026-10-02)
 
 - Edit save, Give every item now works in IB2 too: it adds every weapon, shield, armor, helmet and magic ring you don't have yet. The game's own cheat for it gave nothing, because the game loads its item lists only while a menu needs them; they are now loaded for it.
@@ -102,6 +111,16 @@ Phones and iPhones both use ARM64, so on Android the app's code runs directly on
 <summary><b>Click for IB3</b></summary>
 
 **Download:** [IB3 APK](https://github.com/jelqedagain/ib-2-3-android/releases/tag/ib3) · [IB3 on archive.org](https://archive.org/details/infinity-blade-3-android)
+
+**1.7** (2026-10-02)
+
+- New layout, easier to find things: the home screen has Cheats, Saves, Settings and Help. **Cheats** holds Developer mode and every cheat, grouped (Developer mode, Items, Gems, While playing), with a search box; each line says when it takes effect (ALWAYS ON, NEXT PLAY or IN GAME) and where to see it in the game. **Saves** holds Edit save (gold, level, XP, stats), Back up and Restore. **Help** has Report a problem (was Share logs), the home screen icon, and a "Where do I find…" list. Settings keeps only language, graphics, sound and controls.
+- Developer mode moved to the Cheats page (its first switch; Settings has a row that takes you there): it now puts a CHEATS section at the TOP of the game's Options (gear, Options) with god mode, unlimited super and magic, always fast forward and boss attacks (the same switches as the app's Cheats page, kept in step both ways), kill boss, give gold, get every item and gem shop refills, all working at once without restarting; the rest of the game's developer options are below it under DEVELOPER.
+- God mode, unlimited super and magic and always fast forward can now simply be switched on in the app and stay on every time you play.
+- Gem shop, simpler (Cheats, Gems), with the same two switches in the game's Options (Developer mode): **All gems** makes the gem shop sell every gem in the game, each at its highest level, so any gem can be bought again at full power; **Restock after buying** keeps a gem you buy in the store, ready to buy again at once (the store used to drop its row as soon as you bought it). They replace the earlier gem shop choice and Strongest gems.
+- Touch: a finger lifted while another lands no longer makes the game mix up the two (Android reused the lifted finger's ID at once), which could make taps and swipes not register while tapping fast.
+- Fixed a jagged dark outline around characters in cutscenes with depth of field at 1440p, and at 1080p on phones longer than 16:9. The game widens its background blur with the picture's width but keeps only 4 blur samples (enough for the 2048-pixel iPad); on wider pictures the blur lost its samples on one side. It now keeps up to 16, the engine's own default.
+- The community Dev Mod .ipa works: the world was black, because its graphics settings turn on half-float render targets in a form Apple's driver accepted and Android's GPUs reject; they are now made in the form Android supports. Its developer menu now shows in Options: the .ipa itself carries the menu's code but still points the Options list at the Community Patch's version, so the rows never appeared on any device; the app serves the game a repaired copy of that file (your files are not changed, and normal .ipa files are not affected).
 
 **1.6.1** (2026-10-02)
 

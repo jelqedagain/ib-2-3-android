@@ -24,6 +24,7 @@ import java.util.List;
 final class SettingsScreen {
     private final Activity a;
     private final IniFile ini;
+    private Runnable openCheats;  // the Developer mode signpost
     private final boolean ib2;
 
     private SettingsScreen(Activity a, File iniFile, boolean ib2) {
@@ -32,8 +33,10 @@ final class SettingsScreen {
         this.ib2 = ib2;
     }
 
-    static View build(Activity a, File iniFile, boolean ib2, boolean gameRunning, Runnable back) {
-        return new SettingsScreen(a, iniFile, ib2).build(gameRunning, back);
+    static View build(Activity a, File iniFile, boolean ib2, boolean gameRunning, Runnable back, Runnable openCheats) {
+        SettingsScreen screen = new SettingsScreen(a, iniFile, ib2);
+        screen.openCheats = openCheats;
+        return screen.build(gameRunning, back);
     }
 
     private int dp(float v) {
@@ -71,11 +74,9 @@ final class SettingsScreen {
         content.addView(Ui.sectionHeader(a, "Game"));
         LinearLayout game = Ui.card(a);
         addRow(game, languageRow());
-        addRow(game, toggle("Developer mode", "Adds the game's hidden developer options to its Options menu: god mode, unlimited"
-                + " super, kill boss, give gold and more.", "Game", "DeveloperMode", 0));
-        if (!ib2)
-            addRow(game, toggle("Fast prize wheel", "Once you spin a grab bag's wheel it lands at once, with the same prize.",
-                    "Game", "FastWheel", 0));
+        // Developer mode lived here until 1.6: a signpost to where it is now.
+        addRow(game, Ui.actionRow(a, "Developer mode", "Moved to the Cheats page, together with god mode, gems and items.",
+                v -> openCheats.run()));
         content.addView(game);
 
         content.addView(Ui.sectionHeader(a, "Display"));

@@ -8,6 +8,8 @@
 #include <atomic>
 #include <cctype>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
 #include <map>
 #include <mutex>
 #include <tuple>
@@ -122,6 +124,8 @@ using GLsizeiptr = s64;
       (GLenum a, GLint b, GLint c, GLsizei d, GLsizei e, GLint f, GLenum g, GLenum h, const void* i),                \
       (a, b, c, d, e, f, g, h, i))                                                                                   \
     X(glTexParameteri, void, (GLenum a, GLenum b, GLint c), (a, b, c))                                               \
+    X(glGetTexParameteriv, void, (GLenum a, GLenum b, GLint* c), (a, b, c))                                          \
+    X(glGetAttachedShaders, void, (GLuint a, GLsizei b, GLsizei* c, GLuint* d), (a, b, c, d))                       \
     X(glUniform1fv, void, (GLint a, GLsizei b, const GLfloat* c), (a, b, c))                                         \
     X(glUniform2fv, void, (GLint a, GLsizei b, const GLfloat* c), (a, b, c))                                         \
     X(glUniform3fv, void, (GLint a, GLsizei b, const GLfloat* c), (a, b, c))                                         \
@@ -248,6 +252,69 @@ bool gpu_is_adreno() {
 }
 
 bool gl_diag();
+
+// debug.ibport.framelog N (a new N each time): logs every viewport, framebuffer, texture filter and draw of
+// one frame, with the textures bound to units 0-3 (for render-pass bugs).
+std::atomic<int> g_framelog{0};
+std::string bound_textures() {
+    std::string s;
+    GLint active = 0;
+    p_glGetIntegerv(0x84E0 /*GL_ACTIVE_TEXTURE*/, &active);
+    for (int u = 0; u < 4; u++) {
+        p_glActiveTexture(0x84C0 + u);
+        GLint t = 0, mn = 0, mg = 0;
+        p_glGetIntegerv(0x8069, &t);
+        if (!t) continue;
+        p_glGetTexParameteriv(GL_TEXTURE_2D, 0x2801, &mn);
+        p_glGetTexParameteriv(GL_TEXTURE_2D, 0x2800, &mg);
+        s += " u" + std::to_string(u) + "=tex" + std::to_string(t) + "(min " + std::to_string(mn) + " mag " + std::to_string(mg) + ")";
+    }
+    p_glActiveTexture(active);
+    return s;
+}
+
+void framelog_draw(const char* what, int count) {
+    GLint fb = 0, prog = 0, vp[4] = {};
+    p_glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &fb);
+    p_glGetIntegerv(0x8B8D /*GL_CURRENT_PROGRAM*/, &prog);
+    p_glGetIntegerv(0x0BA2 /*GL_VIEWPORT*/, vp);
+    // Which pass: the post-process uniforms its shaders declare.
+    std::string tags;
+    GLuint shaders[4] = {};
+    GLsizei n = 0;
+    if (prog) p_glGetAttachedShaders(prog, 4, &n, shaders);
+    static char src[65536];
+    for (GLsizei i = 0; i < n; i++) {
+        p_glGetShaderSource(shaders[i], sizeof src, nullptr, src);
+        for (const char* tag : {"DOFPackedParameters", "BloomScaleAndThreshold", "SampleWeights", "SampleOffsets", "OffsetUVs",
+                                "SourceTextureScaleBias", "SceneColorScaleBias", "HalfResMaskRect", "TexCenter", "TextureTransform"})
+            if (std::strstr(src, tag) && tags.find(tag) == std::string::npos) tags += std::string(" ") + tag;
+    }
+    std::string ids;
+    for (GLsizei i = 0; i < n; i++) ids += " " + std::to_string(shaders[i]);
+    LOG_INFO("framelog: %s %d fb %d prog %d (shaders%s) viewport %d,%d %dx%d%s |%s", what, count, fb, prog, ids.c_str(), vp[0], vp[1],
+             vp[2], vp[3], bound_textures().c_str(), tags.c_str());
+}
+
+// Called at every present: starts or ends a logged frame.
+void framelog_frame(u64 frame) {
+#ifdef __ANDROID__
+    static std::string last = "0";
+    if (g_framelog > 0 && --g_framelog == 0) LOG_INFO("framelog: frame %llu ends", (unsigned long long)frame);
+    if (frame % 30) return;
+    char v[PROP_VALUE_MAX] = "";
+    __system_property_get("debug.ibport.framelog", v);
+    if (last == v) return;
+    bool first = last == "0" && std::string(v) == "0";
+    last = v;
+    if (!first && v[0] && std::string(v) != "0") {
+        g_framelog = 2;  // the rest of this frame, then a whole one
+        LOG_INFO("framelog: from frame %llu", (unsigned long long)frame);
+    }
+#else
+    (void)frame;
+#endif
+}
 
 void log_frame_stats(u64 frame) {
     if (frame == 600 && gl_diag()) g_glcheck = false;  // diagnostics: errors of the first frames only
@@ -547,6 +614,36 @@ bool bgra_renderable() {
     return ok;
 }
 
+// Whether the GPU can draw into half-float RGBA16F textures (EXT_color_buffer_half_float / _float).
+// Mods that turn on FloatingPointRenderTargets (the IB3 "Dev Mod" .ipa's graphics profiles) make the
+// render targets unsized GL_RGBA with GL_HALF_FLOAT: Apple's driver took that, GLES 3 rejects it
+// (GL_INVALID_OPERATION), so the targets never existed and the world was black under the HUD.
+bool half_float_renderable() {
+    static int ok = -1;
+    if (ok >= 0) return ok;
+    GLint prev_tex = 0, prev_draw = 0, prev_read = 0;
+    p_glGetIntegerv(0x8069 /*GL_TEXTURE_BINDING_2D*/, &prev_tex);
+    p_glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &prev_draw);
+    p_glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &prev_read);
+    GLuint tex = 0, fbo = 0;
+    p_glGenTextures(1, &tex);
+    p_glBindTexture(GL_TEXTURE_2D, tex);
+    p_glTexImage2D(GL_TEXTURE_2D, 0, 0x881A /*GL_RGBA16F*/, 16, 16, 0, GL_RGBA, 0x140B /*GL_HALF_FLOAT*/, nullptr);
+    p_glGenFramebuffers(1, &fbo);
+    p_glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fbo);
+    p_glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, 0x8CE0 /*COLOR_ATTACHMENT0*/, GL_TEXTURE_2D, tex, 0);
+    GLenum st = p_glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER);
+    p_glBindFramebuffer(GL_DRAW_FRAMEBUFFER, prev_draw);
+    p_glBindFramebuffer(GL_READ_FRAMEBUFFER, prev_read);
+    p_glDeleteFramebuffers(1, &fbo);
+    p_glBindTexture(GL_TEXTURE_2D, prev_tex);
+    p_glDeleteTextures(1, &tex);
+    while (p_glGetError() != 0) {}
+    ok = st == 0x8CD5;
+    LOG_INFO("render targets: half-float ones are %s", ok ? "RGBA16F" : "made 8-bit RGBA (this GPU cannot draw into RGBA16F)");
+    return ok;
+}
+
 // IB3 with MSAA (Settings, Anti-aliasing MSAA 4x) draws its menu scenes, such as the item models of the
 // inventory, into a framebuffer of the multisampled colour renderbuffer and the single-sampled scene depth
 // texture. Apple's driver took that; GLES calls it incomplete (0x8D56) and draws nothing, so the items
@@ -812,6 +909,17 @@ void install_gl() {
         if (fmt == GL_BGRA_EXT) ifmt = GL_BGRA_EXT;  // APPLE_texture_format_BGRA8888 allows RGBA internal format
         // An empty BGRA texture is a render target: RGBA where BGRA cannot be drawn into (no pixels, so no swizzle).
         if (fmt == GL_BGRA_EXT && !data && !game::is_infinity_blade_2() && !bgra_renderable()) ifmt = fmt = GL_RGBA;
+        // Half-float data with an unsized format (iOS) needs the sized one on GLES 3; an empty texture is a
+        // render target, 8-bit RGBA where the GPU cannot draw into RGBA16F (half_float_renderable).
+        if ((type == 0x140B /*GL_HALF_FLOAT*/ || type == GL_HALF_FLOAT_OES) && (ifmt == GL_RGBA || ifmt == 0x1907 /*GL_RGB*/)) {
+            if (data || half_float_renderable()) {
+                ifmt = ifmt == GL_RGBA ? 0x881A /*GL_RGBA16F*/ : 0x881B /*GL_RGB16F*/;
+                type = 0x140B;
+            } else {
+                ifmt = fmt = GL_RGBA;
+                type = GL_UNSIGNED_BYTE;
+            }
+        }
         p_glTexImage2D(target, level, ifmt, w, h, border, fmt, type, data);
         if (!ifmt && !fmt && gl_diag()) {
             static std::atomic<int> once{0};
@@ -881,11 +989,13 @@ void install_gl() {
         GLint fb = 0;
         p_glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &fb);
         g_stats.last_draw_fb = fb;
+        if (g_framelog > 0) framelog_draw("drawElements", count);
         p_glDrawElements(mode, count, type, idx);
     });
     hle::fn("_glDrawArrays", [](GLenum mode, GLint first, GLsizei count) {
         ErrorCheck check{"glDrawArrays"};
         g_stats.draws++;
+        if (g_framelog > 0) framelog_draw("drawArrays", count);
         p_glDrawArrays(mode, first, count);
     });
     hle::fn("_glClear", [](GLbitfield mask) {
@@ -911,6 +1021,18 @@ void install_gl() {
             if (r <= 10 || r % 50 == 0)
                 LOG_INFO("shader %d rewritten (%d so far): %s", n, r, moved != src ? "globals moved into main" : "shadow filter");
         }
+#ifdef __ANDROID__
+        // debug.ibport.dumpshaders 1: every shader as compiled goes to shaderdump/<n>.glsl (for reverse engineering).
+        static const bool dump = [] {
+            char v[PROP_VALUE_MAX] = {};
+            return __system_property_get("debug.ibport.dumpshaders", v) > 0 && v[0] == '1';
+        }();
+        if (dump) {
+            std::error_code ec;
+            std::filesystem::create_directories("shaderdump", ec);
+            std::ofstream("shaderdump/" + std::to_string(s) + ".glsl", std::ios::binary) << fixed;
+        }
+#endif
         if (fixed == src) return p_glShaderSource(s, count, strings, lengths);
         const char* one = fixed.c_str();
         p_glShaderSource(s, 1, &one, nullptr);

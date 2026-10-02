@@ -117,6 +117,30 @@ final class Ui {
         return t;
     }
 
+    // A page's top bar: "‹ Back", the title, and an optional button on the right.
+    static LinearLayout pageHeader(Context c, String title, String button, View.OnClickListener onButton, Runnable back) {
+        LinearLayout header = new LinearLayout(c);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        header.setPadding(dp(c, 16), dp(c, 10), dp(c, 28), dp(c, 6));
+        TextView backButton = text(c, "‹  Back", 16, ACCENT, true);
+        backButton.setPadding(dp(c, 12), dp(c, 10), dp(c, 16), dp(c, 10));
+        backButton.setBackground(pressable(c, rounded(c, 0x00000000, 10, 0), 10));
+        backButton.setClickable(true);
+        backButton.setOnClickListener(v -> back.run());
+        header.addView(backButton);
+        TextView t = text(c, title, 24, TEXT, true);
+        t.setPadding(dp(c, 8), 0, 0, 0);
+        header.addView(t, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+        if (button != null) {
+            TextView b = primaryButton(c, button);
+            b.setTextSize(15);
+            b.setPadding(dp(c, 22), 0, dp(c, 22), 0);
+            b.setOnClickListener(onButton);
+            header.addView(b, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(c, 44)));
+        }
+        return header;
+    }
+
     // Views that look disabled while a task runs.
     static void setEnabled(View v, boolean enabled) {
         v.setEnabled(enabled);

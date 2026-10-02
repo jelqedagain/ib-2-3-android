@@ -348,17 +348,80 @@ public class LauncherActivity extends Activity {
         left.addView(makeStatus(), new LinearLayout.LayoutParams(dp(320), LinearLayout.LayoutParams.WRAP_CONTENT));
 
         LinearLayout card = Ui.card(this);
-        addMenuRow(card, "Settings", "Frame rate, screen, graphics, sound", v -> showSettings());
-        addMenuRow(card, "Edit save", "Gold, level, stats, items", v -> showSaveEditor());
+        addMenuRow(card, "Cheats", "Developer mode, items, gems, god mode", v -> showCheats());
+        addMenuRow(card, "Saves", "Edit, back up or restore your progress", v -> showSaves());
+        addMenuRow(card, "Settings", "Language, graphics, sound, controls", v -> showSettings());
+        addMenuRow(card, "Help", "Report a problem, home screen icon, where to find things", v -> showHelp());
+        show(left, card);
+    }
+
+    // A page of rows under a title (Saves, Help); Back returns to the menu.
+    private void showPage(String title, View... cards) {
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        Ui.screenBackground(root);
+        root.addView(Ui.pageHeader(this, title, null, null, this::buildMenuScreen));
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(28), dp(8), dp(28), dp(28));
+        for (View c : cards) content.addView(c);
+        LinearLayout center = new LinearLayout(this);
+        center.setGravity(Gravity.CENTER_HORIZONTAL);
+        center.addView(content, new LinearLayout.LayoutParams(Math.min(dp(760), getResources().getDisplayMetrics().widthPixels),
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+        ScrollView scroll = new ScrollView(this);
+        scroll.setVerticalScrollBarEnabled(false);
+        scroll.addView(center);
+        root.addView(scroll, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1));
+        setContentView(root);
+        showingSettings = true;
+        backTarget = this::buildMenuScreen;
+        hideSystemBars();
+    }
+
+    private void showSaves() {
+        menuButtons.clear();
+        LinearLayout card = Ui.card(this);
+        addMenuRow(card, "Edit save", "Gold, level, XP, stats, bloodline. Changes happen the next time you press Play.", v -> showSaveEditor());
         addMenuRow(card, "Back up saves", "Save your progress to a .zip file", v -> pickBackupFile());
         addMenuRow(card, "Restore saves", "Load your progress from a backup", v -> pickRestoreFile());
-        addMenuRow(card, "Share logs", "Copies the log for bug reports. Hold to send it as a file.", v -> copyLogs())
+        showPage("Saves", Ui.sectionHeader(this, "Your progress"), card, makeStatus());
+    }
+
+    private void showHelp() {
+        menuButtons.clear();
+        LinearLayout card = Ui.card(this);
+        addMenuRow(card, "Report a problem", "Copies the log to paste in Discord. Hold to send it as a file.", v -> copyLogs())
             .setOnLongClickListener(v -> {
                 shareLogFile();
                 return true;
             });
         if (canPinIcon()) addMenuRow(card, "Home screen icon", "Adds the icon from your .ipa to the home screen", v -> pinHomeIcon());
-        show(left, card);
+        LinearLayout where = Ui.card(this);
+        where.setPadding(dp(18), dp(14), dp(18), dp(14));
+        String store = isIb2() ? "Menu › Character › Items › Store, then › until Supplies" : "Menu › Items, the gem tab, then Store";
+        String[][] faq = {
+            {"Developer mode (dev mode)", "Cheats › Developer mode, the first switch. Then in the game: Menu › gear › Options, at the top"},
+            {"Gold, level, stats, bloodline", "Saves › Edit save"},
+            {"Get every item, god mode, gem shop", "Cheats"},
+            {"The gem shop in the game", store},
+            {"Graphics, language, sound, controller", "Settings"},
+            {"Back up or restore saves", "Saves"},
+        };
+        for (int i = 0; i < faq.length; i++) {
+            TextView q = Ui.text(this, faq[i][0], 15, Ui.TEXT, true);
+            q.setPadding(0, i == 0 ? 0 : dp(12), 0, 0);
+            where.addView(q);
+            where.addView(Ui.text(this, "→ " + faq[i][1], 13.5f, Ui.SUBTEXT, false));
+        }
+        showPage("Help", Ui.sectionHeader(this, "Help"), card, Ui.sectionHeader(this, "Where do I find…"), where, makeStatus());
+    }
+
+    private void showCheats() {
+        setContentView(CheatsScreen.build(this, filesDir(), isIb2(), this::buildMenuScreen));
+        showingSettings = true;
+        backTarget = this::buildMenuScreen;
+        hideSystemBars();
     }
 
     private View addMenuRow(LinearLayout card, String title, String subtitle, View.OnClickListener click) {
@@ -369,27 +432,31 @@ public class LauncherActivity extends Activity {
         return row;
     }
 
-    private boolean showingSettings;  // a page opened from the menu (Settings, Edit save): Back returns to the menu
+    private boolean showingSettings;  // a page opened from the menu: Back returns to backTarget
+    private Runnable backTarget = this::buildMenuScreen;
 
     private boolean isIb2() {
         return getPackageName().equals("com.ib2port.game");
     }
 
     private void showSettings() {
-        setContentView(SettingsScreen.build(this, new File(filesDir(), "settings.ini"), isIb2(), GameActivity.started, this::buildMenuScreen));
+        setContentView(SettingsScreen.build(this, new File(filesDir(), "settings.ini"), isIb2(), GameActivity.started, this::buildMenuScreen,
+                this::showCheats));
         showingSettings = true;
+        backTarget = this::buildMenuScreen;
         hideSystemBars();
     }
 
     private void showSaveEditor() {
-        setContentView(SaveEditorScreen.build(this, filesDir(), isIb2(), GameActivity.started, this::buildMenuScreen));
+        setContentView(SaveEditorScreen.build(this, filesDir(), isIb2(), GameActivity.started, this::showSaves));
         showingSettings = true;
+        backTarget = this::showSaves;
         hideSystemBars();
     }
 
     @Override
     public void onBackPressed() {
-        if (showingSettings) buildMenuScreen();
+        if (showingSettings) backTarget.run();
         else super.onBackPressed();
     }
 

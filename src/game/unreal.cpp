@@ -138,6 +138,55 @@ int property_offset(cpu::Thread& t, GuestAddr obj, const char* name) {
     return g_offsets[key] = off;
 }
 
+// UBoolProperty::BitMask: script bools share a 32-bit word, each a bit of it. Its place in the property
+// object is found once from two of Actor's bools that share a word (bStatic, bHidden): the first field
+// after the offset where both hold a single, different bit.
+int g_bitmask_field = -1;
+
+bool bool_property(cpu::Thread& t, GuestAddr obj, const char* name, int& offset, u32& mask) {
+    GuestAddr cls = obj ? *gptr<u64>(obj + kObjClass) : 0;
+    if (!cls || (g_offset_field < 0 && !locate_offset_field(t, cls))) return false;
+    if (g_bitmask_field < 0) {
+        GuestAddr a = find_property(t, cls, "bStatic"), b = find_property(t, cls, "bHidden");
+        if (!a || !b || *gptr<u32>(a + g_offset_field) != *gptr<u32>(b + g_offset_field)) return false;
+        auto bit = [](u32 v) { return v && !(v & (v - 1)); };
+        for (int off = g_offset_field + 4; off < g_offset_field + 0x80; off += 4) {
+            u32 ma = *gptr<u32>(a + off), mb = *gptr<u32>(b + off);
+            if (bit(ma) && bit(mb) && ma != mb) {
+                g_bitmask_field = off;
+                LOG_INFO("unreal: UBoolProperty::BitMask at +0x%x", off);
+                break;
+            }
+        }
+        if (g_bitmask_field < 0) {
+            LOG_WARN("unreal: could not locate UBoolProperty::BitMask");
+            return false;
+        }
+    }
+    GuestAddr prop = find_property(t, cls, name);
+    if (!prop) return false;
+    offset = (int)*gptr<u32>(prop + g_offset_field);
+    mask = *gptr<u32>(prop + g_bitmask_field);
+    return mask != 0;
+}
+
+bool read_bool(cpu::Thread& t, GuestAddr obj, const char* name, bool& out) {
+    int off;
+    u32 mask;
+    if (!bool_property(t, obj, name, off, mask)) return false;
+    out = (*gptr<u32>(obj + off) & mask) != 0;
+    return true;
+}
+
+bool write_bool(cpu::Thread& t, GuestAddr obj, const char* name, bool value) {
+    int off;
+    u32 mask;
+    if (!bool_property(t, obj, name, off, mask)) return false;
+    u32& word = *gptr<u32>(obj + off);
+    word = value ? word | mask : word & ~mask;
+    return true;
+}
+
 int param_offset(cpu::Thread& t, GuestAddr obj, const std::string& func, const char* param) {
     GuestAddr fn = t.call(g_find_function, {obj, fname(t, func), 0});
     if (!fn) return -1;

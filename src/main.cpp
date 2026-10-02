@@ -216,6 +216,7 @@ int main(int argc, char** argv) {
     game::start_controller();
     game::install_config(img);
     game::install_widescreen();
+    game::install_dev_ipa_fix();
     game::install_save_editor(img);
     {
         const auto& st = settings::get();

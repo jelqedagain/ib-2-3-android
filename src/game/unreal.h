@@ -47,6 +47,10 @@ bool read_property(cpu::Thread& t, GuestAddr obj, const char* name, T& out) {
     return true;
 }
 
+// Script bools (one bit of a 32-bit word): read or set `obj`'s bool property `name`.
+bool read_bool(cpu::Thread& t, GuestAddr obj, const char* name, bool& out);
+bool write_bool(cpu::Thread& t, GuestAddr obj, const char* name, bool value);
+
 // Byte offset in `obj` of member `member` of its struct property `struct_prop`, or -1.
 int struct_member_offset(cpu::Thread& t, GuestAddr obj, const char* struct_prop, const char* member);
 

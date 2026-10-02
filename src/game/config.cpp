@@ -55,6 +55,12 @@ void apply(cpu::Thread& t, GuestAddr config) {
     set(kDevice, "bAllowLightShafts", flag(s.light_shafts), g_system_ini);
     set(kDevice, "Bloom", flag(s.bloom), g_system_ini);
     set(kDevice, "DepthOfField", flag(s.depth_of_field), g_system_ini);
+    // The bloom / depth-of-field blur (GaussianBlurFilterBuffer) widens its kernel with the render width
+    // (width / 1280) and keeps only the first MaxFilterBlurSampleCount taps, 4 on iOS: enough up to the 2048
+    // pixels of iOS screens. Wider renders (1440p, 1080p on phones longer than 16:9) lost the taps on one
+    // side, so the blur shifted and drew a jagged dark fringe beside everything in focus. 16 is the engine's
+    // own default; renders up to 2048 wide never need more than 4, so they are unchanged.
+    set(kDevice, "MaxFilterBlurSampleCount", "16", g_system_ini);
     set(kDevice, "MaxAnisotropy", std::to_string(s.anisotropy), g_system_ini);
     LOG_INFO("settings: %s, %d fps cap, AA %d, shadows %d%s, light shafts %d, bloom %d, DoF %d, aniso %d (%s)", scale,
              s.max_fps, s.anti_aliasing, s.dynamic_shadows, s.high_res_shadows ? " (high res)" : "", s.light_shafts,
