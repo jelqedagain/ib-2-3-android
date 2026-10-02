@@ -4,6 +4,11 @@ Two Android apps, IB2 and IB3, are built from one codebase. Each has its own ver
 
 # IB2
 
+## 1.6.1 (2026-10-02)
+- Edit save, Give every item now works in IB2 too: it adds every weapon, shield, armor, helmet and magic ring you don't have yet. The game's own cheat for it gave nothing, because the game loads its item lists only while a menu needs them; they are now loaded for it.
+- Edit save no longer lowers XP to 24,999 when you save changes with a save that has more (for example at level 50).
+- Saving changes on the Edit save page while the game is still running closes the app, so the game loads them the next time you press Play (it reads the save only when it starts).
+
 ## 1.6 (2026-10-01)
 - Developer mode: Settings, Game, Developer mode (off by default) adds the game's own hidden developer options to the Options menu inside the game (gear icon, Options, at the bottom): god mode, unlimited super and magic, always fast forward, boss attacks on/off, kill boss, give gold, reload last checkpoint, start next bloodline, rebalance stats, rename character, show FPS, gesture test, demo HUD, shadows, light shafts, tutorial, and dump / load an unencrypted save. They are the game's leftover functions from development; no modified .ipa is needed.
 
@@ -54,6 +59,12 @@ Two Android apps, IB2 and IB3, are built from one codebase. Each has its own ver
 - First IB2 build, with sharp character shadows on GPUs other than Apple's.
 
 # IB3
+
+## 1.6.1 (2026-10-02)
+- Fast prize wheel: Settings, Game, Fast prize wheel (off by default). After you spin a prize wheel (Supplies), it lands and gives your prize in about half a second instead of playing the whole animation. The prize is the same: the game picks it before the spin.
+- Edit save, Gems: Add random gems adds new gems like the ones fights give, up to the free space in your gem bag. Gem shop fills the gem shop (Items, Gems, Store) with one of every kind of gem, or only the kind you pick from the game's own list (indoor and outdoor gems are labelled), to buy with gold; Strongest gems in the shop makes them the most powerful versions. These use the game's own developer cheats.
+- Edit save no longer lowers XP to 24,999 when you save changes with a save that has more (for example at level 50).
+- Saving changes on the Edit save page while the game is still running closes the app, so the game loads them the next time you press Play (it reads the save only when it starts).
 
 ## 1.6 (2026-10-01)
 - Developer mode: Settings, Game, Developer mode (off by default) adds the game's own hidden developer options to the Options menu inside the game (gear icon, Options, at the bottom): god mode, unlimited super and magic, always fast forward, boss attacks on/off, kill boss, give gold, reload last checkpoint, start next bloodline, rebalance stats, rename character, show FPS, gesture test, demo HUD, shadows, light shafts, tutorial, and dump an unencrypted save, plus go to the Hideout and set the boss's next weapon. They are the game's leftover functions from development; no modified .ipa is needed.

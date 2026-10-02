@@ -73,6 +73,9 @@ final class SettingsScreen {
         addRow(game, languageRow());
         addRow(game, toggle("Developer mode", "Adds the game's hidden developer options to its Options menu: god mode, unlimited"
                 + " super, kill boss, give gold and more.", "Game", "DeveloperMode", 0));
+        if (!ib2)
+            addRow(game, toggle("Fast prize wheel", "Once you spin a grab bag's wheel it lands at once, with the same prize.",
+                    "Game", "FastWheel", 0));
         content.addView(game);
 
         content.addView(Ui.sectionHeader(a, "Display"));

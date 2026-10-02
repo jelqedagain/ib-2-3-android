@@ -25,6 +25,7 @@
 #include <set>
 #include <sstream>
 #include <unordered_map>
+#include <vector>
 #ifdef __ANDROID__
 #include <sys/system_properties.h>
 #endif
@@ -123,6 +124,12 @@ std::map<std::string, int> current_values(cpu::Thread& t, const Objects& o) {
         if (read_int(t, o.pawn, f.prop, n) || read_int(t, o.save, f.prop, n)) v[f.id] = n;
     ue::TArray<u8> items{};
     if (ue::read_property(t, o.save, "PlayerInventory", items)) v["Items"] = items.num;
+    if (!is_infinity_blade_2()) {  // the gem bag: gems in it, and how many it holds
+        ue::TArray<u8> gems{};
+        if (ue::read_property(t, o.pawn, "PlayerUnequippedGems", gems)) v["Gems"] = gems.num;
+        alignas(16) u8 params[512] = {};  // GetMaxGemCarryCount(bool bNextUpgrade) -> int at +4
+        if (ue::call_event(t, o.pawn, "GetMaxGemCarryCount", params)) v["GemBagSize"] = *reinterpret_cast<s32*>(params + 4);
+    }
     return v;
 }
 
@@ -157,6 +164,56 @@ bool take(Edits& edits, const char* id, int& out) {
     return true;
 }
 
+// Loads the engine's item cache for class `cls` (as the menus do: Load / Free count requests) and passes
+// each item to `fn`. Returns the number of items, or -1 without such a cache.
+template <class Fn>
+int for_each_cached_item(cpu::Thread& t, const char* cls, Fn fn) {
+    GuestAddr engine = ue::engine();
+    ue::TArray<GuestAddr> caches{}, classes{};
+    if (!ue::read_property(t, engine, "ItemCaches", caches) || !ue::read_property(t, engine, "ItemCacheClasses", classes))
+        return -1;
+    for (int i = 0; i < caches.num && i < classes.num; i++) {
+        GuestAddr cache = caches.at(i);
+        int off = cache ? ue::property_offset(t, cache, "CurrentClass") : -1;
+        if (off < 0 || !classes.at(i) || ue::object_name(t, classes.at(i)) != cls) continue;
+        if (!*gptr<GuestAddr>(cache + off)) *gptr<GuestAddr>(cache + off) = classes.at(i);
+        alignas(16) u8 params[256] = {};
+        if (!ue::call_event(t, cache, "Load", params)) return -1;
+        ue::TArray<GuestAddr> items{};
+        ue::read_property(t, cache, "Items", items);
+        for (int j = 0; j < items.num; j++)
+            if (items.at(j)) fn(items.at(j));
+        std::memset(params, 0, sizeof(params));
+        ue::call_event(t, cache, "Free", params);
+        return items.num;
+    }
+    return -1;
+}
+
+// IB3's kinds of gems for the launcher's gem shop choice: GemKind.<template name>=<name the game shows>.
+std::string gem_kinds(cpu::Thread& t) {
+    std::ostringstream s;
+    int kinds = 0;
+    int n = for_each_cached_item(t, "SwordInventoryItemGem", [&](GuestAddr gem) {
+        std::string name = ue::object_name(t, gem);
+        if (name.rfind("Potion_", 0) == 0 || name.rfind("Spawn_", 0) == 0) return;  // potions, treasure touches
+        auto text = [&](const char* func) {  // GetFriendlyName() / GetDescription(): the text the game shows
+            int ret = ue::param_offset(t, gem, func, "ReturnValue");
+            alignas(16) u8 params[512] = {};
+            std::string s = ret >= 0 && ue::call_event(t, gem, func, params) ? ue::read_fstring(gaddr(params + ret)) : "";
+            for (char& c : s)
+                if (c == '\n' || c == '\r' || c == '|') c = ' ';
+            return s;
+        };
+        std::string shown = text("GetFriendlyName");
+        if (shown.empty()) return;
+        s << "GemKind." << name << "=" << shown << "|" << text("GetDescription") << "\n";
+        kinds++;
+    });
+    LOG_INFO("saveedit: %d gem kind(s) of %d cached gem item(s)", kinds, n);
+    return s.str();
+}
+
 // The game's own limits, for the launcher to keep edits within (worked out once per run).
 std::string limits(cpu::Thread& t, const Objects& o) {
     static std::string cached;
@@ -189,6 +246,7 @@ std::string limits(cpu::Thread& t, const Objects& o) {
         write_int(t, o.pawn, "GemCarryUpgradeCount", count);
         LOG_INFO("saveedit: gem bag takes %d upgrade(s) (%d gems now)", max, capacity(count));
         if (max > 0) s << "MaxGemCarry=" << max << "\n";
+        s << gem_kinds(t);
     }
     return cached = s.str();
 }
@@ -304,15 +362,93 @@ void save_now(cpu::Thread& t, const Objects& o) {
     call(t, o.pc, "SaveGame", params);  // IB3: SaveGame(int RequiredSave = 0, ...)
 }
 
+// IB2's give-all cheat (SwordPlayer.GiveAllItems) hands out what the engine's item caches hold, and
+// those are filled only while a menu needs them, so it gave nothing. The caches are loaded around it,
+// the way the menus do (Load / Free count requests).
+bool give_all_items_ib2(cpu::Thread& t, const Objects& o) {
+    GuestAddr engine = ue::engine();
+    ue::TArray<GuestAddr> caches{}, classes{};
+    if (!ue::read_property(t, engine, "ItemCaches", caches) || !ue::read_property(t, engine, "ItemCacheClasses", classes))
+        return false;
+    std::vector<GuestAddr> loaded;
+    for (int i = 0; i < caches.num; i++) {
+        GuestAddr cache = caches.at(i), cls = 0;
+        int off = cache ? ue::property_offset(t, cache, "CurrentClass") : -1;
+        if (off < 0) continue;
+        if (!*gptr<GuestAddr>(cache + off) && i < classes.num) *gptr<GuestAddr>(cache + off) = classes.at(i);
+        cls = *gptr<GuestAddr>(cache + off);
+        if (!call(t, cache, "Load")) continue;
+        loaded.push_back(cache);
+        ue::TArray<GuestAddr> items{};
+        ue::read_property(t, cache, "Items", items);
+        LOG_INFO("saveedit: item cache %d (%s) holds %d item(s)", i, cls ? ue::object_name(t, cls).c_str() : "?", items.num);
+    }
+    ue::TArray<u8> before{}, after{};
+    ue::read_property(t, o.pawn, "PlayerInventory", before);
+    bool ok = call(t, o.pc, "SetPlayerGiveAllItems");
+    ue::read_property(t, o.pawn, "PlayerInventory", after);
+    LOG_INFO("saveedit: inventory %d -> %d item(s)", before.num, after.num);
+    for (GuestAddr cache : loaded) call(t, cache, "Free");
+    return ok;
+}
+
+int array_count(cpu::Thread& t, GuestAddr obj, const char* prop) {
+    ue::TArray<u8> a{};
+    return ue::read_property(t, obj, prop, a) ? a.num : -1;
+}
+
+// IB3's gem cheats (SwordPlayer.SetPlayerCreateNewListOfStoreGems / SwordPC.SetPlayerGiveRandomGem).
+bool gems_ib3(cpu::Thread& t, const Objects& o, Edits& edits) {
+    bool changed = false;
+    auto shop = edits.find("GemShop");  // a gem name (IB3 Coalesced, e.g. FireGem), or * for the usual mix
+    if (shop != edits.end()) {
+        std::string type = shop->second == "*" ? "" : shop->second;
+        edits.erase(shop);
+        int high = 0;
+        take(edits, "GemShopHighEnd", high);
+        const char* fn = "SetPlayerCreateNewListOfStoreGems";
+        alignas(16) u8 params[1024] = {};
+        // bUseCheatGems: one of every kind of gem (AllSameType empty) or gems of one kind; the type is read
+        // only with it on.
+        int cheat_off = ue::param_offset(t, o.pawn, fn, "bUseCheatGems"), type_off = ue::param_offset(t, o.pawn, fn, "AllSameType"),
+            high_off = ue::param_offset(t, o.pawn, fn, "bCheatHighEndGems");
+        if (cheat_off >= 0) *reinterpret_cast<u32*>(params + cheat_off) = 1;
+        if (type_off >= 0 && !type.empty()) *reinterpret_cast<ue::FString*>(params + type_off) = ue::make_fstring(t, type);
+        if (high_off >= 0) *reinterpret_cast<u32*>(params + high_off) = high ? 1 : 0;
+        int before = array_count(t, o.pawn, "CurrentStoreGems");
+        changed |= call(t, o.pawn, fn, params);
+        LOG_INFO("saveedit: gem shop (%s%s): %d -> %d gem(s)", type.empty() ? "any" : type.c_str(), high ? ", high end" : "",
+                 before, array_count(t, o.pawn, "CurrentStoreGems"));
+    }
+    int n = 0;
+    if (take(edits, "RandomGems", n) && n > 0) {
+        int level = 1;
+        read_int(t, o.pawn, "PawnLevel", level);
+        int before = array_count(t, o.pawn, "PlayerUnequippedGems");
+        alignas(16) u8 size[512] = {};  // GetMaxGemCarryCount(bool bNextUpgrade) -> int at +4: no more than fits
+        if (ue::call_event(t, o.pawn, "GetMaxGemCarryCount", size) && before >= 0)
+            n = std::min(n, std::max(0, *reinterpret_cast<s32*>(size + 4) - before));
+        for (int i = 0; i < std::min(n, 100); i++) {
+            alignas(16) u8 params[512] = {};  // SetPlayerGiveRandomGem(int RewardLevel, float GoldScale, int FavorSocketType, int Unused)
+            *reinterpret_cast<s32*>(params) = level;
+            *reinterpret_cast<float*>(params + 4) = 1.0f;
+            changed |= ue::call_event(t, o.pc, "SetPlayerGiveRandomGem", params);
+        }
+        LOG_INFO("saveedit: %d random gem(s) at reward level %d: unequipped gems %d -> %d", n, level, before,
+                 array_count(t, o.pawn, "PlayerUnequippedGems"));
+    }
+    return changed;
+}
+
 bool apply_in_world(cpu::Thread& t, const Objects& o, Edits edits) {
     int n;
     bool changed = false;
-    // IB3 only: IB2 has the same cheats, but they do nothing there. IB3's all perks cheat also makes the
-    // character level 50 with every stat at 100.
-    if (!is_infinity_blade_2()) {
-        if (take(edits, "GiveAllItems", n) && n) changed |= call(t, o.pc, "SetPlayerGiveAllItems");
-        if (take(edits, "GiveAllPerks", n) && n) changed |= call(t, o.pc, "SetPlayerGiveAllPerks");
-    }
+    if (!is_infinity_blade_2()) changed |= gems_ib3(t, o, edits);
+    if (take(edits, "GiveAllItems", n) && n)
+        changed |= is_infinity_blade_2() ? give_all_items_ib2(t, o) : call(t, o.pc, "SetPlayerGiveAllItems");
+    // IB3 only: IB2 has the same cheat, but it does nothing there. It also makes the character level 50
+    // with every stat at 100.
+    if (!is_infinity_blade_2() && take(edits, "GiveAllPerks", n) && n) changed |= call(t, o.pc, "SetPlayerGiveAllPerks");
     for (auto& [k, v] : edits) LOG_WARN("saveedit: edit %s was not applied", k.c_str());
     return changed;
 }
@@ -332,6 +468,15 @@ void dump_save(cpu::Thread& t) {
         ue::dump_functions(t, pawn, words);
     }
     if (ue::read_property(t, pc, "SaveGameObject", save) && save) ue::dump_functions(t, save, words);
+    ue::TArray<GuestAddr> caches{};  // the engine's item caches (IB2: one per item type)
+    if (ue::read_property(t, ue::engine(), "ItemCaches", caches))
+        for (int i = 0; i < caches.num; i++) {
+            GuestAddr c = caches.at(i);
+            if (!c) continue;
+            LOG_INFO("saveedit: item cache %d = %s (%s)", i, ue::object_name(t, c).c_str(), ue::class_name(t, c).c_str());
+            ue::dump_properties(t, c);
+            ue::dump_values(t, c, 1);
+        }
 }
 
 // IB3 raises its engine's frame-rate limit to 62 itself after reading its config (config.cpp's values), so
@@ -403,6 +548,7 @@ void install_save_editor(const macho::Image& img) {
         on_tick(t);
         credits_tick(t);
         devmode_tick(t);
+        wheel_tick(t);
         t.jump(g_tick);
     });
     // The script interpreter is hooked only when there are edits to make, or the save was edited (its
