@@ -350,6 +350,7 @@ public class LauncherActivity extends Activity {
         LinearLayout card = Ui.card(this);
         addMenuRow(card, "Cheats", "Developer mode, items, gems, god mode", v -> showCheats());
         addMenuRow(card, "Saves", "Edit, back up or restore your progress", v -> showSaves());
+        if (!isIb2()) addMenuRow(card, "ClashMobs", "Live events, your name on the leaderboards", v -> showClashMobs());
         addMenuRow(card, "Settings", "Language, graphics, sound, controls", v -> showSettings());
         addMenuRow(card, "Help", "Report a problem, home screen icon, where to find things", v -> showHelp());
         show(left, card);
@@ -437,6 +438,13 @@ public class LauncherActivity extends Activity {
 
     private boolean isIb2() {
         return getPackageName().equals("com.ib2port.game");
+    }
+
+    private void showClashMobs() {
+        setContentView(ClashMobsScreen.build(this, new File(filesDir(), "settings.ini"), this::buildMenuScreen));
+        showingSettings = true;
+        backTarget = this::buildMenuScreen;
+        hideSystemBars();
     }
 
     private void showSettings() {
