@@ -43,5 +43,10 @@ npx wrangler deploy
 npx wrangler secret put ADMIN_KEY        # the admin password (asked for, not echoed)
 ```
 
+Abuse limits: 100 requests a minute and 10 new players a day per connection, 10 wrong admin passwords an hour per
+connection, one scoring fight every 20 seconds per player, and caps on what one fight can score. Connections are
+counted by a fingerprint of their address (an HMAC with the IP_SALT secret: `npx wrangler secret put IP_SALT`), never
+the address itself.
+
 Free plan limits: 100,000 requests and 5 million database rows read a day. Each challenge's totals are kept
 as players play, so a request reads a handful of rows; a play session is about 30 to 50 requests.

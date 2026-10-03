@@ -19,6 +19,9 @@
 // Pages: / shows the live events to anyone (from /status); /admin is the admin page (public.html, admin.html). The admin
 // API (/admin/api/...) needs the ADMIN_KEY secret as the password ("Authorization: Bearer <password>"). For tests only,
 // TIME_TRAVEL=1 lets requests set the server's clock (X-ClashMob-Now).
+//
+// Abuse limits (see "connections"): 100 requests a minute and NEW_PLAYERS_PER_DAY new players a day per connection,
+// 10 wrong admin passwords an hour per connection, and per player: one scoring fight every MIN_PLAY_SECONDS.
 import DEFAULT_EVENTS from "./events.js";
 import { checkName, nameKey } from "./names.js";
 import PUBLIC_PAGE from "./public.html";
@@ -62,9 +65,11 @@ const SCHEMA = [
   // Ranks count the players above one: these keep that to an index range
   `CREATE INDEX IF NOT EXISTS progress_rank_total ON progress (challenge, complete, progress)`,
   `CREATE INDEX IF NOT EXISTS progress_rank_best ON progress (challenge, complete, high)`,
+  // (ip: a connection's fingerprint, see connection(); never the address itself)
   `CREATE TABLE IF NOT EXISTS admin_failures (ip TEXT PRIMARY KEY, count INTEGER NOT NULL, since INTEGER NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS registrations (ip TEXT NOT NULL, day INTEGER NOT NULL, count INTEGER NOT NULL, PRIMARY KEY (ip, day))`,
 ];
-const SCHEMA_VERSION = "3";
+const SCHEMA_VERSION = "4";
 
 let schemaReady = null;
 function ensureSchema(db) {
@@ -77,6 +82,7 @@ function ensureSchema(db) {
       if (!cols.includes("name")) await db.prepare("ALTER TABLE players ADD COLUMN name TEXT").run();
       if (!cols.includes("name_key")) await db.prepare("ALTER TABLE players ADD COLUMN name_key TEXT").run();
       await db.prepare("CREATE UNIQUE INDEX IF NOT EXISTS players_name ON players (name_key) WHERE name_key IS NOT NULL").run();
+      await db.prepare("DELETE FROM admin_failures").run();  // (version 4: kept by fingerprint, no longer by address)
       // totals for the progress made before they were kept (version 1)
       await db.batch([
         db.prepare(`INSERT OR REPLACE INTO totals (challenge, total, players, scorers)
@@ -393,6 +399,22 @@ async function sha256(s) {
   return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+// ---- connections ----
+//
+// Where the server counts something per connection (requests a minute, new players a day, wrong admin passwords), it
+// uses a fingerprint of the connection's address: an HMAC with the IP_SALT secret, so the address itself is never
+// kept and the fingerprint cannot be turned back into it.
+async function connection(request, env) {
+  const ip = request.headers.get("CF-Connecting-IP") || "local";
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(env.IP_SALT || "clashmob"), { name: "HMAC", hash: "SHA-256" },
+    false, ["sign"]);
+  const mac = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(ip));
+  return [...new Uint8Array(mac)].slice(0, 16).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+// New players a day from one connection (several phones can share an address, so it is not 1)
+const newPlayersPerDay = (env) => parseInt(env.NEW_PLAYERS_PER_DAY ?? "10");
+
 // The player making the request: their id, null if the request has none, or an error Response.
 async function authenticate(request, env, now) {
   const id = request.headers.get("X-ClashMob-Player"), key = request.headers.get("X-ClashMob-Key");
@@ -402,6 +424,16 @@ async function authenticate(request, env, now) {
   const h = await sha256(key);
   const row = await env.DB.prepare("SELECT key_hash, seen FROM players WHERE id = ?").bind(id).first();
   if (!row) {
+    // a new player: at most NEW_PLAYERS_PER_DAY from one connection (against made-up players)
+    const ip = await connection(request, env), day = Math.floor(now / DAY);
+    const used = await env.DB.prepare("SELECT count FROM registrations WHERE ip = ? AND day = ?").bind(ip, day).first();
+    if (used && used.count >= newPlayersPerDay(env))
+      return json({ error: "too many new players from this connection today" }, 429);
+    await env.DB.batch([
+      env.DB.prepare(`INSERT INTO registrations (ip, day, count) VALUES (?1, ?2, 1)
+                      ON CONFLICT (ip, day) DO UPDATE SET count = count + 1`).bind(ip, day),
+      env.DB.prepare("DELETE FROM registrations WHERE day < ?").bind(day - 1),
+    ]);
     await env.DB.prepare("INSERT OR IGNORE INTO players (id, key_hash, created, seen) VALUES (?, ?, ?, ?)")
       .bind(id, h, now, now).run();
     const again = await env.DB.prepare("SELECT key_hash FROM players WHERE id = ?").bind(id).first();
@@ -605,7 +637,7 @@ const timingSafeEqual = async (a, b) => (await sha256(a)) === (await sha256(b));
 // hour is turned away for the rest of that hour.
 async function adminAllowed(request, env, now) {
   if (!env.ADMIN_KEY) return json({ error: "no admin password is set on this server" }, 404);
-  const ip = request.headers.get("CF-Connecting-IP") || "local";
+  const ip = await connection(request, env);
   const f = await env.DB.prepare("SELECT count, since FROM admin_failures WHERE ip = ?").bind(ip).first();
   const recent = f && now - f.since < 3600;
   if (recent && f.count >= 10) return json({ error: "too many wrong passwords: try again later" }, 429);
@@ -696,6 +728,12 @@ async function handle(request, env) {
   if (url.pathname === "/favicon.ico") return new Response(null, { status: 204 });
   if (url.pathname === "/theme.css")
     return new Response(THEME_CSS, { headers: { "Content-Type": "text/css; charset=utf-8", "Cache-Control": "public, max-age=300" } });
+  // At most 100 requests a minute from one connection (the PER_CONNECTION rate limiter in wrangler.toml: in memory,
+  // no database rows). A game starting up sends 20 to 30, then a few a fight.
+  if (env.PER_CONNECTION && env.RATE_LIMIT !== "0") {
+    const { success } = await env.PER_CONNECTION.limit({ key: await connection(request, env) });
+    if (!success) return json({ error: "too many requests: slow down" }, 429);
+  }
   // "/sword/api/x" -> ["sword", "api", "x"]; empty parts stay (the game asks for ".../users//saveSlots/0")
   const p = url.pathname.slice(1).split("/").map(decodeURIComponent);
   let now = Math.floor(Date.now() / 1000);

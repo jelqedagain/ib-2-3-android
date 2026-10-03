@@ -489,7 +489,7 @@ bool serve(const ns::HttpRequest& req, ns::HttpResponse& resp) {
     bool list = p.size() == 3, own_event = !list && p[3].rfind("port-", 0) == 0;
     if (!server.empty() && !own_event) {
         bool answered = ask_server(server + path + (query.empty() ? "" : "?" + query), req, resp);
-        if (answered && !(list && resp.status >= 500)) {
+        if (answered && !(list && (resp.status >= 500 || resp.status == 429))) {  // (429: too many requests from here)
             LOG_INFO("clashmob: server: %d %s", resp.status, resp.body.substr(0, 400).c_str());
             return true;
         }
