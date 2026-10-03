@@ -35,7 +35,6 @@ BossLevel=10
 BossScaledLevel=1.0
 MapName=00_ClashMob_BaseScripting
 SubMapName=cm_obelisk_art
-QuestMapPin=MapPin_Obelisk_A
 
 [darkknight.1]
 Goal=50
@@ -85,7 +84,6 @@ MaxPlays=10
 .RewardGoal=5000
 MapName=00_ClashMob_BaseScripting
 SubMapName=cm_dunes_art
-QuestMapPin=MapPin_Dunes_A
 
 [emberknight]
 Type=Trial
@@ -111,7 +109,6 @@ MaxPlays=10
 .RewardGoal=60
 MapName=00_ClashMob_BaseScripting
 SubMapName=C01_CM_Monastery_Art
-QuestMapPin=MapPin_Monastary_A
 
 [aegis]
 Type=Tournament
@@ -130,7 +127,6 @@ EndTime=30
 MaxPlays=5
 MapName=00_ClashMob_BaseScripting
 SubMapName=cm_obelisk_art
-QuestMapPin=MapPin_ThePit
 
 [aegis.1]
 Desc=Stage 1 of 5: do as much damage to ASHIMAR as you can in 30 seconds. Your best fight counts, and the top half go on to stage 2.

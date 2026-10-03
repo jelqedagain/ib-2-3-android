@@ -85,6 +85,8 @@ Type=ClashMob
 Hours=2
 Title=Test mob
 BattleType=BT_KillNBosses
+SubMapName=cm_obelisk_art
+QuestMapPin=MapPin_Obelisk_A
 [mob.1]
 Goal=2
 .RewardType=TRA_Gold_Large
@@ -101,6 +103,7 @@ Hours=2
 TopPercent=50
 Title=Test cup
 BattleType=BT_Kill1Boss
+SubMapName=cm_obelisk_art
 BossHealth=1000
 [cup.1]
 .RewardType=TRA_Chips_Small
@@ -115,6 +118,7 @@ Type=Trial
 Hours=2
 Title=Test trial
 BattleType=BT_Kill1Boss
+SubMapName=CM_Obelisk_Art
 BossHealth=1000
 MaxPlays=2
 .RewardType=TRA_Gold_Small
@@ -127,6 +131,15 @@ MaxPlays=2
   const chk = JSON.parse((await admin("POST", "/admin/api/check", ini + "\n[mob2]\nType=ClashMob\nHours=2\nBossObj=x\nQuestMapPin=P\n[mob2.1]\nGoal=1\n")).text);
   check("admin: check finds problems without saving", chk.ok && !chk.saved && chk.warnings.some((w) => w.includes("mob2.1 has no reward")),
     chk.warnings.join("; "));
+
+  // Events at the same arena at the same time: each on one of the arena's own ClashMob pins, in file order (the story's
+  // quests take story pins like MapPin_Obelisk_A first)
+  {
+    const all = await list(newPlayer("pins"));
+    const pin = async (c) => (await call("GET", `${C}/${c.challengeId}/file/x`, null)).text.match(/^QuestMapPin=(.*)$/m)?.[1];
+    const pins = [await pin(find(all, "mob", "-s1")), await pin(find(all, "mob", "-s2")), await pin(find(all, "cup", "-s1")), await pin(find(all, "trial"))];
+    check("events at one arena get its three ClashMob pins", pins.join() === "cm_obelisk_art,cm_obelisk_art,CM_Obelisk_Art2,CM_Obelisk_Art3", pins.join());
+  }
 
   // ClashMob: the mob clears stage 1, stage 2 opens; everyone (late joiners too) is in the stage being played
   const P = [newPlayer("a"), newPlayer("b"), newPlayer("c")];

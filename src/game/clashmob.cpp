@@ -744,9 +744,11 @@ bool clashmob_wants_script_hook() { return !is_infinity_blade_2(); }
 // - SwordBattleEvent.RewardGoalString(RewardIdx): the text of a reward tier. For damage events (BT_Kill1Boss) the
 //   game's text has no number ("KILL TITAN" for every tier), so the port writes "DO 5,000 DAMAGE".
 // - SwordInventoryItem.ShouldBeHidden(P) for the ClashMob Prize Wheel (TRA_GrabBag_Uber): a reward-only wheel (the
-//   only one with no chip price), hidden (HiddenLevel=-1), and the game throws hidden rewards away. It stays hidden in
-//   the shop; it is not hidden when a reward is given (SwordPlayer.OwnMaxOfConsumable), nor while the player has one
-//   (so it shows in Supplies to be spun).
+//   only one with no chip price), hidden (HiddenLevel=-1), and SwordPlayer.OwnMaxOfConsumable counts a hidden item as
+//   owned to the max, so the game throws it away as a reward. It is not hidden while a ClashMob reward is given
+//   (SwordPlayer.bGiveTreasureIsClashMob, set by the game around it), and for the item lists while the player has one
+//   (so it shows in Supplies to be spun). Everything else gets the game's answer: the shop, the merchant and drops
+//   never offer it, and Supplies has no BUY for it (that also asks OwnMaxOfConsumable).
 enum class Target { None, UserHasMcpId, GetShowQuestType, RewardGoalString, ShouldBeHidden };
 
 std::string with_commas(long long v) {
@@ -786,11 +788,14 @@ bool clashmob_script_call(cpu::Thread& t, GuestAddr frame, GuestAddr result) {
         if (ue::object_name(t, item) != "TRA_GrabBag_Uber") return false;
         GuestAddr prev = *gptr<u64>(frame + kFramePrevious);
         GuestAddr caller = prev ? *gptr<u64>(prev + kFrameNode) : 0;
-        bool reward = caller && ue::object_name(t, caller) == "OwnMaxOfConsumable";
-        bool owned = false;
         int p_off = ue::param_offset(t, item, "ShouldBeHidden", "P");
         GuestAddr player = p_off >= 0 ? *gptr<u64>(*gptr<u64>(frame + kFrameLocals) + p_off) : 0;
-        int n_off = player ? ue::property_offset(t, player, "NumConsumable") : -1;
+        bool reward = false;
+        if (player) ue::read_bool(t, player, "bGiveTreasureIsClashMob", reward);
+        // (the item lists, FilterShowCanBuy included: it decides what Supplies lists. BUY is OwnMaxOfConsumable's.)
+        bool list = caller && ue::object_name(t, *gptr<u64>(caller + kObjOuter)) == "SwordInventoryItemList";
+        bool owned = false;
+        int n_off = list && player ? ue::property_offset(t, player, "NumConsumable") : -1;
         if (n_off >= 0) owned = gptr<s32>(player + n_off)[kPrizeWheel] > 0;
         if (!reward && !owned) return false;  // the game's answer: hidden
         if (result) *gptr<u32>(result) = 0;

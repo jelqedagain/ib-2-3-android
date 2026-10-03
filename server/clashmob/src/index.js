@@ -191,7 +191,42 @@ export function parseEvents(text, now) {
     });
     out.push(parent, ...parent.children);
   }
+  placePins(out);
   return out;
+}
+
+// The world map's ClashMob pins: three at each arena, named after it (the original game's ClashMob pins; no story
+// quest uses them). A pin holds one quest and the story's quests take theirs first, so an event on a story pin
+// (MapPin_Obelisk_A...) is hidden while a story mission is there. Each event shows at its arena's (SubMapName) pins:
+// events at the same arena at the same time get the next one, in the order of the events file.
+const ARENA_PINS = Object.fromEntries([
+  ["cm_obelisk_art", "CM_Obelisk_Art2", "CM_Obelisk_Art3"],
+  ["cm_lake_art", "CM_Lake_art2", "CM_Lake_art3"],
+  ["cm_dunes_art", "CM_Dunes_Art2", "CM_Dunes_Art3"],
+  ["C01_CM_Monastery_Art", "C01_CM_Monastery_Art2", "C01_CM_Monastery_Art3"],
+  ["B20_CrackedDesert_CM", "B20_CrackedDesert_CM2", "B20_CrackedDesert_CM3"],
+  ["B20_FieldBurning_CM", "B20_FieldBurning_CM2", "B20_FieldBurning_CM3"],
+  ["B20_SandDay_CM", "B20_SandDay_CM2", "B20_SandDay_CM3"],
+].map((pins) => [pins[0].toLowerCase(), pins]));
+
+const fileValue = (file, key) => file?.match(new RegExp(`^${key}=(.*)$`, "m"))?.[1]?.trim() || "";
+
+function placePins(all) {
+  const placed = [];  // {arena, slot, start, end}
+  for (const c of all.filter((c) => c.role !== "child")) {
+    const files = c.children ? c.children.map((x) => x.file) : [c.file];
+    const arena = fileValue(files[0], "SubMapName").toLowerCase(), pins = ARENA_PINS[arena];
+    if (!pins) continue;  // (an arena the server does not know: its own QuestMapPin)
+    const busy = placed.filter((o) => o.arena === arena && o.start < c.end && c.start < o.end).map((o) => o.slot);
+    const slot = [0, 1, 2].find((i) => !busy.includes(i));
+    if (slot === undefined) continue;  // a fourth event there at once: its own QuestMapPin (warnings() says so)
+    placed.push({ arena, slot, start: c.start, end: c.end });
+    for (const x of c.children || [c]) {
+      x.file = /^QuestMapPin=/m.test(x.file)
+        ? x.file.replace(/^QuestMapPin=.*$/m, `QuestMapPin=${pins[slot]}`)
+        : x.file + `QuestMapPin=${pins[slot]}\n`;
+    }
+  }
 }
 
 async function eventsText(env) {
@@ -294,7 +329,9 @@ function challengeJson(c, com, now) {
     startedAt: iso(c.start),
     minChallengeDuration: 0,
     files: c.file ? [{
-      filename: "BattleEvent_1.4.ib3",
+      // filename too is the event's own: games with a title file cache (the PC port) find a file's download, and
+      // keep the file, by this name, so with one name for all they download the first event's file for every event
+      filename: `${c.id}_BattleEvent_1.4.ib3`,
       uniqueFileName: `${c.id}_BattleEvent_1.4.ib3`,
       hash: hash(c.file),
       type: "ib3",
@@ -604,12 +641,15 @@ async function overview(env, all, now, topCount) {
 function warnings(all, previous) {
   const out = [];
   const top = all.filter((c) => c.role !== "child");
-  const pins = {};
+  const pins = {}, arenaPins = new Set(Object.values(ARENA_PINS).flat().map((p) => p.toLowerCase()));
   for (const c of top) {
     const file = c.file || c.children[0].file;
     const pin = file.match(/^QuestMapPin=(.*)$/m)?.[1];
     const overlap = (pins[pin] || []).find((o) => o.start < c.end && c.start < o.end);
-    if (pin && overlap) out.push(`${c.name} and ${overlap.name} are on the same map pin (${pin}) at the same time`);
+    if (pin && overlap) out.push(`${c.name} and ${overlap.name} are on the same map pin (${pin}) at the same time: only one of them shows`);
+    if (pin && !arenaPins.has(pin.toLowerCase()))
+      out.push(`${c.name} is on a story map pin (${pin}): it is hidden while a story mission is there. ` +
+        "Events at a ClashMob arena get the arena's own pins (three at each)");
     (pins[pin] ||= []).push(c);
     if (!file.match(/^BossObj=/m)) out.push(`${c.name} has no boss (BossObj)`);
     for (const x of c.children || [c]) {
@@ -745,6 +785,8 @@ async function handle(request, env) {
     return json({ now, events: await overview(env, parseEvents(await eventsText(env), now), now, 10) });
   if (p[0] === "admin") return handleAdmin(request, env, p, now);
   if (p[0] === "player") return handlePlayer(request, env, p, now);
+  // GET /sword/api/timestamp: the server's time (McpServerTimeManagerV3; the game's SecureTime waits for it)
+  if (p[0] === "sword" && p[1] === "api" && p[2] === "timestamp" && p.length === 3) return text(iso(now));
   if (p[0] === "sword" && p[1] === "api" && p[2] === "challenges") return handleChallenges(request, env, p, url, now);
   return json({}, 404);
 }

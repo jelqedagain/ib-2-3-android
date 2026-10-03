@@ -140,8 +140,6 @@ const KIND_HELP = {
   Tournament: "Competitive. Timed stages: each ranks the players' best fights, and only the top players go on to the next stage.",
 };
 const BOSSES = { "10ft_SnS_BlackKnight": "Dark Knight", "20ft_B_MX-Goliath": "MX-Goliath", "10ft_SnS_LavaLord": "Ember Knight", "10ft_SnS_Ashimar": "Ashimar" };
-const PINS = { MapPin_Obelisk_A: "Obelisk", MapPin_Dunes_A: "Dunes", MapPin_Monastary_A: "Monastery", MapPin_ThePit: "The Pit",
-  MapPin_Lake_A: "Lake", MapPin_SlotCanyon: "Slot Canyon", MapPin_Lookout: "Lookout" };
 const SCENERY = { cm_obelisk_art: "Obelisk", cm_dunes_art: "Dunes", C01_CM_Monastery_Art: "Monastery" };
 const SCORING = {
   BT_KillNBosses: ["Kills", "Each boss killed is 1 point (one boss per fight).", "kills"],
@@ -490,9 +488,9 @@ function eventHtml(e, ei) {
       ${type === "Tournament" ? `<div class="grid" style="margin-top:10px">${inp("Who goes on to the next stage (top %)", `${p}.keys.TopPercent`, k.TopPercent || "50", 'type="number" min="1" max="100"')}</div>` : ""}
       <div class="rule">On the map</div>
       <div class="grid">
-        ${pick("Where it shows on the world map", `${p}.fields.QuestMapPin`, f.QuestMapPin, PINS)}
         ${pick("Where the fight takes place", `${p}.fields.SubMapName`, f.SubMapName, SCENERY)}
       </div>
+      <div class="hint">It shows on the world map at that arena's ClashMob markers (three there, none used by the story), so story missions never hide it.</div>
       <details style="margin-top:14px"><summary>Advanced</summary><div class="grid" style="margin-top:10px">
         ${inp("Id", `${p}.name`, e.name, 'pattern="[A-Za-z0-9_-]{1,40}"', "Letters, digits, - and _. Changing it starts the event over.")}
         <label>A player's points<select data-path="${p}.keys.Score">${opt({ Total: "All their fights added up", Best: "Their best fight" }, k.Score || (type === "ClashMob" ? "Total" : "Best"))}</select></label>
@@ -593,18 +591,18 @@ $("tab-edit").addEventListener("change", (ev) => {
 const TEMPLATES = {
   Trial: () => ({ name: "trial", keys: { Type: "Trial", Days: "7", Score: "Best" },
     fields: { Title: "New Trial", Desc: "Do as much damage as you can in 30 seconds!", BattleType: "BT_Kill1Boss", BossObj: "20ft_B_MX-Goliath", BossLevel: "10",
-      BossScaledLevel: "1.0", BossHealth: "100000", MaxPlays: "10", SubMapName: "cm_dunes_art", QuestMapPin: "MapPin_Dunes_A" },
+      BossScaledLevel: "1.0", BossHealth: "100000", MaxPlays: "10", SubMapName: "cm_dunes_art" },
     rewards: [{ type: "TRA_Random_Gold", data: "GOLD.10000", goal: "500" }, { type: "TRA_GrabBag_LargeGem", data: "", goal: "2000" },
       { type: "TRA_GrabBag_Uber", data: "", goal: "5000" }], other: [], stages: [] }),
   ClashMob: () => ({ name: "clashmob", keys: { Type: "ClashMob", Days: "7" },
     fields: { Title: "New ClashMob", BattleType: "BT_KillNBosses", BossObj: "10ft_SnS_BlackKnight", BossLevel: "10", BossScaledLevel: "1.0",
-      SubMapName: "cm_obelisk_art", QuestMapPin: "MapPin_Obelisk_A" },
+      SubMapName: "cm_obelisk_art" },
     rewards: [], other: [], stages: [1, 2, 3].map((i) => ({ n: String(i), keys: { Goal: String(i * 50) },
       fields: { Desc: `Stage ${i}: the mob must kill ${i * 50}. Kill one to earn the prize.` },
       rewards: [{ type: i < 3 ? "TRA_Random_Gold" : "TRA_GrabBag_Uber", data: i < 3 ? `GOLD.${i * 15000}` : "", goal: "1" }], other: [] })) }),
   Tournament: () => ({ name: "tournament", keys: { Type: "Tournament", Days: "7", StageHours: "24", TopPercent: "50", Score: "Best" },
     fields: { Title: "Aegis Tournament", BattleType: "BT_Kill1Boss", BossObj: "10ft_SnS_Ashimar", BossLevel: "20", BossScaledLevel: "1.2", BossHealth: "1000000",
-      EndTime: "30", MaxPlays: "5", SubMapName: "cm_obelisk_art", QuestMapPin: "MapPin_ThePit" },
+      EndTime: "30", MaxPlays: "5", SubMapName: "cm_obelisk_art" },
     rewards: [], other: [], stages: [1, 2, 3, 4, 5].map((i) => ({ n: String(i), keys: {}, fields: { Desc: `Stage ${i} of 5: do as much damage as you can. The top half go on.` },
       rewards: [i < 5 ? { type: "TRA_Random_Gold", data: `CHIPS.${i * 10}`, goal: "1" } : { type: "TRA_Item_Fixed", data: "Sword_222", goal: "1" }], other: [] })) }),
 };

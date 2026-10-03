@@ -113,6 +113,11 @@ Phones and iPhones both use ARM64, so on Android the app's code runs directly on
 
 **Download:** [IB3 APK](https://github.com/jelqedagain/ib-2-3-android/releases/tag/ib3) · [IB3 on archive.org](https://archive.org/details/infinity-blade-3-android)
 
+**1.8.1** (2026-10-03)
+
+- The ClashMob Prize Wheel can no longer be bought in Supplies: as in the original game, you only win it in ClashMobs. Supplies shows it to use, with MAX where a price would be, and merchants and fight drops treat it as hidden again. Winning it as a ClashMob prize works as before.
+- ClashMobs now show on the world map at their own ClashMob markers, three at each arena, instead of story markers, so a story mission no longer hides them (for example the Dark Knight ClashMob during Act 5). This comes from the ClashMob server, so 1.8 gets it too.
+
 **1.8** (2026-10-02)
 
 - **ClashMobs are back, online.** The game's community events run again, on a new community server, played by everyone together. Find them on the world map: **Trials** (solo: your best fight earns bronze, silver and gold prizes), **ClashMobs** (co-op, in stages: everyone's fights add up toward one goal per stage; when the mob reaches it, everyone who played gets the stage prize and the next stage opens) and **Aegis Tournaments** (timed stages where the top players go on to the next; the final pays an exclusive item).
