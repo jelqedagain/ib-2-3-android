@@ -32,5 +32,5 @@ export function checkName(raw) {
   return { name };
 }
 
-// What two names are compared by, to keep them unique ("Joel", "joel" and "J O E L" are the same name)
+// What two names are compared by, to keep them unique ("Siris", "siris" and "S I R I S" are the same name)
 export const nameKey = (name) => name.toLowerCase().replace(/ /g, "");

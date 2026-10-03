@@ -44,7 +44,7 @@ npx wrangler secret put ADMIN_KEY        # the admin password (asked for, not ec
 ```
 
 Abuse limits: 100 requests a minute and 10 new players a day per connection, 10 wrong admin passwords an hour per
-connection, one scoring fight every 20 seconds per player, and caps on what one fight can score. Connections are
+connection, one scoring fight every 15 seconds per player, and caps on what one fight can score. Connections are
 counted by a fingerprint of their address (an HMAC with the IP_SALT secret: `npx wrangler secret put IP_SALT`), never
 the address itself.
 
