@@ -21,6 +21,7 @@ Phones and iPhones both use ARM64, so on Android the app's code runs directly on
 - **Graphics:** OpenGL ES calls go to the device's driver.
 - **Audio and video:** AAudio and MediaCodec.
 - **Input:** touch, keyboard and game controllers.
+- **ClashMobs (IB3):** a small community server (`server/clashmob`, a Cloudflare Worker) runs the online events; see its README.
 
 ## Versions
 
@@ -111,6 +112,13 @@ Phones and iPhones both use ARM64, so on Android the app's code runs directly on
 <summary><b>Click for IB3</b></summary>
 
 **Download:** [IB3 APK](https://github.com/jelqedagain/ib-2-3-android/releases/tag/ib3) · [IB3 on archive.org](https://archive.org/details/infinity-blade-3-android)
+
+**1.8** (2026-10-02)
+
+- **ClashMobs are back, online.** The game's community events run again, on a new community server, played by everyone together. Find them on the world map: **Trials** (solo: your best fight earns bronze, silver and gold prizes), **ClashMobs** (co-op, in stages: everyone's fights add up toward one goal per stage; when the mob reaches it, everyone who played gets the stage prize and the next stage opens) and **Aegis Tournaments** (timed stages where the top players go on to the next; the final pays an exclusive item).
+- New **ClashMobs** page on the home screen: your name on the ClashMob leaderboards (3 to 16 letters, numbers and spaces; no two players alike), online ClashMobs on or off, and the events running now with time left, the mob's progress and the prizes. It links to the ClashMobs web page with the leaderboards.
+- Your game never gets an online account and your saves never leave your phone: the server only knows a random player id and the name you choose. Without a connection, or with online ClashMobs off, the game plays offline ClashMobs on your own.
+- The app now asks Android for internet access, for the ClashMob server only: nothing else in the game goes online.
 
 **1.7** (2026-10-02)
 

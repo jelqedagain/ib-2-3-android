@@ -68,6 +68,12 @@ Two Android apps, IB2 and IB3, are built from one codebase. Each has its own ver
 
 # IB3
 
+## 1.8 (2026-10-02)
+- **ClashMobs are back, online.** The game's community events run again, on a new community server, played by everyone together. Find them on the world map: **Trials** (solo: your best fight earns bronze, silver and gold prizes), **ClashMobs** (co-op, in stages: everyone's fights add up toward one goal per stage; when the mob reaches it, everyone who played gets the stage prize and the next stage opens) and **Aegis Tournaments** (timed stages where the top players go on to the next; the final pays an exclusive item).
+- New **ClashMobs** page on the home screen: your name on the ClashMob leaderboards (3 to 16 letters, numbers and spaces; no two players alike), online ClashMobs on or off, and the events running now with time left, the mob's progress and the prizes. It links to the ClashMobs web page with the leaderboards.
+- Your game never gets an online account and your saves never leave your phone: the server only knows a random player id and the name you choose. Without a connection, or with online ClashMobs off, the game plays offline ClashMobs on your own.
+- The app now asks Android for internet access, for the ClashMob server only: nothing else in the game goes online.
+
 ## 1.7 (2026-10-02)
 - New layout, easier to find things: the home screen has Cheats, Saves, Settings and Help. **Cheats** holds Developer mode and every cheat, grouped (Developer mode, Items, Gems, While playing), with a search box; each line says when it takes effect (ALWAYS ON, NEXT PLAY or IN GAME) and where to see it in the game. **Saves** holds Edit save (gold, level, XP, stats), Back up and Restore. **Help** has Report a problem (was Share logs), the home screen icon, and a "Where do I find…" list. Settings keeps only language, graphics, sound and controls.
 - Developer mode moved to the Cheats page (its first switch; Settings has a row that takes you there): it now puts a CHEATS section at the TOP of the game's Options (gear, Options) with god mode, unlimited super and magic, always fast forward and boss attacks (the same switches as the app's Cheats page, kept in step both ways), kill boss, give gold, get every item and gem shop refills, all working at once without restarting; the rest of the game's developer options are below it under DEVELOPER.

@@ -3,8 +3,8 @@
      a NativeActivity (GameActivity); LauncherActivity installs it from the player's .ipa first. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="@PACKAGE@"
-    android:versionCode="23"
-    android:versionName="1.7">
+    android:versionCode="24"
+    android:versionName="1.8">
 
     <uses-feature android:glEsVersion="0x00030000" android:required="true" />
     <!-- ClashMobs: the community ClashMob server (src/game/clashmob.cpp); nothing else goes online. -->
