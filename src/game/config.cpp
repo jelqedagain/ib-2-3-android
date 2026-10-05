@@ -82,13 +82,19 @@ std::string read_file(const std::string& path) {
 // stripped), the settings become console commands the engine runs at startup instead: its command
 // line (CookedIPhone/UE3CommandLine.txt) can run a file of commands, as the Community Patches do
 // with Binaries/Commands.txt. The game is served copies of both with the settings added.
-// Only the shadow resolution is changed: turning on effects the game's own settings leave off (bloom,
-// depth of field...) broke Infinity Blade II's picture.
+// Only the shadow resolution is changed, and shadows and light shafts can be turned off: turning on effects
+// the game's own settings leave off (bloom, depth of field...) broke IB2's picture.
 void apply_as_startup_commands() {
     const settings::Settings& s = settings::get();
     std::string commands = read_file(vfs::host_bundle() + "/Binaries/Commands.txt");
     commands += "\n; Added by the port: sharper character shadows at today's screen resolutions\n";
     commands += std::string("Scale Set MaxShadowResolution ") + (s.high_res_shadows ? "2048" : "1024") + "\n";
+    // IB2's phone profiles have both on; off is what its in-game developer rows ("scale toggle ...") did for the
+    // rest of a session.
+    if (is_infinity_blade_2()) {
+        if (!s.dynamic_shadows) commands += "Scale Set DynamicShadows False\n";
+        if (!s.light_shafts) commands += "Scale Set bAllowLightShafts False\n";
+    }
     // The Community Patch caps the frame rate at 62 (about 60); a later line wins.
     if (s.max_fps != 60)
         commands += "Set Engine MaxSmoothedFrameRate " + std::to_string(s.max_fps == 30 ? 30 : s.max_fps + 2) + "\n";
@@ -107,8 +113,8 @@ void apply_as_startup_commands() {
     std::ofstream(dir + "/UE3CommandLine.txt", std::ios::binary) << command_line;
     vfs::override_bundle_file("Binaries/Commands.txt", dir + "/Commands.txt");
     vfs::override_bundle_file("CookedIPhone/UE3CommandLine.txt", dir + "/UE3CommandLine.txt");
-    LOG_INFO("settings: shadow resolution %s, %d fps cap set by startup commands", s.high_res_shadows ? "2048" : "1024",
-             s.max_fps);
+    LOG_INFO("settings: shadow resolution %s, %d fps cap, shadows %d, light shafts %d set by startup commands",
+             s.high_res_shadows ? "2048" : "1024", s.max_fps, s.dynamic_shadows, s.light_shafts);
 }
 
 }  // namespace

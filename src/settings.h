@@ -59,6 +59,8 @@ void load();
 void save();
 // Changes one [Cheats] switch, in memory and in settings.ini (the in-game CHEATS rows).
 void set_cheat(const char* key, bool on);
+// The same for a [Graphics] switch (IB2's in-game Shadows and Light shafts rows).
+void set_graphics(const char* key, bool on);
 
 // Key bindings: Unreal key name ("S", "LeftShift", ...) for each action id.
 std::string key_for(const char* action, const char* default_key);

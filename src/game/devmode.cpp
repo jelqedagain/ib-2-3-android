@@ -35,6 +35,7 @@ struct Row {
     int games = 3;               // 1 IB2, 2 IB3, 3 both (IB2 lacks the Hideout and boss weapon handlers)
     const char* cheat = nullptr;  // [Cheats] key of a switch shared with the app
     Action action = Action::None;
+    const char* graphics = nullptr;  // IB2: [Graphics] key of the effect the row toggles (the app's Settings has it too)
 };
 constexpr int kIB2 = 1, kIB3 = 2;
 
@@ -64,8 +65,8 @@ const Row kRows[] = {
     {Kind::Button, "OnRebalancePlayerStats", "Rebalance player stats"},
     {Kind::Button, "OnUpdateNameCharacter", "Rename character"},
     {Kind::Button, "OnUpdateToggleFps", "Show FPS"},
-    {Kind::Check, "OnUpdateToggleGodrays", "Light shafts"},
-    {Kind::Check, "OnUpdateToggleShadows", "Shadows"},
+    {Kind::Check, "OnUpdateToggleGodrays", "Light shafts", 3, nullptr, Action::None, "LightShafts"},
+    {Kind::Check, "OnUpdateToggleShadows", "Shadows", 3, nullptr, Action::None, "DynamicShadows"},
     {Kind::Check, "OnUpdateDemoHud", "Demo HUD"},
     {Kind::Check, "OnToggleGestureTest", "Gesture test"},
     {Kind::Check, "OnUpdateTutorial", "Tutorial"},
@@ -140,6 +141,11 @@ bool cheat_on(const char* key) {
            : k == "GemShopRestock" ? s.gem_shop_restock : k == "AllGems" ? s.all_gems : false;
 }
 
+bool graphics_on(const char* key) {
+    const auto& s = settings::get();
+    return std::string(key) == "LightShafts" ? s.light_shafts : s.dynamic_shadows;
+}
+
 // Moves the rows added at the end of the list (from index `first`) to its top.
 void move_to_top(ue::TArray<u64>& items, int first) {
     std::vector<u64> all(items.num);
@@ -183,6 +189,9 @@ void add_rows(cpu::Thread& t, GuestAddr list) {
         g_ours.insert(item);
         g_rows.push_back({item, &r});
         if (r.cheat) set_checked(t, item, cheat_on(r.cheat));
+        // IB2's light shafts and shadows rows toggle the effect ("scale toggle ..."); their check mark starts as the
+        // effect is (on unless the app's Settings turned it off at startup), so it shows the truth.
+        if (r.graphics && game == kIB2) set_checked(t, item, graphics_on(r.graphics));
     }
     if (ue::read_property(t, list, "Items", items) && items.num > first) move_to_top(items, first);
     g_count = items.num;
@@ -289,6 +298,8 @@ void gem_shop_tick(cpu::Thread& t, GuestAddr pawn) {
 
 bool is_cheat_row_handler(const std::string& name) {
     if (name == "OnUpdateGiveGold") return true;  // runs as it is; its row then shows the gold
+    if ((name == "OnUpdateToggleGodrays" || name == "OnUpdateToggleShadows") && is_infinity_blade_2())
+        return true;  // runs as it is; the new state is kept in settings.ini
     for (const char* h : kSpare)
         if (name == h) return true;
     return false;
@@ -305,6 +316,15 @@ bool cheat_row_called(cpu::Thread& t, GuestAddr list, GuestAddr frame, const std
     }
     for (auto& [it, r] : g_rows) {
         if (it != item) continue;
+        if (r->graphics) {
+            if (!is_infinity_blade_2()) return false;
+            // The tap has flipped the check mark; the game's handler then toggles the effect. Kept for the next start.
+            bool on = false;
+            ue::read_bool(t, item, "bIsChecked", on);
+            settings::set_graphics(r->graphics, on);
+            LOG_INFO("settings: %s %s (in-game Options)", r->graphics, on ? "on" : "off");
+            return false;
+        }
         if (r->cheat) {
             bool on = false;
             ue::read_bool(t, item, "bIsChecked", on);

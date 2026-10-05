@@ -18,8 +18,8 @@ import java.util.List;
 
 /**
  * The settings page: writes settings.ini (src/settings.cpp reads it when the game starts). The two apps
- * show only what their game uses: IB3 takes all of its renderer's options; IB2 only the shadow
- * resolution and frame rate (src/game/config.cpp), plus its full-screen layout. Both choose the game's language.
+ * show only what their game uses: IB3 takes all of its renderer's options; IB2 only the shadows (on/off and
+ * resolution), light shafts and frame rate (src/game/config.cpp), plus its full-screen layout. Both choose the game's language.
  */
 final class SettingsScreen {
     private final Activity a;
@@ -99,11 +99,13 @@ final class SettingsScreen {
         if (!ib2) {
             addRow(graphics, choice("Anti-aliasing", "Smooths jagged edges. MSAA looks best and costs the most.",
                     "Graphics", "AntiAliasing", 1, new int[] {0, 1, 2}, new String[] {"Off", "FXAA", "MSAA 4x"}));
-            addRow(graphics, toggle("Shadows", "Characters cast shadows.", "Graphics", "DynamicShadows", 1));
         }
+        // IB2: the same switches as the in-game developer rows "Shadows" and "Light shafts", kept from one start to the next.
+        String smoother = ib2 ? " Turning it off can make the game run smoother." : "";
+        addRow(graphics, toggle("Shadows", "Characters cast shadows." + smoother, "Graphics", "DynamicShadows", 1));
         addRow(graphics, toggle("Sharper shadows", "Higher-resolution character shadows.", "Graphics", "HighResShadows", 0));
+        addRow(graphics, toggle("Light shafts", "Beams of light through windows and trees." + smoother, "Graphics", "LightShafts", 1));
         if (!ib2) {
-            addRow(graphics, toggle("Light shafts", "Beams of light through windows and trees.", "Graphics", "LightShafts", 1));
             addRow(graphics, toggle("Bloom", "Glow around bright light.", "Graphics", "Bloom", 1));
             addRow(graphics, toggle("Depth of field", "Blurs the background in cutscenes and menus.", "Graphics", "DepthOfField", 1));
             addRow(graphics, choice("Texture filtering", "Sharper textures at an angle.",

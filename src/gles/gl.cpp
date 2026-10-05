@@ -94,6 +94,7 @@ using GLsizeiptr = s64;
     X(glGenQueriesEXT, void, (GLsizei a, GLuint* b), (a, b))                                                         \
     X(glGenRenderbuffers, void, (GLsizei a, GLuint* b), (a, b))                                                      \
     X(glGenTextures, void, (GLsizei a, GLuint* b), (a, b))                                                           \
+    X(glGetActiveUniform, void, (GLuint a, GLuint b, GLsizei c, GLsizei* d, GLint* e, GLenum* f, char* g), (a, b, c, d, e, f, g)) \
     X(glGetAttribLocation, GLint, (GLuint a, const char* b), (a, b))                                                 \
     X(glGetError, GLenum, (), ())                                                                                    \
     X(glGetIntegerv, void, (GLenum a, GLint* b), (a, b))                                                             \
@@ -104,6 +105,7 @@ using GLsizeiptr = s64;
     X(glGetShaderPrecisionFormat, void, (GLenum a, GLenum b, GLint* c, GLint* d), (a, b, c, d))                      \
     X(glGetString, const u8*, (GLenum a), (a))                                                                       \
     X(glGetUniformLocation, GLint, (GLuint a, const char* b), (a, b))                                                \
+    X(glGetUniformfv, void, (GLuint a, GLint b, GLfloat* c), (a, b, c))                                              \
     X(glInvalidateFramebuffer, void, (GLenum a, GLsizei b, const GLenum* c), (a, b, c))                              \
     X(glLinkProgram, void, (GLuint a), (a))                                                                          \
     X(glMapBufferOES, void*, (GLenum a, GLenum b), (a, b))                                                           \
@@ -294,6 +296,30 @@ void framelog_draw(const char* what, int count) {
     for (GLsizei i = 0; i < n; i++) ids += " " + std::to_string(shaders[i]);
     LOG_INFO("framelog: %s %d fb %d prog %d (shaders%s) viewport %d,%d %dx%d%s |%s", what, count, fb, prog, ids.c_str(), vp[0], vp[1],
              vp[2], vp[3], bound_textures().c_str(), tags.c_str());
+    // The blur's taps and weights as set (the idea and the uniform dump come from rafidwayne's depth-of-field fix).
+    if (!prog || tags.find("SampleOffsets") == std::string::npos) return;
+    GLint uniforms = 0;
+    p_glGetProgramiv(prog, 0x8B86 /*GL_ACTIVE_UNIFORMS*/, &uniforms);
+    for (GLint i = 0; i < uniforms; i++) {
+        char name[96] = "";
+        GLint size = 0;
+        GLenum type = 0;
+        p_glGetActiveUniform(prog, i, sizeof name, nullptr, &size, &type, name);
+        std::string base = name;
+        if (base.size() > 3 && base.compare(base.size() - 3, 3, "[0]") == 0) base.resize(base.size() - 3);
+        if (base.find("SampleOffsets") == std::string::npos && base.find("SampleWeights") == std::string::npos) continue;
+        std::string line;
+        for (GLint k = 0; k < size && k < 16; k++) {
+            GLint loc = p_glGetUniformLocation(prog, (size > 1 ? base + "[" + std::to_string(k) + "]" : base).c_str());
+            GLfloat v[4] = {};
+            if (loc < 0) continue;
+            p_glGetUniformfv(prog, loc, v);
+            char buf[96];
+            snprintf(buf, sizeof buf, " [%d](%.5g %.5g %.5g %.5g)", k, v[0], v[1], v[2], v[3]);
+            line += buf;
+        }
+        LOG_INFO("framelog:   %s%s", base.c_str(), line.c_str());
+    }
 }
 
 // Called at every present: starts or ends a logged frame.
@@ -789,6 +815,24 @@ std::string smooth_modulated_shadows(const std::string& src) {
     return out;
 }
 
+// IB3's Gaussian blur (bloom, depth of field) takes two taps per vec4 of offsets: its vertex shader
+// makes `OffsetUVs[i] = TexCoords0.xyyx + SampleOffsets16[i]` and the pixel shader reads `.xy` and `.wz`, which
+// expects each pair packed (xA, yA, yB, xB), as UE3 packs them for its PC shaders. The game sets them (xA, yA, xB, yB)
+// (framelog: a horizontal pass has its second x offset in z), so every second tap went along the other axis and the
+// blur came out streaky and too weak. Swizzling the offsets to .xywz puts both taps where they belong.
+// Found by rafidwayne (github.com/rafidwayne/Infinity-Blade-3-Android-Depth-of-Field-effect-fix).
+std::string fix_blur_tap_order(const std::string& src) {
+    static const std::string key = "TexCoords0.xyyx + SampleOffsets";
+    if (game::is_infinity_blade_2() || src.find(key) == std::string::npos) return src;
+    std::string out = src;
+    for (size_t at = out.find(key); at != std::string::npos; at = out.find(key, at + 1)) {
+        size_t close = out.find(']', at);
+        if (close == std::string::npos) break;
+        if (out.compare(close + 1, 5, ".xywz") != 0) out.insert(close + 1, ".xywz");
+    }
+    return out;
+}
+
 #ifdef __ANDROID__
 // Android GPUs can't sample PVRTC, and decoded to RGBA8 it takes 8x (2 bpp: 16x) the memory the game
 // budgets for. IB3: over 1 GB of textures at the beach, 2 GB while the tutorial hands over to it, enough
@@ -1013,10 +1057,21 @@ void install_gl() {
         for (GLsizei i = 0; i < count; i++)
             src += lengths && lengths[i] >= 0 ? std::string(strings[i], lengths[i]) : std::string(strings[i]);
         std::string moved = fix_global_initializers(src);
-        std::string fixed = smooth_modulated_shadows(moved);
-        static std::atomic<int> total{0}, rewritten{0};
+        std::string shadowed = smooth_modulated_shadows(moved);
+#ifdef __ANDROID__
+        // debug.ibport.blurfix 0: the blur as the game sets it (for comparisons).
+        static const bool blurfix = [] {
+            char v[PROP_VALUE_MAX] = {};
+            return !(__system_property_get("debug.ibport.blurfix", v) > 0 && v[0] == '0');
+        }();
+#else
+        constexpr bool blurfix = true;
+#endif
+        std::string fixed = blurfix ? fix_blur_tap_order(shadowed) : shadowed;
+        static std::atomic<int> total{0}, rewritten{0}, blurs{0};
         int n = ++total;
-        if (moved != src || fixed != moved) {
+        if (fixed != shadowed) LOG_INFO("shader %d: blur taps reordered (%d so far)", n, ++blurs);
+        if (moved != src || shadowed != moved) {
             int r = ++rewritten;
             if (r <= 10 || r % 50 == 0)
                 LOG_INFO("shader %d rewritten (%d so far): %s", n, r, moved != src ? "globals moved into main" : "shadow filter");

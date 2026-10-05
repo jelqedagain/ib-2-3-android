@@ -138,6 +138,14 @@ void set_cheat(const char* key, bool on) {
     write_int(L"Cheats", widen(key).c_str(), on);
 }
 
+void set_graphics(const char* key, bool on) {
+    Settings& s = get();
+    std::string k = key;
+    bool* field = k == "DynamicShadows" ? &s.dynamic_shadows : k == "LightShafts" ? &s.light_shafts : nullptr;
+    if (field) *field = on;
+    write_int(L"Graphics", widen(key).c_str(), on);
+}
+
 Settings& get() {
     if (!g_loaded) load();
     return g_settings;

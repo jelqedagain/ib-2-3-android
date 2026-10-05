@@ -4,6 +4,9 @@ Two Android apps, IB2 and IB3, are built from one codebase. Each has its own ver
 
 # IB2
 
+## 1.8.2 (2026-10-05)
+- Settings, Graphics now has **Shadows** and **Light shafts** switches that stay as you set them every time you play. Turning them off can make the game run smoother. The game's own Shadows and Light shafts rows (Developer mode, Options, DEVELOPER) used to start as "off" whatever the game was doing, and a tap only flipped the effect for that session; they now show the real state and a change there is kept too.
+
 ## 1.7 (2026-10-02)
 - New layout, easier to find things: the home screen has Cheats, Saves, Settings and Help. **Cheats** holds Developer mode and every cheat, grouped (Developer mode, Items, Gems, While playing), with a search box; each line says when it takes effect (ALWAYS ON, NEXT PLAY or IN GAME) and where to see it in the game. **Saves** holds Edit save (gold, level, XP, stats), Back up and Restore. **Help** has Report a problem (was Share logs), the home screen icon, and a "Where do I find…" list. Settings keeps only language, graphics, sound and controls.
 - Developer mode moved to the Cheats page (its first switch; Settings has a row that takes you there): it now puts a CHEATS section at the TOP of the game's Options (gear, Options) with god mode, unlimited super and magic, always fast forward and boss attacks (the same switches as the app's Cheats page, kept in step both ways), kill boss, give gold, get every item and gem shop refills, all working at once without restarting; the rest of the game's developer options are below it under DEVELOPER.
@@ -67,6 +70,9 @@ Two Android apps, IB2 and IB3, are built from one codebase. Each has its own ver
 - First IB2 build, with sharp character shadows on GPUs other than Apple's.
 
 # IB3
+
+## 1.8.2 (2026-10-05)
+- Depth of field and bloom blur fixed: the background in cutscenes and menus was streaky and grainy instead of smoothly out of focus, and glows had a hard dark edge. The game packs its blur offsets differently from what its larger blur shaders read, so half of every blur's samples went the wrong way; this showed on every phone since 1.7, which made the blur wide enough for today's screens. Found and fixed by rafidwayne (github.com/rafidwayne/Infinity-Blade-3-Android-Depth-of-Field-effect-fix).
 
 ## 1.8.1 (2026-10-03)
 - The ClashMob Prize Wheel can no longer be bought in Supplies: as in the original game, you only win it in ClashMobs. Supplies shows it to use, with MAX where a price would be, and merchants and fight drops treat it as hidden again. Winning it as a ClashMob prize works as before.

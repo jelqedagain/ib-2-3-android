@@ -30,6 +30,10 @@ Phones and iPhones both use ARM64, so on Android the app's code runs directly on
 
 **Download:** [IB2 APK](https://github.com/jelqedagain/ib-2-3-android/releases/tag/ib2) · [IB2 on archive.org](https://archive.org/details/infinity-blade-2-android)
 
+**1.8.2** (2026-10-05)
+
+- Settings, Graphics now has **Shadows** and **Light shafts** switches that stay as you set them every time you play. Turning them off can make the game run smoother. The game's own Shadows and Light shafts rows (Developer mode, Options, DEVELOPER) used to start as "off" whatever the game was doing, and a tap only flipped the effect for that session; they now show the real state and a change there is kept too.
+
 **1.7** (2026-10-02)
 
 - New layout, easier to find things: the home screen has Cheats, Saves, Settings and Help. **Cheats** holds Developer mode and every cheat, grouped (Developer mode, Items, Gems, While playing), with a search box; each line says when it takes effect (ALWAYS ON, NEXT PLAY or IN GAME) and where to see it in the game. **Saves** holds Edit save (gold, level, XP, stats), Back up and Restore. **Help** has Report a problem (was Share logs), the home screen icon, and a "Where do I find…" list. Settings keeps only language, graphics, sound and controls.
@@ -112,6 +116,10 @@ Phones and iPhones both use ARM64, so on Android the app's code runs directly on
 <summary><b>Click for IB3</b></summary>
 
 **Download:** [IB3 APK](https://github.com/jelqedagain/ib-2-3-android/releases/tag/ib3) · [IB3 on archive.org](https://archive.org/details/infinity-blade-3-android)
+
+**1.8.2** (2026-10-05)
+
+- Depth of field and bloom blur fixed: the background in cutscenes and menus was streaky and grainy instead of smoothly out of focus, and glows had a hard dark edge. The game packs its blur offsets differently from what its larger blur shaders read, so half of every blur's samples went the wrong way; this showed on every phone since 1.7, which made the blur wide enough for today's screens. Found and fixed by rafidwayne (github.com/rafidwayne/Infinity-Blade-3-Android-Depth-of-Field-effect-fix).
 
 **1.8.1** (2026-10-03)
 
