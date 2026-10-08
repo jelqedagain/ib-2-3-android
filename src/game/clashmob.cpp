@@ -482,6 +482,13 @@ bool serve(const ns::HttpRequest& req, ns::HttpResponse& resp) {
     LOG_INFO("clashmob: %s %s%s%s %s", req.method.c_str(), path.c_str(), query.empty() ? "" : "?", query.c_str(), body.c_str());
 
     auto p = split_path(path);
+    // GET /sword/api/timestamp: the game's SecureTime waits for the server's time before SwordClashMobManager.FullyEnabled
+    // lets it ask for the event list (offline, the request just fails and no ClashMob is ever requested). The phone's
+    // own clock is the time.
+    if (p.size() == 3 && p[0] == "sword" && p[1] == "api" && p[2] == "timestamp") {
+        resp.body = "\"" + iso_time(time(nullptr)) + "\"";
+        return true;
+    }
     if (p.size() < 3 || p[0] != "sword" || p[1] != "api" || p[2] != "challenges") return false;  // offline
 
     // The community server's events: everything but the port's own events
