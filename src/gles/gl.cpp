@@ -756,6 +756,20 @@ bool only_literals(const std::string& s) {
     return true;
 }
 
+// Infinity Blade III's character shaders declare `uniform float RimLightingStrength` in both stages with no precision of its
+// own: the vertex shader's default is highp and the fragment shader's mediump, and GLSL ES wants one uniform to have one
+// precision. Apple's GPUs accept that; stricter drivers (the Android emulator's, some phones') fail to link every rim-lit
+// character, which then draws with a wrong shader (neon outlines, broken textures). Declaring the precision gives both stages
+// the same one.
+std::string fix_uniform_precision(const std::string& src) {
+    static const std::string bare = "uniform float RimLightingStrength", fixed = "uniform mediump float RimLightingStrength";
+    size_t at = src.find(bare);
+    if (at == std::string::npos) return src;
+    std::string out = src;
+    out.replace(at, bare.size(), fixed);
+    return out;
+}
+
 std::string fix_global_initializers(const std::string& src) {
     auto trim = [](std::string s) {
         size_t a = s.find_first_not_of(" \t\r"), b = s.find_last_not_of(" \t\r");
@@ -1056,7 +1070,7 @@ void install_gl() {
         std::string src;
         for (GLsizei i = 0; i < count; i++)
             src += lengths && lengths[i] >= 0 ? std::string(strings[i], lengths[i]) : std::string(strings[i]);
-        std::string moved = fix_global_initializers(src);
+        std::string moved = fix_global_initializers(fix_uniform_precision(src));
         std::string shadowed = smooth_modulated_shadows(moved);
 #ifdef __ANDROID__
         // debug.ibport.blurfix 0: the blur as the game sets it (for comparisons).
