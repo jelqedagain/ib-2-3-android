@@ -17,6 +17,7 @@
 #include "port/android/android_app.h"
 #include <sys/system_properties.h>
 #endif
+#include <cstdio>
 #include <cstring>
 #include <cstdlib>
 #include <ctime>
@@ -399,14 +400,17 @@ void identity(std::string& id, std::string& key) {
 
 // Sends the game's request to the server (through GameActivity.httpRequest). False when the server could not be
 // reached; any answer it gives, errors too, is the server's.
-bool ask_server(const std::string& url, const ns::HttpRequest& req, ns::HttpResponse& resp) {
+bool ask_server(const std::string& url, const ns::HttpRequest& req, ns::HttpResponse& resp, bool identify = true) {
 #ifdef __ANDROID__
     ANativeActivity* a = android::activity();
     JNIEnv* env = android::env();
     if (!a || !env) return false;
-    std::string id, key;
-    identity(id, key);
-    std::string headers = "X-ClashMob-Player: " + id + "\nX-ClashMob-Key: " + key + "\nX-ClashMob-Game: ib3\n";
+    std::string headers;
+    if (identify) {  // IB3: the player's id and key (Infinity Blade II's server learns the player from /registeruser)
+        std::string id, key;
+        identity(id, key);
+        headers = "X-ClashMob-Player: " + id + "\nX-ClashMob-Key: " + key + "\nX-ClashMob-Game: ib3\n";
+    }
     for (auto& [k, v] : req.headers)
         if (_stricmp(k.c_str(), "Content-Type") == 0) headers += k + ": " + v + "\n";
     jclass cls = env->GetObjectClass(a->clazz);
@@ -572,10 +576,101 @@ bool serve(const ns::HttpRequest& req, ns::HttpResponse& resp) {
     return true;
 }
 
+// ---- Infinity Blade II ----
+//
+// IB2's ClashMobs speak Epic's classic MCP web API (/registeruser, /challengelist, /challengestatus, /acceptchallenge,
+// /updatechallenge, /updatereward, /timestamp, /listfiles, /downloadfile) to ib2-mcp-prod.appspot.com, which is gone. With the
+// community server set, those requests go to it as they are (same paths, same query), and the server (the one the patched iOS
+// game uses too) answers them. The player is whoever /registeruser made: no identity headers.
+//
+// Two more things the game needs on Android:
+// * The event details (title, description, boss) reach IB2 as a config patch (SwordChallenges.ini) that the game downloads
+//   through Game Center; Android has none, so every event would show the game's built-in text for its map. IBG's fix: the game
+//   has a Facebook function that downloads FacebookMePermissionsUrl (graph.facebook.com/me/permissions) and that nothing uses
+//   any more. Its checks are skipped and its answer is handed to the ClashMob status handler (4 same-length script patches
+//   below, checked against the original bytes first), and the request for that URL is answered with the server's config patch.
+// * The ClashMob tab asks for a Facebook login first; the same patches send it to the event list instead.
+
+// "https://host/path?query" -> "host"
+std::string url_host(const std::string& url) {
+    size_t start = url.find("://");
+    start = start == std::string::npos ? 0 : start + 3;
+    size_t end = url.find_first_of("/?", start);
+    return url.substr(start, end == std::string::npos ? std::string::npos : end - start);
+}
+
+// Infinity Blade II 1.3.5's SwordGame.xxx (7,924,840 bytes): file offset, the bytes there, the bytes to put there.
+struct ScriptPatch {
+    long offset;
+    std::vector<u8> from, to;
+    const char* what;
+};
+
+void patch_ib2_package() {
+    static const std::vector<ScriptPatch> patches = {
+        {2915615, {0xF2, 0x02}, {0xE1, 0x02}, "SwordClashMobScene.Opened: always go to the event list"},
+        {4385715, {0xDC, 0x00}, {0x47, 0x00}, "SwordSocialChallenge.VerifyFacebookPermissions: skip the first check"},
+        {4385733, {0x07, 0xDC, 0x00}, {0x06, 0xAE, 0x00}, "VerifyFacebookPermissions: skip the second check"},
+        {4385806, {0xC7}, {0xCC}, "VerifyFacebookPermissions: hand the answer to the ClashMob status handler"},
+    };
+    std::string path = vfs::host_bundle() + "/CookedIPhone/SwordGame.xxx";
+    FILE* f = std::fopen(path.c_str(), "r+b");
+    if (!f) {
+        LOG_WARN("clashmob: cannot open %s: ClashMob text and Facebook patches skipped", path.c_str());
+        return;
+    }
+    std::fseek(f, 0, SEEK_END);
+    long size = std::ftell(f);
+    std::vector<bool> todo(patches.size(), false);
+    bool ok = size == 7924840;
+    for (size_t i = 0; ok && i < patches.size(); i++) {
+        std::vector<u8> now(patches[i].from.size());
+        ok = std::fseek(f, patches[i].offset, SEEK_SET) == 0 && std::fread(now.data(), 1, now.size(), f) == now.size() &&
+             (now == patches[i].from || now == patches[i].to);
+        todo[i] = ok && now == patches[i].from;
+    }
+    if (!ok) {
+        LOG_WARN("clashmob: SwordGame.xxx is not the stock Infinity Blade II 1.3.5 package (size %ld): script patches skipped", size);
+    } else {
+        for (size_t i = 0; i < patches.size(); i++) {
+            if (!todo[i]) continue;
+            if (std::fseek(f, patches[i].offset, SEEK_SET) != 0 || std::fwrite(patches[i].to.data(), 1, patches[i].to.size(), f) != patches[i].to.size())
+                LOG_WARN("clashmob: could not write the patch at %ld", patches[i].offset);
+            else
+                LOG_INFO("clashmob: patched %s", patches[i].what);
+        }
+    }
+    std::fclose(f);
+}
+
+bool serve_ib2(const ns::HttpRequest& req, ns::HttpResponse& resp) {
+    std::string server = server_url();
+    if (server.empty()) return false;  // offline
+    std::string host = url_host(req.url), path, query;
+    split_url(req.url, path, query);
+    std::string target;
+    if (host.size() >= 11 && host.compare(host.size() - 11, 11, "appspot.com") == 0)
+        target = server + path + (query.empty() ? "" : "?" + query);
+    else if (host == "graph.facebook.com" && path == "/me/permissions")
+        target = server + "/downloadfile?titleid=ib2&dlName=SwordChallenges.ini&uniqueChallengeId=ConfigPatch";
+    else
+        return false;
+    bool answered = ask_server(target, req, resp, false);
+    LOG_INFO("clashmob: ib2 %s %s%s -> %s", req.method.c_str(), host.c_str(), path.c_str(),
+             answered ? std::to_string(resp.status).c_str() : "the server cannot be reached");
+    return answered;
+}
+
 }  // namespace
 
 void install_clashmob(const macho::Image& img) {
-    if (is_infinity_blade_2()) return;  // IB3 only for now
+    if (is_infinity_blade_2()) {
+        patch_ib2_package();
+        ns::set_local_server(serve_ib2);
+        std::string server = server_url();
+        LOG_INFO("clashmob: Infinity Blade II ClashMobs (%s%s)", server.empty() ? "offline" : "server ", server.c_str());
+        return;
+    }
     g_dlmalloc = img.find("__Z8dlmallocm");
     ns::set_local_server(serve);
     std::string server = server_url();
