@@ -823,16 +823,31 @@ bool clashmob_script_call(cpu::Thread& t, GuestAddr frame, GuestAddr result) {
         return true;
     }
     if (it->second != Target::UserHasMcpId) return false;
+    // Walk up the script stack: SwordClashMobManager.RequestList asks SwordMyMobManager.IsAuthorized, which asks this,
+    // so the ClashMob code is not the direct caller. (Each function's class is looked up once.)
+    bool from_clashmob = false;
+    std::string chain;
     GuestAddr prev = *gptr<u64>(frame + kFramePrevious);
-    GuestAddr caller = prev ? *gptr<u64>(prev + kFrameNode) : 0;
-    auto c = callers.find(caller);
-    if (c == callers.end()) {
-        std::string cls = caller ? ue::object_name(t, *gptr<u64>(caller + kObjOuter)) : "";
-        c = callers.emplace(caller, cls.find("ClashMob") != std::string::npos).first;
-        LOG_INFO("clashmob: UserHasMcpId from %s.%s -> %s", cls.c_str(), caller ? ue::object_name(t, caller).c_str() : "?",
-                 c->second ? "yes" : "the game's answer");
+    for (int depth = 0; prev && depth < 6; depth++, prev = *gptr<u64>(prev + kFramePrevious)) {
+        GuestAddr caller = *gptr<u64>(prev + kFrameNode);
+        if (!caller) break;
+        auto c = callers.find(caller);
+        if (c == callers.end()) {
+            std::string cls = ue::object_name(t, *gptr<u64>(caller + kObjOuter));
+            c = callers.emplace(caller, cls.find("ClashMob") != std::string::npos).first;
+        }
+        if (c->second) {
+            from_clashmob = true;
+            break;
+        }
     }
-    if (!c->second) return false;
+    static bool logged_yes = false, logged_no = false;
+    if (from_clashmob ? !logged_yes : !logged_no) {
+        (from_clashmob ? logged_yes : logged_no) = true;
+        LOG_INFO("clashmob: UserHasMcpId (first %s) -> %s", from_clashmob ? "from ClashMob code" : "from other code",
+                 from_clashmob ? "yes" : "the game's answer");
+    }
+    if (!from_clashmob) return false;
     if (result) *gptr<u32>(result) = 1;
     return true;
 }
