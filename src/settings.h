@@ -47,7 +47,7 @@ struct Settings {
     bool all_gems = false;  // AllGems: the gem shop sells every gem, each at its highest level (game/devmode.cpp)
     // ClashMobs ([ClashMob] Server, IB3): the community ClashMob server's address (the port's own server unless
     // set; "off" = offline ClashMobs only)
-    std::string clashmob_server = "https://clashmob.clashmob-server.workers.dev";
+    std::string clashmob_server = "https://ibclashmobs.dev";
 };
 
 // Directory of the executable (with trailing backslash); on Android, the app's files folder.

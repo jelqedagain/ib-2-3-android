@@ -25,7 +25,7 @@ import java.security.SecureRandom;
  * saves, the same ones the game sends (src/game/clashmob.cpp); they are made here if the game has not made them yet.
  */
 final class ClashMobName {
-    static final String DEFAULT_SERVER = "https://clashmob.clashmob-server.workers.dev";
+    static final String DEFAULT_SERVER = "https://ibclashmobs.dev";
 
     private ClashMobName() {}
 
