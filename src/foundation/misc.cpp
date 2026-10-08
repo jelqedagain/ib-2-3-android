@@ -339,8 +339,10 @@ void install_misc() {
         cd.started = true;
         auto response = std::make_shared<HttpResponse>();
         objc::retain(conn);
-        RunLoop* loop = &RunLoop::current();
-        auto post = [loop](std::function<void()> fn) { loop->post(std::move(fn)); };
+        // The delegate's callbacks run on the main run loop, as sendAsynchronousRequest's do. (The loop of the thread that
+        // started the connection is not always one that is run: Infinity Blade II starts its ClashMob requests from a
+        // thread whose loop never runs, and never got an answer.)
+        auto post = post_to_main;
         serve_async(cd.request, response, post, [conn, response](bool served) {
             auto& d = objc::ensure<ConnData>(conn);
             auto has = [&](const char* s) { return d.delegate && objc::responds_to(d.delegate, objc::sel(s)); };
