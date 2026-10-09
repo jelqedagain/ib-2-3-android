@@ -75,6 +75,9 @@ Two Android apps, IB2 and IB3, are built from one codebase. Each has its own ver
 
 # IB3
 
+## 1.9.1 (2026-10-09)
+- **The Hideout chest works.** The IB community's ClashMob server (ibclashmobs.dev, run by omgxhat) can fill the chest in the Hideout (in the hut on the left) with gold, an item or another prize, and each player can open each new chest once. A new chest arrives the next time you start the game. The game gets these from the server as small settings files, as it did on iPhone; without a connection nothing changes.
+
 ## 1.9 (2026-10-08)
 - ClashMobs moved to the IB community's ClashMob server (ibclashmobs.dev, run by omgxhat), the same one iPhone players with the ClashMob Revival patch use, with new events run by the community. Names and progress from the old server don't carry over: set your name again on the ClashMobs page.
 - Characters with rim lighting now draw right on phones with strict graphics drivers (some showed them with neon outlines or the wrong shading).
