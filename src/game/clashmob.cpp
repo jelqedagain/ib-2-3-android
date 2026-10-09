@@ -599,7 +599,9 @@ std::string url_host(const std::string& url) {
     return url.substr(start, end == std::string::npos ? std::string::npos : end - start);
 }
 
-// Infinity Blade II 1.3.5's SwordGame.xxx (7,924,840 bytes): file offset, the bytes there, the bytes to put there.
+// Infinity Blade II 1.3.5's SwordGame.xxx: file offset, the bytes there, the bytes to put there. The same in the stock
+// package (7,924,840 bytes) and the Community Patch v2.5's (7,925,026 bytes): checked
+// byte for byte, the patched places are the same in both.
 struct ScriptPatch {
     long offset;
     std::vector<u8> from, to;
@@ -622,7 +624,7 @@ void patch_ib2_package() {
     std::fseek(f, 0, SEEK_END);
     long size = std::ftell(f);
     std::vector<bool> todo(patches.size(), false);
-    bool ok = size == 7924840;
+    bool ok = size == 7924840 || size == 7925026;
     for (size_t i = 0; ok && i < patches.size(); i++) {
         std::vector<u8> now(patches[i].from.size());
         ok = std::fseek(f, patches[i].offset, SEEK_SET) == 0 && std::fread(now.data(), 1, now.size(), f) == now.size() &&
@@ -630,7 +632,7 @@ void patch_ib2_package() {
         todo[i] = ok && now == patches[i].from;
     }
     if (!ok) {
-        LOG_WARN("clashmob: SwordGame.xxx is not the stock Infinity Blade II 1.3.5 package (size %ld): script patches skipped", size);
+        LOG_WARN("clashmob: SwordGame.xxx is not a known Infinity Blade II 1.3.5 package (size %ld): script patches skipped", size);
     } else {
         for (size_t i = 0; i < patches.size(); i++) {
             if (!todo[i]) continue;
