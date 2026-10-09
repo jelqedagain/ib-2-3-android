@@ -493,6 +493,18 @@ bool serve(const ns::HttpRequest& req, ns::HttpResponse& resp) {
         resp.body = "\"" + iso_time(time(nullptr)) + "\"";
         return true;
     }
+    // GET /sword/api/cloudstorage/system[/{file}]: the community server's config patch files. The game's IniLocPatcher asks for
+    // them at startup and merges them into its config, which is how the server can switch on things the game ships with turned
+    // off (the Hideout chest: SwordPlayer.HideOutChestType/Tag/DropData). Without a server, or when it does not answer, there are
+    // no files, as before.
+    if (p.size() >= 4 && p[0] == "sword" && p[1] == "api" && p[2] == "cloudstorage" && p[3] == "system" && req.method == "GET") {
+        std::string server = server_url();
+        if (!server.empty() && ask_server(server + path + (query.empty() ? "" : "?" + query), req, resp) && resp.status == 200) {
+            LOG_INFO("clashmob: system files: %d, %zu bytes", resp.status, resp.body.size());
+            return true;
+        }
+        return false;
+    }
     if (p.size() < 3 || p[0] != "sword" || p[1] != "api" || p[2] != "challenges") return false;  // offline
 
     // The community server's events: everything but the port's own events
