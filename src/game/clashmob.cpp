@@ -27,6 +27,10 @@
 #include <unordered_map>
 #include <mutex>
 #include <random>
+#include <regex>
+#include <condition_variable>
+#include <chrono>
+#include <thread>
 #include <sstream>
 #include <string>
 
@@ -675,6 +679,85 @@ bool serve_ib2(const ns::HttpRequest& req, ns::HttpResponse& resp) {
     return answered;
 }
 
+// ---- config patches ----
+//
+// The server's config patch files (GET /sword/api/cloudstorage/system: [{uniqueFilename, filename, ...}], each file at
+// .../system/{uniqueFilename}). On an iPhone the game's IniLocPatcher downloads them at startup and merges the .ini
+// ones into its config; that is how the server switches on things the game ships with turned off (the Hideout chest:
+// SwordPlayer.HideOutChestType/Tag/DropData in IPhone-SwordGame.ini). The patcher belongs to the online subsystem,
+// which needs Game Center, so on Android the game has neither. The port downloads the files itself (a thread, from
+// the start) and, when SwordEngine.Init runs (before the player exists), hands each .ini to the game's own
+// UIniLocPatcher::ProcessIniLocFile. Without a server, or when it does not answer, there are no patches, as before.
+
+constexpr int kPatchWaitMs = 4000;  // how long SwordEngine.Init waits for the download
+
+struct ConfigPatch {
+    std::string filename, data;
+};
+std::mutex g_patch_mutex;
+std::condition_variable g_patch_cv;
+bool g_patches_ready = true;
+std::vector<ConfigPatch> g_patches;
+GuestAddr g_process_ini_loc = 0, g_patcher_class = 0, g_default_object = 0;
+GuestAddr g_gobjobjects = 0;  // UObject::GObjObjects (debug: the chest dump)
+
+void download_config_patches(std::string server) {
+    std::vector<ConfigPatch> files;
+    ns::HttpRequest req{"GET", "", {}, {}};
+    ns::HttpResponse list;
+    if (ask_server(server + "/sword/api/cloudstorage/system", req, list) && list.status == 200) {
+        static const std::regex entry(R"re(\{[^{}]*\})re"), unique(R"re("uniqueFilename"\s*:\s*"([^"]+)")re"),
+            name(R"re("filename"\s*:\s*"([^"]+)")re");
+        for (std::sregex_iterator it(list.body.begin(), list.body.end(), entry), end; it != end; ++it) {
+            std::string e = it->str();
+            std::smatch u, n;
+            if (!std::regex_search(e, u, unique) || !std::regex_search(e, n, name)) continue;
+            std::string filename = n[1];
+            if (filename.size() < 4 || _stricmp(filename.c_str() + filename.size() - 4, ".ini") != 0) continue;
+            ns::HttpResponse file;
+            if (ask_server(server + "/sword/api/cloudstorage/system/" + u[1].str(), req, file) && file.status == 200 &&
+                !file.body.empty())
+                files.push_back({filename, file.body});
+        }
+        LOG_INFO("clashmob: %zu config patch file(s) from the server", files.size());
+    } else {
+        LOG_INFO("clashmob: no config patches (the server answered %d)", list.status);
+    }
+    std::lock_guard lock(g_patch_mutex);
+    g_patches = std::move(files);
+    g_patches_ready = true;
+    g_patch_cv.notify_all();
+}
+
+void apply_config_patches(cpu::Thread& t) {
+    static bool done = false;
+    if (done) return;
+    done = true;
+    std::vector<ConfigPatch> patches;
+    {
+        std::unique_lock lock(g_patch_mutex);
+        if (!g_patch_cv.wait_for(lock, std::chrono::milliseconds(kPatchWaitMs), [] { return g_patches_ready; }))
+            LOG_WARN("clashmob: the config patches did not arrive in time");
+        patches = g_patches;
+    }
+    GuestAddr cls = g_patcher_class ? *gptr<u64>(g_patcher_class) : 0;
+    GuestAddr patcher = cls && g_default_object ? t.call(g_default_object, {cls, 0}) : 0;
+    for (auto& p : patches) {
+        if (!patcher || !g_process_ini_loc) {
+            LOG_WARN("clashmob: cannot apply %s (patcher %d)", p.filename.c_str(), !!patcher);
+            break;
+        }
+        ue::FString name = ue::make_fstring(t, p.filename);
+        // The game's allocator: ProcessIniLocFile grows the array (it adds a terminating zero) and frees it
+        GuestAddr bytes = g_dlmalloc ? t.call(g_dlmalloc, {p.data.size() + 16}) : 0;
+        if (!bytes) break;
+        std::memcpy(gptr<u8>(bytes), p.data.data(), p.data.size());
+        ue::TArray<u8> data{bytes, (s32)p.data.size(), (s32)p.data.size() + 16};
+        t.call(g_process_ini_loc, {patcher, gaddr(&name), 0, gaddr(&data)});  // (Filename, bIsUnicode, FileData)
+        LOG_INFO("clashmob: applied config patch %s (%zu bytes)", p.filename.c_str(), p.data.size());
+    }
+}
+
 }  // namespace
 
 void install_clashmob(const macho::Image& img) {
@@ -688,6 +771,14 @@ void install_clashmob(const macho::Image& img) {
     g_dlmalloc = img.find("__Z8dlmallocm");
     ns::set_local_server(serve);
     std::string server = server_url();
+    g_process_ini_loc = img.find("__ZN14UIniLocPatcher17ProcessIniLocFileERK7FStringjRK6TArrayIh17FDefaultAllocatorE");
+    g_patcher_class = img.find("__ZN14UIniLocPatcher18PrivateStaticClassE");
+    g_default_object = img.find("__ZN6UClass16GetDefaultObjectEj");
+    g_gobjobjects = img.find("__ZN7UObject11GObjObjectsE");
+    if (!server.empty()) {
+        g_patches_ready = false;
+        std::thread(download_config_patches, server).detach();
+    }
     LOG_INFO("clashmob: ClashMobs on (player %s; %s%s)", player_id().c_str(), server.empty() ? "offline" : "server ",
              server.c_str());
 }
@@ -758,6 +849,36 @@ void clashmob_tick(cpu::Thread& t) {
                          gptr<s32>(pawn + off)[25], gptr<s32>(pawn + off)[26], gptr<s32>(pawn + off)[27],
                          gptr<s32>(pawn + off)[22], gptr<s32>(pawn + off)[23], gptr<s32>(pawn + off)[24],
                          gptr<s32>(pawn + off)[28]);
+        }
+        // debug.ibport.clashmob chest<N>: the Hideout chest settings on the player, and the chests in the level
+        if (!first && pc && std::string(v).rfind("chest", 0) == 0 && ue::read_property(t, pc, "Pawn", pawn) && pawn) {
+            u8 type = 0;
+            ue::read_property(t, pawn, "HideOutChestType", type);
+            int tag = ue::property_offset(t, pawn, "HideOutChestTag"), saved = ue::property_offset(t, pawn, "SavedHideOutChestTag"),
+                drop = ue::property_offset(t, pawn, "HideOutChestDropData");
+            LOG_INFO("clashmob: chest type %d tag '%s' saved '%s' drop '%s'", type, tag >= 0 ? ue::read_fstring(pawn + tag).c_str() : "?",
+                     saved >= 0 ? ue::read_fstring(pawn + saved).c_str() : "?", drop >= 0 ? ue::read_fstring(pawn + drop).c_str() : "?");
+            auto objects = g_gobjobjects ? *gptr<ue::TArray<u64>>(g_gobjobjects) : ue::TArray<u64>{};
+            for (int i = 0; i < objects.num; i++) {
+                GuestAddr o = objects.at(i);
+                if (o && ue::class_name(t, o).rfind("SeqAct_StartChoiceMode", 0) == 0) {
+                    for (const char* list : {"TouchActors", "TouchActorsL1", "TouchActorsL2"}) {
+                        ue::TArray<u64> actors{};
+                        if (!ue::read_property(t, o, list, actors)) continue;
+                        for (int k = 0; k < actors.num; k++)
+                            if (actors.at(k) && ue::class_name(t, actors.at(k)) == "SwordTreasureChestTouchActor")
+                                LOG_INFO("clashmob: chest %s is in %s.%s", ue::object_name(t, actors.at(k)).c_str(),
+                                         ue::object_name(t, o).c_str(), list);
+                    }
+                }
+                if (!o || ue::class_name(t, o) != "SwordTreasureChestTouchActor") continue;
+                int group = ue::property_offset(t, o, "RandomGroupIndex"), loc = ue::property_offset(t, o, "Location");
+                bool hidden = false;
+                ue::read_bool(t, o, "bHidden", hidden);
+                LOG_INFO("clashmob: chest actor %s group '%s' hidden %d at %.0f %.0f %.0f", ue::object_name(t, o).c_str(),
+                         group >= 0 ? ue::read_fstring(o + group).c_str() : "?", hidden, loc >= 0 ? gptr<float>(o + loc)[0] : 0.f,
+                         loc >= 0 ? gptr<float>(o + loc)[1] : 0.f, loc >= 0 ? gptr<float>(o + loc)[2] : 0.f);
+            }
         }
     }
 #endif
@@ -865,7 +986,7 @@ bool clashmob_wants_script_hook() { return !is_ib2(); }
 //   (SwordPlayer.bGiveTreasureIsClashMob, set by the game around it), and for the item lists while the player has one
 //   (so it shows in Supplies to be spun). Everything else gets the game's answer: the shop, the merchant and drops
 //   never offer it, and Supplies has no BUY for it (that also asks OwnMaxOfConsumable).
-enum class Target { None, UserHasMcpId, GetShowQuestType, RewardGoalString, ShouldBeHidden };
+enum class Target { None, UserHasMcpId, GetShowQuestType, RewardGoalString, ShouldBeHidden, EngineInit };
 
 std::string with_commas(long long v) {
     std::string s = std::to_string(v);
@@ -879,7 +1000,7 @@ bool clashmob_script_call(cpu::Thread& t, GuestAddr frame, GuestAddr result) {
     static std::unordered_map<GuestAddr, Target> targets;
     static std::unordered_map<GuestAddr, bool> callers;
     GuestAddr fn = *gptr<u64>(frame + kFrameNode);
-    std::lock_guard lock(mutex);
+    std::unique_lock lock(mutex);
     auto it = targets.find(fn);
     if (it == targets.end()) {
         std::string name = ue::object_name(t, fn), cls = ue::object_name(t, *gptr<u64>(fn + kObjOuter));
@@ -887,8 +1008,14 @@ bool clashmob_script_call(cpu::Thread& t, GuestAddr frame, GuestAddr result) {
                    : name == "GetShowQuestType" && cls == "SwordQuestData" ? Target::GetShowQuestType
                    : name == "RewardGoalString" && cls == "SwordBattleEvent" ? Target::RewardGoalString
                    : name == "ShouldBeHidden"                                  ? Target::ShouldBeHidden
+                   : name == "Init" && cls == "SwordEngine"                    ? Target::EngineInit
                                                                             : Target::None;
         it = targets.emplace(fn, k).first;
+    }
+    if (it->second == Target::EngineInit) {
+        lock.unlock();  // the patches reload config, which may run script
+        apply_config_patches(t);
+        return false;  // then the game's own Init
     }
     if (it->second == Target::GetShowQuestType) {
         GuestAddr quest = *gptr<u64>(frame + kFrameObject);
