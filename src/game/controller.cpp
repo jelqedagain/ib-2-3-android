@@ -1,4 +1,4 @@
-// Controller support (Xbox-style pads), laid out like the Infinity Blade II controller
+// Controller support (Xbox-style pads), laid out like the IB2 controller
 // mod but built into the game: the left stick moves an on-screen cursor, touches are virtual
 // fingers (the real mouse is never moved), and buttons press the same game actions as the
 // keyboard (game/actions.h). So they follow the same rules: a button only works when its

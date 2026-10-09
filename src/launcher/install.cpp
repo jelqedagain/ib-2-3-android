@@ -74,7 +74,7 @@ bool install_from_ipa(const std::wstring& ipa, const std::function<void(double)>
         error = L"This file is not a valid .ipa (zip) archive.";
         return false;
     }
-    // Check it really is Infinity Blade III and add up the work.
+    // Check it really is IB3 and add up the work.
     mz_uint count = mz_zip_reader_get_num_files(&zip);
     u64 total = 0;
     bool has_binary = false, has_engine = false;
@@ -88,7 +88,7 @@ bool install_from_ipa(const std::wstring& ipa, const std::function<void(double)>
     if (!has_binary || !has_engine) {
         mz_zip_reader_end(&zip);
         fclose(in);
-        error = L"This .ipa does not contain Infinity Blade III (Payload/SwordGame.app).";
+        error = L"This .ipa does not contain IB3 (Payload/SwordGame.app).";
         return false;
     }
     ULARGE_INTEGER free_bytes{};

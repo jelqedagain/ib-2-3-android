@@ -455,7 +455,7 @@ void install_eagl() {
         static const bool release_surface = [] {
             char v[PROP_VALUE_MAX] = "";
             if (__system_property_get("debug.ibport.keepsurface", v) > 0 && (v[0] == '1' || v[0] == '0')) return v[0] == '0';
-            if (game::is_infinity_blade_2()) return true;  // Infinity Blade II: as in 1.3.2, on every GPU
+            if (game::is_ib2()) return true;  // IB2: as in 1.3.2, on every GPU
             return !gpu_is_adreno();
         }();
         if (release_surface) {

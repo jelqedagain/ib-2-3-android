@@ -18,14 +18,14 @@ settings.ini
 # Dependencies fetched by scripts/fetch-deps.sh
 /external/boost-*/
 
-# Launcher copies made by "Play Infinity Blade III.bat"
-/Infinity Blade III.exe
-/Play Infinity Blade III.bat
+# Launcher copies made next to the repository (their names are in .git/info/exclude)
 /libEGL.dll
 /libGLESv2.dll
 /build-android/
 /tools/
-/Infinity Blade III.exe.*.old
+
+# Local app and .apk names (scripts/build-apk.sh)
+/android/app-names.local
 
 # Game artwork: local builds only, never committed
 android/res-ib2/

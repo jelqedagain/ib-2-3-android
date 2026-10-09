@@ -676,7 +676,7 @@ bool half_float_renderable() {
 // were invisible. Such a framebuffer gets a multisampled depth-stencil renderbuffer of the same size instead
 // (for depth and stencil: the game attaches the depth-stencil texture to both, one after the other).
 void fix_mixed_samples(GLenum target) {
-    if (game::is_infinity_blade_2()) return;
+    if (game::is_ib2()) return;
     GLenum status = p_glCheckFramebufferStatus(target);
     if (status != 0x8D56 /*INCOMPLETE_MULTISAMPLE*/ && status != 0x8CDD /*UNSUPPORTED*/) return;
     GLint type = 0, color = 0, depth_type = 0, stencil_type = 0;
@@ -731,7 +731,7 @@ void diag_framebuffer(const char* what, GLenum target, GLenum attachment, GLuint
 }
 
 // GLSL ES 1.00 only allows constant initializers on global variables. Apple's compiler also took
-// uniforms (Infinity Blade II's light shafts: `float BloomScale = LightShaftParameters.y;`), which
+// uniforms (IB2's light shafts: `float BloomScale = LightShaftParameters.y;`), which
 // stricter drivers reject. Such globals become plain declarations assigned at the start of main().
 // Whether an expression is made of numbers and constructors of basic types only (no variable, uniform or call).
 bool only_literals(const std::string& s) {
@@ -756,7 +756,7 @@ bool only_literals(const std::string& s) {
     return true;
 }
 
-// Infinity Blade III's character shaders declare `uniform float RimLightingStrength` in both stages with no precision of its
+// IB3's character shaders declare `uniform float RimLightingStrength` in both stages with no precision of its
 // own: the vertex shader's default is highp and the fragment shader's mediump, and GLSL ES wants one uniform to have one
 // precision. Apple's GPUs accept that; stricter drivers (the Android emulator's, some phones') fail to link every rim-lit
 // character, which then draws with a wrong shader (neon outlines, broken textures). Declaring the precision gives both stages
@@ -788,9 +788,9 @@ std::string fix_global_initializers(const std::string& src) {
                        code.find_first_of("{}(") > eq && code.find(',') > eq && code.compare(0, 6, "const ") != 0 &&
                        code.compare(0, 8, "uniform ") != 0 && code.compare(0, 10, "attribute ") != 0 &&
                        code.compare(0, 8, "varying ") != 0 && code.compare(0, 10, "precision ") != 0;
-        // A constant initializer is legal as it is (Infinity Blade III's FXAA pass has several): leave those alone.
-        // Infinity Blade III only: Infinity Blade II keeps the rewrite it shipped with in 1.3.2.
-        if (movable && !game::is_infinity_blade_2() && only_literals(trim(code.substr(eq + 1, code.size() - eq - 2)))) movable = false;
+        // A constant initializer is legal as it is (IB3's FXAA pass has several): leave those alone.
+        // IB3 only: IB2 keeps the rewrite it shipped with in 1.3.2.
+        if (movable && !game::is_ib2() && only_literals(trim(code.substr(eq + 1, code.size() - eq - 2)))) movable = false;
         std::string decl = movable ? trim(code.substr(0, eq)) : std::string();
         size_t name_at = decl.find_last_of(" \t");
         if (movable && name_at != std::string::npos) {
@@ -809,7 +809,7 @@ std::string fix_global_initializers(const std::string& src) {
     return out;
 }
 
-// Infinity Blade II's modulated-shadow projection reconstructs each pixel's position from the scene
+// IB2's modulated-shadow projection reconstructs each pixel's position from the scene
 // depth texture in the shader's default precision (mediump, and lowp samplers). Apple's GPUs read
 // depth at full precision anyway; others really use 16 bits, and device depth (close to 1.0) then
 // snaps to a few values, so shadow edges come out as screen-aligned blocks. Run the shader at full
@@ -834,10 +834,10 @@ std::string smooth_modulated_shadows(const std::string& src) {
 // expects each pair packed (xA, yA, yB, xB), as UE3 packs them for its PC shaders. The game sets them (xA, yA, xB, yB)
 // (framelog: a horizontal pass has its second x offset in z), so every second tap went along the other axis and the
 // blur came out streaky and too weak. Swizzling the offsets to .xywz puts both taps where they belong.
-// Found by rafidwayne (github.com/rafidwayne/Infinity-Blade-3-Android-Depth-of-Field-effect-fix).
+// Found by rafidwayne.
 std::string fix_blur_tap_order(const std::string& src) {
     static const std::string key = "TexCoords0.xyyx + SampleOffsets";
-    if (game::is_infinity_blade_2() || src.find(key) == std::string::npos) return src;
+    if (game::is_ib2() || src.find(key) == std::string::npos) return src;
     std::string out = src;
     for (size_t at = out.find(key); at != std::string::npos; at = out.find(key, at + 1)) {
         size_t close = out.find(']', at);
@@ -966,7 +966,7 @@ void install_gl() {
         ErrorCheck check{"glTexImage2D"};
         if (fmt == GL_BGRA_EXT) ifmt = GL_BGRA_EXT;  // APPLE_texture_format_BGRA8888 allows RGBA internal format
         // An empty BGRA texture is a render target: RGBA where BGRA cannot be drawn into (no pixels, so no swizzle).
-        if (fmt == GL_BGRA_EXT && !data && !game::is_infinity_blade_2() && !bgra_renderable()) ifmt = fmt = GL_RGBA;
+        if (fmt == GL_BGRA_EXT && !data && !game::is_ib2() && !bgra_renderable()) ifmt = fmt = GL_RGBA;
         // Half-float data with an unsized format (iOS) needs the sized one on GLES 3; an empty texture is a
         // render target, 8-bit RGBA where the GPU cannot draw into RGBA16F (half_float_renderable).
         if ((type == 0x140B /*GL_HALF_FLOAT*/ || type == GL_HALF_FLOAT_OES) && (ifmt == GL_RGBA || ifmt == 0x1907 /*GL_RGB*/)) {

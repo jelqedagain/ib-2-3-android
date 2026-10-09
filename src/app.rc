@@ -14,13 +14,13 @@ BEGIN
     BEGIN
         BLOCK "040904b0"
         BEGIN
-            VALUE "CompanyName", "Infinity Blade III PC Port contributors"
-            VALUE "FileDescription", "Infinity Blade III PC Port"
+            VALUE "CompanyName", "IB3 PC Port contributors"
+            VALUE "FileDescription", "IB3 PC Port"
             VALUE "FileVersion", "1.2.0"
-            VALUE "InternalName", "InfinityBladeIII"
-            VALUE "LegalCopyright", "MIT License. Infinity Blade III is (c) Chair Entertainment / Epic Games."
-            VALUE "OriginalFilename", "Infinity Blade III.exe"
-            VALUE "ProductName", "Infinity Blade III PC Port"
+            VALUE "InternalName", "IB3"
+            VALUE "LegalCopyright", "MIT License. IB3 is (c) Chair Entertainment / Epic Games."
+            VALUE "OriginalFilename", "IB3.exe"
+            VALUE "ProductName", "IB3 PC Port"
             VALUE "ProductVersion", "1.2.0"
         END
     END

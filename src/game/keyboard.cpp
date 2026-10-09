@@ -1,4 +1,4 @@
-// Keyboard input, laid out like the Infinity Blade II PC port by default (see game/actions.h;
+// Keyboard input, laid out like the IB2 PC port by default (see game/actions.h;
 // players can rebind keys in the launcher). Game actions are sent to Unreal
 // (UGameViewportClient::InputKey, on the game thread) as the input names IB3's own touch controls
 // use (e.g. "Sword_BttnBlock"), so the game's PlayerInput bindings run the real commands. Raw keys
@@ -175,7 +175,7 @@ void ask_quit_game() {
         g_paused = true;
     }
     HWND hwnd = (HWND)uikit::main_window();
-    int answer = MessageBoxW(hwnd, L"Quit Infinity Blade III?", L"Infinity Blade III",
+    int answer = MessageBoxW(hwnd, L"Quit IB3?", L"IB3",
                              MB_OKCANCEL | MB_ICONQUESTION | MB_DEFBUTTON1);
     {
         std::lock_guard lock(g_mutex);
@@ -382,7 +382,7 @@ bool hud_is_fight() { return g_hud_fight; }
 void install_keyboard(const macho::Image& img) {
     GuestAddr tick = img.find("__ZN19UGameViewportClient4TickEf");
     g_input_key = img.find("__ZN24USwordGameViewportClient8InputKeyEP9FViewporti5FName11EInputEventfj");
-    // Infinity Blade II's viewport client does not override InputKey: the engine's own is the one it runs.
+    // IB2's viewport client does not override InputKey: the engine's own is the one it runs.
     if (!g_input_key) g_input_key = img.find("__ZN19UGameViewportClient8InputKeyEP9FViewporti5FName11EInputEventfj");
     g_have_reflection = ue::init(img);
     if (!tick || !g_input_key) {

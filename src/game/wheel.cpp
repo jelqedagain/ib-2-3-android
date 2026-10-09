@@ -30,7 +30,7 @@ void wheel_tick(cpu::Thread& t) {
     static GuestAddr world = 0;  // the WorldInfo whose time is sped up, 0 when none
     static float normal = 1;
     static int last_state = -1;
-    if (is_infinity_blade_2() || !settings::get().fast_wheel) return;
+    if (is_ib2() || !settings::get().fast_wheel) return;
     GuestAddr scene = grab_bag_scene(t), wheel = 0;
     if (scene) ue::read_property(t, scene, "ItemWheel", wheel);
     u8 state = 0;

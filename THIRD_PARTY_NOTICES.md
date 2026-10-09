@@ -1,6 +1,6 @@
 # Third-party notices
 
-Infinity Blade III PC Port includes the following third-party software.
+This project includes the following third-party software.
 
 ## dynarmic
 
@@ -511,4 +511,4 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ```
 
-Infinity Blade III is (c) Chair Entertainment Group / Epic Games. Its app icon is used as the program icon; no other part of the game is included.
+IB3 is (c) Chair Entertainment Group / Epic Games. Its app icon is used as the program icon; no other part of the game is included.

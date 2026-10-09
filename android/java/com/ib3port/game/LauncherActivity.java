@@ -52,7 +52,7 @@ import java.util.zip.ZipOutputStream;
 
 /**
  * Starts the game, or first installs it from the player's own .ipa: the Payload/SwordGame.app
- * folder is extracted into the app's files folder (game/). The same code serves Infinity Blade II
+ * folder is extracted into the app's files folder (game/). The same code serves IB2
  * and III: the app's label is the game's name, and the manifest's meta-data says which .ipa to
  * accept (ib.bundleId), which version to ask for (ib.ipaVersion) and the space it needs (ib.size).
  * Once installed, it shows a menu: Play, backing up and restoring saves (userdata/, as a .zip the

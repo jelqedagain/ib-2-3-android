@@ -214,7 +214,7 @@ void install_misc() {
         std::memcpy(gptr<void>(t.x(8)), identity, sizeof identity);
     });
     Class IMG = objc::host_class("UIImage");
-    // No name, or a file that is not there, gives nil, as on iOS. Infinity Blade II asks for Logo.m4v
+    // No name, or a file that is not there, gives nil, as on iOS. IB2 asks for Logo.m4v
     // after Isa's post-credits scene; the Community Patch has neither Logo.m4v nor Logo.png, so the
     // game calls imageNamed:nil, and a made-up image made it wait forever for a splash screen that
     // never ends (black screen, music playing).
@@ -387,7 +387,7 @@ void install_misc() {
     method(MQ, "startQuery", [](id, SEL) { return false; });
     method(MQ, "resultCount", [](id, SEL) -> u64 { return 0; });
     method(MQ, "results", [](id, SEL) { return array({}); });
-    // Infinity Blade II resolves iCloud save conflicts through NSFileVersion: there are none.
+    // IB2 resolves iCloud save conflicts through NSFileVersion: there are none.
     Class FV = objc::host_class("NSFileVersion");
     class_method(FV, "currentVersionOfItemAtURL:", [](Class, SEL, id) -> id { return 0; });
     class_method(FV, "unresolvedConflictVersionsOfItemAtURL:", [](Class, SEL, id) { return array({}); });
@@ -442,7 +442,7 @@ void install_misc() {
         static id s = objc::alloc(c);
         return s;
     });
-    // Infinity Blade II also loads leaderboard scores and player names, and keeps achievement progress.
+    // IB2 also loads leaderboard scores and player names, and keeps achievement progress.
     method(objc::class_named("GKLeaderboard"), "loadScoresWithCompletionHandler:", [](id, SEL, GuestAddr b) { complete_later(b, 0); });
     class_method(objc::class_named("GKPlayer"), "loadPlayersForIdentifiers:withCompletionHandler:",
                  [](Class, SEL, id, GuestAddr b) { complete_later(b, 0); });
@@ -575,7 +575,7 @@ void install_misc() {
             objc::block_release(bb);
         });
     });
-    // Infinity Blade II uses the older request and renews credentials: no access, renewal failed.
+    // IB2 uses the older request and renews credentials: no access, renewal failed.
     method(ACS, "requestAccessToAccountsWithType:withCompletionHandler:", [](id, SEL, id, GuestAddr b) {
         if (!b) return;
         GuestAddr bb = objc::block_copy(b);

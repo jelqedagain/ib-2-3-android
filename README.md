@@ -4,12 +4,12 @@ An experimental iOS emulator for Android: a compatibility layer that runs ARM64 
 
 ## Download
 
-| App | archive.org | GitHub |
-| --- | --- | --- |
-| **IB2** | [IB2 on archive.org](https://archive.org/details/infinity-blade-2-android) | [IB2 release](https://github.com/jelqedagain/ib-2-3-android/releases/tag/ib2) |
-| **IB3** | [IB3 on archive.org](https://archive.org/details/infinity-blade-3-android) | [IB3 release](https://github.com/jelqedagain/ib-2-3-android/releases/tag/ib3) |
+| App | GitHub |
+| --- | --- |
+| **IB2** | [IB2 release](https://github.com/jelqedagain/ib-2-3-android/releases/tag/ib2) |
+| **IB3** | [IB3 release](https://github.com/jelqedagain/ib-2-3-android/releases/tag/ib3) |
 
-Both places have the same app (Android 11+, ARM64); install the `.apk` on your phone and open it. You also need your own `.ipa` of the game. Installing a new version over an old one keeps your game and saves.
+The same apps are also on archive.org, with the game's own icon. It is the same app (Android 11+, ARM64); install the `.apk` on your phone and open it. You also need your own `.ipa` of the game. Installing a new version over an old one keeps your game and saves.
 
 **This repository contains no game files.** It is only the source code of the emulator: a Mach-O loader, and implementations of the parts of iOS the apps call (C library, Objective-C runtime, Foundation, UIKit) on top of Android's OpenGL ES, AAudio and MediaCodec. To run a game you need your own copy of the app as an `.ipa` file; nothing here provides one.
 
@@ -21,14 +21,19 @@ Phones and iPhones both use ARM64, so on Android the app's code runs directly on
 - **Graphics:** OpenGL ES calls go to the device's driver.
 - **Audio and video:** AAudio and MediaCodec.
 - **Input:** touch, keyboard and game controllers.
-- **ClashMobs (IB3):** a small community server (`server/clashmob`, a Cloudflare Worker) runs the online events; see its README.
+- **ClashMobs (IB2 and IB3):** the online events run on the IB community's ClashMob server (ibclashmobs.dev). `server/clashmob` holds the earlier server (a Cloudflare Worker); see its README.
 
 ## Versions
 
 <details>
 <summary><b>Click for IB2</b></summary>
 
-**Download:** [IB2 APK](https://github.com/jelqedagain/ib-2-3-android/releases/tag/ib2) · [IB2 on archive.org](https://archive.org/details/infinity-blade-2-android)
+**Download:** [IB2 APK](https://github.com/jelqedagain/ib-2-3-android/releases/tag/ib2)
+
+**1.9** (2026-10-08)
+
+- **ClashMobs are back, online.** The game's ClashMob tab shows the community's live events again, from the IB community's ClashMob server (ibclashmobs.dev, run by omgxhat), and you can join and play them: your fights count toward each event's goal and prizes. Event names and text come from the server, and the tab no longer stops at a Facebook login. Works with the stock 1.3.5 `.ipa` and with the Community Patch v2.5.
+- The app now uses the internet, for ClashMobs only. The server knows only a random player id the game is given, never your saves.
 
 **1.8.2** (2026-10-05)
 
@@ -115,11 +120,16 @@ Phones and iPhones both use ARM64, so on Android the app's code runs directly on
 <details>
 <summary><b>Click for IB3</b></summary>
 
-**Download:** [IB3 APK](https://github.com/jelqedagain/ib-2-3-android/releases/tag/ib3) · [IB3 on archive.org](https://archive.org/details/infinity-blade-3-android)
+**Download:** [IB3 APK](https://github.com/jelqedagain/ib-2-3-android/releases/tag/ib3)
+
+**1.9** (2026-10-08)
+
+- ClashMobs moved to the IB community's ClashMob server (ibclashmobs.dev, run by omgxhat), the same one iPhone players with the ClashMob Revival patch use, with new events run by the community. Names and progress from the old server don't carry over: set your name again on the ClashMobs page.
+- Characters with rim lighting now draw right on phones with strict graphics drivers (some showed them with neon outlines or the wrong shading).
 
 **1.8.2** (2026-10-05)
 
-- Depth of field and bloom blur fixed: the background in cutscenes and menus was streaky and grainy instead of smoothly out of focus, and glows had a hard dark edge. The game packs its blur offsets differently from what its larger blur shaders read, so half of every blur's samples went the wrong way; this showed on every phone since 1.7, which made the blur wide enough for today's screens. Found and fixed by rafidwayne (github.com/rafidwayne/Infinity-Blade-3-Android-Depth-of-Field-effect-fix).
+- Depth of field and bloom blur fixed: the background in cutscenes and menus was streaky and grainy instead of smoothly out of focus, and glows had a hard dark edge. The game packs its blur offsets differently from what its larger blur shaders read, so half of every blur's samples went the wrong way; this showed on every phone since 1.7, which made the blur wide enough for today's screens. Found and fixed by rafidwayne.
 
 **1.8.1** (2026-10-03)
 

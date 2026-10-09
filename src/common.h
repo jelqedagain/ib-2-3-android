@@ -36,7 +36,7 @@ void set_thread_name(const char* name);
 void set_thread_trace(bool on);  // per-thread trace override
 // When set (normal play, not tests), fatal errors and crashes are also shown in a message box.
 extern bool g_error_dialogs;
-extern std::string g_app_name;  // for those messages ("Infinity Blade III"; the app's label on Android)
+extern std::string g_app_name;  // for those messages ("IB3"; the app's label on Android)
 void show_error_dialog(const char* what);
 }  // namespace logging
 

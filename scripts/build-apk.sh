@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Builds the Android apps (arm64, Android 11+), one per game, from the same code:
-#   dist/InfinityBladeIII-Android-<version>.apk   (com.ib3port.game)
-#   dist/InfinityBladeII-Android-<version>.apk    (com.ib2port.game)
+#   dist/ib3-android-<version>.apk   (com.ib3port.game)
+#   dist/ib2-android-<version>.apk   (com.ib2port.game)
+# The app names and the .apk names are "IB3" / "IB2" and ib3-android / ib2-android, unless android/app-names.local
+# (not in the repository) has lines "<id>|<app name>|<apk name>", for example "ib3|My name|my-file-name".
 # The version is the manifest's versionName, so every released file says which build it is.
 # Needs tools/android: the NDK, build-tools (aapt2, d8, zipalign, apksigner) and android-35/android.jar,
 # plus a JDK (javac, keytool).
@@ -30,7 +32,7 @@ NDK="$(ls -d tools/android/android-ndk-* | head -1)"
 # Signed with a local key made on first use (kept out of the repository).
 if [ ! -f "$KEYSTORE" ]; then
     keytool -genkeypair -keystore "$KEYSTORE" -storepass ib3port -keypass ib3port -alias ib3 \
-        -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Infinity Blade III Port" >/dev/null 2>&1
+        -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=IB3 Port" >/dev/null 2>&1
 fi
 
 # package_app <id> <app name> <package> <.ipa bundle id> <.ipa version> <space needed> <apk name, without .apk>
@@ -56,5 +58,12 @@ EOF
     ls -la "dist/$7-$VERSION.apk"
 }
 
-package_app ib3 "Infinity Blade III" com.ib3port.game com.chairentertainment.IB3 1.4.4 "3 GB" InfinityBladeIII-Android
-package_app ib2 "Infinity Blade II" com.ib2port.game com.chairentertainment.IB2 1.3.5 "1.5 GB" InfinityBladeII-Android
+# name <id> <field> <default>: the app's name (field 2) or .apk name (field 3) from android/app-names.local
+name() {
+    local v
+    v="$(grep "^$1|" android/app-names.local 2>/dev/null | head -1 | cut -d'|' -f"$2" | tr -d '\r')"
+    echo "${v:-$3}"
+}
+
+package_app ib3 "$(name ib3 2 IB3)" com.ib3port.game com.chairentertainment.IB3 1.4.4 "3 GB" "$(name ib3 3 ib3-android)"
+package_app ib2 "$(name ib2 2 IB2)" com.ib2port.game com.chairentertainment.IB2 1.3.5 "1.5 GB" "$(name ib2 3 ib2-android)"

@@ -172,7 +172,7 @@ void add_rows(cpu::Thread& t, GuestAddr list) {
     g_list = list;
     g_count = items.num;
     if (!main_list || !checkbox || !button) return;
-    const int first = items.num, game = is_infinity_blade_2() ? kIB2 : kIB3;
+    const int first = items.num, game = is_ib2() ? kIB2 : kIB3;
     g_ours.clear();
     g_rows.clear();
     int added = 0;
@@ -298,7 +298,7 @@ void gem_shop_tick(cpu::Thread& t, GuestAddr pawn) {
 
 bool is_cheat_row_handler(const std::string& name) {
     if (name == "OnUpdateGiveGold") return true;  // runs as it is; its row then shows the gold
-    if ((name == "OnUpdateToggleGodrays" || name == "OnUpdateToggleShadows") && is_infinity_blade_2())
+    if ((name == "OnUpdateToggleGodrays" || name == "OnUpdateToggleShadows") && is_ib2())
         return true;  // runs as it is; the new state is kept in settings.ini
     for (const char* h : kSpare)
         if (name == h) return true;
@@ -317,7 +317,7 @@ bool cheat_row_called(cpu::Thread& t, GuestAddr list, GuestAddr frame, const std
     for (auto& [it, r] : g_rows) {
         if (it != item) continue;
         if (r->graphics) {
-            if (!is_infinity_blade_2()) return false;
+            if (!is_ib2()) return false;
             // The tap has flipped the check mark; the game's handler then toggles the effect. Kept for the next start.
             bool on = false;
             ue::read_bool(t, item, "bIsChecked", on);

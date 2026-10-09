@@ -1,4 +1,4 @@
-// Infinity Blade III specific integration (input, test scripting).
+// IB3 specific integration (input, test scripting).
 #pragma once
 #include "common.h"
 #include <string>
@@ -48,7 +48,7 @@ int cheat_current_gold(cpu::Thread& t);  // the game's own normal shop again
 // IB3 prize wheel: settings fast_wheel speeds up its spin (game/wheel.cpp).
 void wheel_tick(cpu::Thread& t);
 
-// Infinity Blade II on screens longer than 16:9: serves patched copies of its HUD layout script and
+// IB2 on screens longer than 16:9: serves patched copies of its HUD layout script and
 // menu backdrops. If the patch does not apply, the emulated screen goes back to 16:9.
 void install_widescreen();
 // IB3 "Dev Mod" .ipa: its developer Options rows are orphaned in SwordGame.xxx; serve a repaired copy (game/devipa.cpp).
@@ -59,16 +59,16 @@ void options_item_caches_tick(cpu::Thread& t);
 // Keeps the Unreal/ChAIR logo movie from playing twice when loading is slow (after class realization).
 void install_startup_movie_fix();
 
-// True when the running game is Infinity Blade II (its bundle id). Every change that is meant for only one of
+// True when the running game is IB2 (its bundle id). Every change that is meant for only one of
 // the two apps checks this, so a fix for one never changes the other (see CLAUDE.md).
-bool is_infinity_blade_2();
+bool is_ib2();
 
 // The language the launcher chose, as iOS reports it to this game: AppleLanguages[0] ("fr", "pt-PT"...)
 // and the locale identifier ("fr_FR"). English when the game has no text in that language.
 std::string ios_language();
 std::string ios_locale();
 
-// Infinity Blade II: turns its store-only memory barriers into full ones (before guest code runs).
+// IB2: turns its store-only memory barriers into full ones (before guest code runs).
 void strengthen_memory_barriers(const macho::Image& img);
 
 // Save editor: applies the launcher's Edit save values to the game's save and writes the current ones out.

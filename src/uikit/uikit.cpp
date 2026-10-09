@@ -772,7 +772,7 @@ void install() {
     });
     method(D, "model", [](id, SEL) { return str(g_device.model); });
     method(D, "localizedModel", [](id, SEL) { return str(g_device.model); });
-    method(D, "name", [](id, SEL) { return str("Infinity Blade PC"); });
+    method(D, "name", [](id, SEL) { return str("IB PC"); });
     method(D, "systemName", [](id, SEL) { return str("iPhone OS"); });
     method(D, "systemVersion", [](id, SEL) { return str("8.2"); });
     method(D, "userInterfaceIdiom", [](id, SEL) -> s64 { return g_device.idiom; });

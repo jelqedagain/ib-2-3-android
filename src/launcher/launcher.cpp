@@ -114,11 +114,11 @@ void refresh_install_state() {
     SetWindowTextW(item(IDC_PLAY), installed ? L"Play" : L"Install game...");
     if (installed) {
         std::string v = installed_version();
-        std::wstring msg = L"Infinity Blade III " + widen(v.empty() ? "(unknown version)" : v) + L" is installed.";
+        std::wstring msg = L"IB3 " + widen(v.empty() ? "(unknown version)" : v) + L" is installed.";
         if (!v.empty() && v != "1.4.4") msg += L" This port was made for version 1.4.4; other versions may not work.";
         set_status(msg);
     } else {
-        set_status(L"Game files not installed yet. Click \"Install game...\" and choose your Infinity Blade III .ipa.");
+        set_status(L"Game files not installed yet. Click \"Install game...\" and choose your IB3 .ipa.");
     }
 }
 
@@ -291,7 +291,7 @@ std::wstring find_ipa_next_to_exe() {
 std::wstring choose_ipa() {
     std::wstring ipa = find_ipa_next_to_exe();
     if (!ipa.empty()) {
-        std::wstring q = L"Install Infinity Blade III from\n" + ipa + L" ?";
+        std::wstring q = L"Install IB3 from\n" + ipa + L" ?";
         int r = MessageBoxW(g_wnd, q.c_str(), L"Install game", MB_YESNOCANCEL | MB_ICONQUESTION);
         if (r == IDYES) return ipa;
         if (r == IDCANCEL) return L"";
@@ -300,11 +300,11 @@ std::wstring choose_ipa() {
     std::wstring dir = settings::exe_dir();
     OPENFILENAMEW ofn{sizeof ofn};
     ofn.hwndOwner = g_wnd;
-    ofn.lpstrFilter = L"Infinity Blade III app (*.ipa)\0*.ipa\0All files\0*.*\0";
+    ofn.lpstrFilter = L"IB3 app (*.ipa)\0*.ipa\0All files\0*.*\0";
     ofn.lpstrFile = file;
     ofn.nMaxFile = (DWORD)std::size(file);
     ofn.lpstrInitialDir = dir.c_str();
-    ofn.lpstrTitle = L"Choose your Infinity Blade III .ipa";
+    ofn.lpstrTitle = L"Choose your IB3 .ipa";
     ofn.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST;
     return GetOpenFileNameW(&ofn) ? file : L"";
 }
@@ -340,7 +340,7 @@ void play() {
     STARTUPINFOW si{sizeof si};
     PROCESS_INFORMATION pi{};
     if (!CreateProcessW(exe, cmd.data(), nullptr, nullptr, FALSE, 0, nullptr, dir.c_str(), &si, &pi)) {
-        MessageBoxW(g_wnd, L"Could not start the game.", L"Infinity Blade III", MB_ICONERROR);
+        MessageBoxW(g_wnd, L"Could not start the game.", L"IB3", MB_ICONERROR);
         return;
     }
     CloseHandle(pi.hThread);
@@ -379,7 +379,7 @@ void open_saves() {
 constexpr int kWidth = 640, kHeaderH = 180;
 
 // --- Header art ---------------------------------------------------------------------------
-// With the game installed, the header shows the "INFINITY BLADE III" title card from the end
+// With the game installed, the header shows the "IB3" title card from the end
 // of the player's own IB3_Origins movie (cached as game\launcher-banner.png) and the window
 // uses the game's icon. None of the game's art ships with this program.
 
@@ -478,7 +478,7 @@ void paint_header(HDC dc, const RECT& header) {
     DrawIconEx(dc, S(18), top, g_icon, S(56), S(56), 0, nullptr, DI_NORMAL);
     SetTextColor(dc, kHeaderText);
     HGDIOBJ old = SelectObject(dc, g_title_font);
-    TextOutW(dc, S(88), top, L"Infinity Blade III", 18);
+    TextOutW(dc, S(88), top, L"IB3", 3);
     SelectObject(dc, g_sub_font);
     SetTextColor(dc, kHeaderSub);
     const wchar_t* sub = L"PC Port";
@@ -595,11 +595,11 @@ LRESULT CALLBACK wnd_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         if (wp) {
             refresh_install_state();
             load_header_art();
-            MessageBoxW(h, L"Infinity Blade III is installed. Click Play to start.", L"Infinity Blade III",
+            MessageBoxW(h, L"IB3 is installed. Click Play to start.", L"IB3",
                         MB_ICONINFORMATION);
         } else {
             refresh_install_state();
-            MessageBoxW(h, (L"Installing failed:\n" + g_install_error).c_str(), L"Infinity Blade III", MB_ICONERROR);
+            MessageBoxW(h, (L"Installing failed:\n" + g_install_error).c_str(), L"IB3", MB_ICONERROR);
         }
         return 0;
     case WM_CTLCOLORSTATIC: {
@@ -628,7 +628,7 @@ LRESULT CALLBACK wnd_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
     }
     case WM_CLOSE:
         if (g_installing) {
-            MessageBoxW(h, L"Please wait until the game files are installed.", L"Infinity Blade III", MB_ICONINFORMATION);
+            MessageBoxW(h, L"Please wait until the game files are installed.", L"IB3", MB_ICONINFORMATION);
             return 0;
         }
         read_controls();
@@ -736,7 +736,7 @@ void create_main_window(int x, int y, bool offscreen) {
     AdjustWindowRectExForDpi(&r, style, FALSE, 0, g_dpi);
     int w = r.right - r.left, h = r.bottom - r.top;
     if (x == -1) x = (GetSystemMetrics(SM_CXSCREEN) - w) / 2, y = (GetSystemMetrics(SM_CYSCREEN) - h) / 2;
-    g_wnd = CreateWindowExW(offscreen ? WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE : 0, L"IB3Launcher", L"Infinity Blade III",
+    g_wnd = CreateWindowExW(offscreen ? WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE : 0, L"IB3Launcher", L"IB3",
                             style, x, y, w, h, nullptr, nullptr, wc.hInstance, nullptr);
     create_controls();
     if (game_installed()) load_header_art();

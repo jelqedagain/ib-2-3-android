@@ -102,7 +102,7 @@ int main(int argc, char** argv) {
             if ((int)(f * 20) != last) LOG_INFO("installing: %d%%", (last = (int)(f * 20)) * 5);
         }, error);
         if (!ok) LOG_ERROR("install failed: %s", launcher::narrow(error).c_str());
-        else LOG_INFO("installed Infinity Blade III %s", launcher::installed_version().c_str());
+        else LOG_INFO("installed IB3 %s", launcher::installed_version().c_str());
         return ok ? 0 : 1;
     }
     SetUnhandledExceptionFilter(crash_filter);
@@ -162,8 +162,8 @@ int main(int argc, char** argv) {
         app = dir + "game/Payload/SwordGame.app";
         home = dir + "userdata";
         if (!launcher::game_installed()) {
-            MessageBoxW(nullptr, L"The game files are not installed. Start Infinity Blade III.exe without -play to install them.",
-                        L"Infinity Blade III", MB_ICONERROR);
+            MessageBoxW(nullptr, L"The game files are not installed. Start IB3.exe without -play to install them.",
+                        L"IB3", MB_ICONERROR);
             return 1;
         }
     }

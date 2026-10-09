@@ -57,7 +57,7 @@ void install_startup_movie_fix() {
         return;
     }
     g_initiate_original = hook::install(imp, "-[FMovieHelper InitiateStartupSequence]", on_initiate_startup_sequence);
-    if (is_infinity_blade_2()) return;
+    if (is_ib2()) return;
     if (GuestAddr play = objc::lookup_imp(helper, objc::sel("PlayMovie:")))
         g_play_original = hook::install(play, "-[FMovieHelper PlayMovie:]", on_play_movie);
 }

@@ -50,7 +50,7 @@ const Entry& chosen() {
 
 std::string ios_language() {
     const Entry& e = chosen();
-    if (is_infinity_blade_2() && std::strcmp(e.suffix, "POR") == 0) return "pt_PT";
+    if (is_ib2() && std::strcmp(e.suffix, "POR") == 0) return "pt_PT";
     return e.language;
 }
 

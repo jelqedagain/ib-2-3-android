@@ -156,7 +156,7 @@ void item_caches(cpu::Thread& t, bool load) {
 void options_item_caches_tick(cpu::Thread& t) {
     static bool loaded = false;
     static u64 last = 0;
-    if (!is_infinity_blade_2()) return;
+    if (!is_ib2()) return;
     u64 now = GetTickCount64();
     if (now - last < 250) return;
     last = now;
@@ -167,7 +167,7 @@ void options_item_caches_tick(cpu::Thread& t) {
 }
 
 void install_dev_ipa_fix() {
-    if (is_infinity_blade_2()) return;
+    if (is_ib2()) return;
     const std::string rel = "CookedIPhone/SwordGame.xxx";
     std::ifstream in(vfs::host_bundle() + "/" + rel, std::ios::binary);
     std::string data((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());

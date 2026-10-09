@@ -113,8 +113,8 @@ void hide_system_bars(ANativeActivity* a) {
     if (env->ExceptionCheck()) env->ExceptionClear();
 }
 
-// Whether the installed game is Infinity Blade II: its bundle id, which is plain text in Info.plist.
-bool is_infinity_blade_2() {
+// Whether the installed game is IB2: its bundle id, which is plain text in Info.plist.
+bool is_ib2() {
     std::ifstream f("game/Payload/SwordGame.app/Info.plist", std::ios::binary);
     std::string plist((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
     static const std::string id = "com.chairentertainment.IB2";
@@ -252,7 +252,7 @@ int32_t on_input(android_app*, AInputEvent* e) {
 // on a 144 Hz screen shows uneven frame times: it feels laggy even when the game keeps up).
 void hint_frame_rate(ANativeWindow* window) {
     float fps = (float)settings::get().max_fps;
-    if (is_infinity_blade_2() && fps == 60) return;  // IB2 at its default rate: as before (no hint)
+    if (is_ib2() && fps == 60) return;  // IB2 at its default rate: as before (no hint)
     using SetFrameRate = int32_t (*)(ANativeWindow*, float, int8_t);  // in libnativewindow, not always linkable
     void* lib = dlopen("libnativewindow.so", RTLD_NOW);
     auto set = reinterpret_cast<SetFrameRate>(dlsym(lib ? lib : RTLD_DEFAULT, "ANativeWindow_setFrameRate"));
@@ -268,14 +268,14 @@ void on_cmd(android_app* app, int32_t cmd) {
         hint_frame_rate(app->window);
         if (!g_started) {
             // Fill the screen: keep iOS's 414-point height and widen the emulated screen to the
-            // phone's shape (Infinity Blade III lays itself out for any width). Infinity Blade II
+            // phone's shape (IB3 lays itself out for any width). IB2
             // only knows the iPhone screens of its time: it is widened only on phones longer than
             // 16:9, where game::install_widescreen patches its HUD layout (or goes back to 16:9), unless
             // the player chose 16:9 with black bars in the settings.
             int w = ANativeWindow_getWidth(app->window), h = ANativeWindow_getHeight(app->window);
             if (w > 0 && h > 0) {
                 double width = std::round(uikit::g_device.height_pt * std::max(w, h) / std::min(w, h));
-                if (!is_infinity_blade_2() || (width > uikit::g_device.width_pt && settings::get().widescreen))
+                if (!is_ib2() || (width > uikit::g_device.width_pt && settings::get().widescreen))
                     uikit::g_device.width_pt = width;
             }
             __android_log_print(ANDROID_LOG_INFO, "ib3", "window %dx%d: screen %.0fx%.0f points", w, h,
@@ -308,7 +308,7 @@ extern "C" JNIEXPORT void ANativeActivity_onCreate(ANativeActivity* activity, vo
     jclass cls = activity->env->GetObjectClass(activity->clazz);
     android::register_dialog_natives(activity->env, cls);
     activity->env->DeleteLocalRef(cls);
-    logging::g_app_name = app_label(activity);  // "Infinity Blade III" or "Infinity Blade II"
+    logging::g_app_name = app_label(activity);  // "IB3" or "IB2"
     g_glue_focus_changed = activity->callbacks->onWindowFocusChanged;
     activity->callbacks->onWindowFocusChanged = on_focus_changed;
     hide_system_bars(activity);

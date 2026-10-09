@@ -1,4 +1,4 @@
-// Infinity Blade II on phones longer than 16:9. Its script (GameViewportClient.AdjustHUDRenderSize)
+// IB2 on phones longer than 16:9. Its script (GameViewportClient.AdjustHUDRenderSize)
 // lays the HUD out over the whole screen only for aspect ratios in (1.7, 1.8) and exactly 1.5; any
 // other shape is taken for an iPad and gets a 3:2 HUD as wide as the screen, which on a 19.5:9 phone
 // runs off the top and bottom (and the touch zones follow it). The game is served a copy of its
@@ -102,7 +102,7 @@ bool serve_patched(const std::string& bundle_relative, Patch patch) {
 
 }  // namespace
 
-bool is_infinity_blade_2() {
+bool is_ib2() {
     static const bool ib2 = [] {
         std::ifstream f(vfs::host_bundle() + "/Info.plist", std::ios::binary);
         std::string plist((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
@@ -115,7 +115,7 @@ bool is_infinity_blade_2() {
 
 void install_widescreen() {
     double aspect = uikit::g_device.width_pt / uikit::g_device.height_pt;
-    if (aspect <= kWidestKnown || !is_infinity_blade_2()) return;
+    if (aspect <= kWidestKnown || !is_ib2()) return;
     if (!serve_patched("CookedIPhone/SwordGame.xxx", raise_hud_limit)) {
         uikit::g_device.width_pt = std::round(uikit::g_device.height_pt * 16 / 9);
         LOG_WARN("widescreen: HUD layout not found in SwordGame.xxx; keeping the 16:9 screen");

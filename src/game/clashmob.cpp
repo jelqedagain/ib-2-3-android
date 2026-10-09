@@ -1,4 +1,4 @@
-// ClashMobs (Infinity Blade III): the game's ClashMob server requests (McpClashMobManagerV3:
+// ClashMobs (IB3): the game's ClashMob server requests (McpClashMobManagerV3:
 // /sword/api/challenges...) go to the community ClashMob server when one is set ([ClashMob] Server, see "the
 // community server" below), and are answered by the port itself otherwise (offline ClashMobs, with events defined
 // locally and progress kept in clashmob-state.ini next to the saves). Every other online request stays offline.
@@ -406,7 +406,7 @@ bool ask_server(const std::string& url, const ns::HttpRequest& req, ns::HttpResp
     JNIEnv* env = android::env();
     if (!a || !env) return false;
     std::string headers;
-    if (identify) {  // IB3: the player's id and key (Infinity Blade II's server learns the player from /registeruser)
+    if (identify) {  // IB3: the player's id and key (IB2's server learns the player from /registeruser)
         std::string id, key;
         identity(id, key);
         headers = "X-ClashMob-Player: " + id + "\nX-ClashMob-Key: " + key + "\nX-ClashMob-Game: ib3\n";
@@ -576,7 +576,7 @@ bool serve(const ns::HttpRequest& req, ns::HttpResponse& resp) {
     return true;
 }
 
-// ---- Infinity Blade II ----
+// ---- IB2 ----
 //
 // IB2's ClashMobs speak Epic's classic MCP web API (/registeruser, /challengelist, /challengestatus, /acceptchallenge,
 // /updatechallenge, /updatereward, /timestamp, /listfiles, /downloadfile) to ib2-mcp-prod.appspot.com, which is gone. With the
@@ -599,7 +599,7 @@ std::string url_host(const std::string& url) {
     return url.substr(start, end == std::string::npos ? std::string::npos : end - start);
 }
 
-// Infinity Blade II 1.3.5's SwordGame.xxx: file offset, the bytes there, the bytes to put there. The same in the stock
+// IB2 1.3.5's SwordGame.xxx: file offset, the bytes there, the bytes to put there. The same in the stock
 // package (7,924,840 bytes) and the Community Patch v2.5's (7,925,026 bytes): checked
 // byte for byte, the patched places are the same in both.
 struct ScriptPatch {
@@ -632,7 +632,7 @@ void patch_ib2_package() {
         todo[i] = ok && now == patches[i].from;
     }
     if (!ok) {
-        LOG_WARN("clashmob: SwordGame.xxx is not a known Infinity Blade II 1.3.5 package (size %ld): script patches skipped", size);
+        LOG_WARN("clashmob: SwordGame.xxx is not a known IB2 1.3.5 package (size %ld): script patches skipped", size);
     } else {
         for (size_t i = 0; i < patches.size(); i++) {
             if (!todo[i]) continue;
@@ -666,11 +666,11 @@ bool serve_ib2(const ns::HttpRequest& req, ns::HttpResponse& resp) {
 }  // namespace
 
 void install_clashmob(const macho::Image& img) {
-    if (is_infinity_blade_2()) {
+    if (is_ib2()) {
         patch_ib2_package();
         ns::set_local_server(serve_ib2);
         std::string server = server_url();
-        LOG_INFO("clashmob: Infinity Blade II ClashMobs (%s%s)", server.empty() ? "offline" : "server ", server.c_str());
+        LOG_INFO("clashmob: IB2 ClashMobs (%s%s)", server.empty() ? "offline" : "server ", server.c_str());
         return;
     }
     g_dlmalloc = img.find("__Z8dlmallocm");
@@ -695,7 +695,7 @@ void give_account(cpu::Thread& t);
 void give_gifts(cpu::Thread& t);
 
 void clashmob_tick(cpu::Thread& t) {
-    if (is_infinity_blade_2()) return;
+    if (is_ib2()) return;
 #ifdef __ANDROID__
     // For testing: adb shell setprop debug.ibport.clashmob menu<N> opens the ClashMob screen (each new value once).
     static std::string last = "";
@@ -794,7 +794,7 @@ void give_account(cpu::Thread& t) {
     // Off: the game encrypts its saves with a key tied to the account, so with an account id it cannot
     // read the player's save and starts a new game. ClashMobs run with no account instead.
     constexpr bool kGiveAccount = false;
-    if (!kGiveAccount || is_infinity_blade_2() || !g_dlmalloc) return;
+    if (!kGiveAccount || is_ib2() || !g_dlmalloc) return;
     static bool done = false;
     if (done) return;
     GuestAddr engine = ue::engine();
@@ -837,7 +837,7 @@ void give_account(cpu::Thread& t) {
     LOG_INFO("clashmob: gave the game an auth ticket");
 }
 
-bool clashmob_wants_script_hook() { return !is_infinity_blade_2(); }
+bool clashmob_wants_script_hook() { return !is_ib2(); }
 
 // Script functions answered here:
 // - SwordMyMobManager.UserHasMcpId(): the ClashMob code only shows an event to players with an online account. The

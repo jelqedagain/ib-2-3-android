@@ -50,7 +50,7 @@ void write(Level lvl, const char* fmt, ...) {
     }
 }
 bool g_error_dialogs = false;
-std::string g_app_name = "Infinity Blade III";
+std::string g_app_name = "IB3";
 
 void show_error_dialog(const char* what) {
     if (!g_error_dialogs) return;

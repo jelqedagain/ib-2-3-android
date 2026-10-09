@@ -78,7 +78,7 @@ std::string read_file(const std::string& path) {
     return std::string(std::istreambuf_iterator<char>(f), {});
 }
 
-// For games whose engine functions cannot be found by name (Infinity Blade II ships with them
+// For games whose engine functions cannot be found by name (IB2 ships with them
 // stripped), the settings become console commands the engine runs at startup instead: its command
 // line (CookedIPhone/UE3CommandLine.txt) can run a file of commands, as the Community Patches do
 // with Binaries/Commands.txt. The game is served copies of both with the settings added.
@@ -91,7 +91,7 @@ void apply_as_startup_commands() {
     commands += std::string("Scale Set MaxShadowResolution ") + (s.high_res_shadows ? "2048" : "1024") + "\n";
     // IB2's phone profiles have both on; off is what its in-game developer rows ("scale toggle ...") did for the
     // rest of a session.
-    if (is_infinity_blade_2()) {
+    if (is_ib2()) {
         if (!s.dynamic_shadows) commands += "Scale Set DynamicShadows False\n";
         if (!s.light_shafts) commands += "Scale Set bAllowLightShafts False\n";
     }

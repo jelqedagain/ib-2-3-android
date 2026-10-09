@@ -16,7 +16,7 @@ int choose(HWND owner, const std::wstring& title, const std::wstring& message, c
     TASKDIALOGCONFIG cfg{sizeof cfg};
     cfg.hwndParent = owner;
     cfg.dwFlags = TDF_ALLOW_DIALOG_CANCELLATION | TDF_POSITION_RELATIVE_TO_WINDOW;
-    cfg.pszWindowTitle = L"Infinity Blade III";
+    cfg.pszWindowTitle = L"IB3";
     cfg.pszMainInstruction = title.c_str();
     cfg.pszContent = message.empty() ? nullptr : message.c_str();
     cfg.cButtons = (UINT)tb.size();

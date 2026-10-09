@@ -60,7 +60,7 @@ void debug_show_credits(cpu::Thread& t) {
 }  // namespace
 
 void credits_tick(cpu::Thread& t) {
-    if (is_infinity_blade_2()) return;
+    if (is_ib2()) return;
 #ifdef __ANDROID__
     debug_show_credits(t);
 #endif

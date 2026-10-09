@@ -1,4 +1,4 @@
-// Android proof of concept: runs Infinity Blade III's own ARM64 code natively on the phone.
+// Android proof of concept: runs IB3's own ARM64 code natively on the phone.
 // Loads the thin arm64 Mach-O at its iOS addresses, calls the game's appMemCrc(), and checks the
 // result against a reference implementation that reads the same CRC table.
 //   adb push ib3poc SwordGame_arm64 /data/local/tmp/ && adb shell /data/local/tmp/ib3poc /data/local/tmp/SwordGame_arm64
@@ -93,7 +93,7 @@ int main(int argc, char** argv) {
 
     using CrcFn = uint32_t (*)(const void*, int, uint32_t);
     auto game_crc = reinterpret_cast<CrcFn>(kAppMemCrc);
-    const char* text = "Infinity Blade III, running natively on Android";
+    const char* text = "IB3, running natively on Android";
     uint32_t native = game_crc(text, (int)strlen(text), 0);
     uint32_t expect = reference_crc(reinterpret_cast<const uint8_t*>(text), (int)strlen(text), 0);
     printf("game's appMemCrc: 0x%08x   reference: 0x%08x   %s\n", native, expect, native == expect ? "MATCH" : "MISMATCH");

@@ -107,7 +107,7 @@ bool write_int(cpu::Thread& t, GuestAddr obj, const char* prop, int value) {
 // it with. IB3 keeps them in Currency[2]; IB2 has CurrentGold and TotalGoldAquired (sic).
 s32* currency(cpu::Thread& t, GuestAddr obj, int index, bool total = false) {
     if (!obj) return nullptr;
-    if (!is_infinity_blade_2()) {
+    if (!is_ib2()) {
         int off = ue::property_offset(t, obj, "Currency");
         return off < 0 ? nullptr : gptr<s32>(obj + off + index * kCurrencySize + (total ? kCurrencyTotalAcquired : 0));
     }
@@ -120,7 +120,7 @@ s32* currency(cpu::Thread& t, GuestAddr obj, int index, bool total = false) {
 // MaxUnequippedGems its HasFullGemInventory checks), or -1.
 int gem_bag_size(cpu::Thread& t, GuestAddr pawn) {
     int n = -1;
-    if (is_infinity_blade_2()) return read_int(t, pawn, "MaxUnequippedGems", n) ? n : -1;
+    if (is_ib2()) return read_int(t, pawn, "MaxUnequippedGems", n) ? n : -1;
     alignas(16) u8 params[512] = {};  // GetMaxGemCarryCount(bool bNextUpgrade) -> int at +4
     return ue::call_event(t, pawn, "GetMaxGemCarryCount", params) ? *reinterpret_cast<s32*>(params + 4) : -1;
 }
@@ -236,7 +236,7 @@ std::string limits(cpu::Thread& t, const Objects& o) {
     if (read_int(t, o.pawn, "CSMaxAwakening", n) && n > 0) s << "MaxBloodline=" << n << "\n";
     // IB3's gem bag: the upgrade count after which more upgrades no longer make the bag bigger.
     int count = 0;
-    if (!is_infinity_blade_2() && read_int(t, o.pawn, "GemCarryUpgradeCount", count)) {
+    if (!is_ib2() && read_int(t, o.pawn, "GemCarryUpgradeCount", count)) {
         auto capacity = [&](int upgrades) {
             write_int(t, o.pawn, "GemCarryUpgradeCount", upgrades);
             alignas(16) u8 params[512] = {};  // GetMaxGemCarryCount(bool bNextUpgrade) -> int at +4
@@ -261,7 +261,7 @@ std::string limits(cpu::Thread& t, const Objects& o) {
 void write_current(const std::map<std::string, int>& v, const std::string& limits) {
     std::ostringstream s;
     s << "; Written by the game: the player's current values, for the launcher's Edit save page.\n[Current]\n";
-    s << "Game=" << (is_infinity_blade_2() ? "IB2" : "IB3") << "\n";
+    s << "Game=" << (is_ib2() ? "IB2" : "IB3") << "\n";
     for (auto& [k, n] : v) s << k << "=" << n << "\n";
     s << "[Limits]\n" << limits;
     std::string tmp = std::string(kCurrentFile) + ".tmp";
@@ -362,7 +362,7 @@ Watched watched(cpu::Thread& t, GuestAddr function) {
 
 void save_now(cpu::Thread& t, const Objects& o) {
     alignas(16) u8 params[512] = {};
-    if (is_infinity_blade_2()) {
+    if (is_ib2()) {
         // SaveGame(string Filename, bool bSkipCommonSave): the file of the slot being played.
         alignas(16) u8 name[512] = {};
         if (!call(t, o.pc, "GetCurrentSaveFilename", name)) return;
@@ -428,7 +428,7 @@ int refill_gem_shop(cpu::Thread& t, const Objects& o, const std::string& type, b
     return changed ? after : -1;
 }
 
-size_t shop_stride() { return is_infinity_blade_2() ? 16 : 24; }  // PlayerGemData: GemName, GemTier, ...
+size_t shop_stride() { return is_ib2() ? 16 : 24; }  // PlayerGemData: GemName, GemTier, ...
 
 // The gems the store screen would show, made as it makes them (SwordPlayer.CreateStoreGemsList): one gem
 // object per named slot of CurrentStoreGems, each knowing its slot (PlayerStoreGemIndex).
@@ -481,7 +481,7 @@ int max_store_gems(cpu::Thread& t, GuestAddr pawn) {
 }
 
 bool give_all_items(cpu::Thread& t, const Objects& o) {
-    return is_infinity_blade_2() ? give_all_items_ib2(t, o) : call(t, o.pc, "SetPlayerGiveAllItems");
+    return is_ib2() ? give_all_items_ib2(t, o) : call(t, o.pc, "SetPlayerGiveAllItems");
 }
 
 bool apply_in_world(cpu::Thread& t, const Objects& o, Edits edits) {
@@ -497,7 +497,7 @@ bool apply_in_world(cpu::Thread& t, const Objects& o, Edits edits) {
     if (take(edits, "GiveAllItems", n) && n) changed |= give_all_items(t, o);
     // IB3 only: IB2 has the same cheat, but it does nothing there. It also makes the character level 50
     // with every stat at 100.
-    if (!is_infinity_blade_2() && take(edits, "GiveAllPerks", n) && n) changed |= call(t, o.pc, "SetPlayerGiveAllPerks");
+    if (!is_ib2() && take(edits, "GiveAllPerks", n) && n) changed |= call(t, o.pc, "SetPlayerGiveAllPerks");
     for (auto& [k, v] : edits) LOG_WARN("saveedit: edit %s was not applied", k.c_str());
     return changed;
 }
@@ -531,7 +531,7 @@ void dump_save(cpu::Thread& t) {
 // IB3 raises its engine's frame-rate limit to 62 itself after reading its config (config.cpp's values), so
 // a 30 or 120 limit is put on the engine object too. At 60 it runs as it always has (60-62).
 void enforce_frame_cap(cpu::Thread& t) {
-    if (is_infinity_blade_2() || settings::get().max_fps == 60) return;  // IB2: startup commands (config.cpp)
+    if (is_ib2() || settings::get().max_fps == 60) return;  // IB2: startup commands (config.cpp)
     GuestAddr engine = ue::engine();
     if (!engine) return;
     float want = (float)settings::get().max_fps, lo = 0, hi = 0;

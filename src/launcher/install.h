@@ -1,4 +1,4 @@
-// Game files: installing Infinity Blade III from the player's own .ipa, and finding them later.
+// Game files: installing IB3 from the player's own .ipa, and finding them later.
 #pragma once
 #include "common.h"
 #include <functional>

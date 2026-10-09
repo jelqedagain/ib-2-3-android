@@ -98,7 +98,7 @@ LRESULT CALLBACK wnd_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         break;
     case WM_APP_FPS: {
         wchar_t title[96];
-        swprintf(title, 96, L"Infinity Blade III - %u FPS", (unsigned)wp);
+        swprintf(title, 96, L"IB3 - %u FPS", (unsigned)wp);
         SetWindowTextW(h, title);
         return 0;
     }
@@ -135,7 +135,7 @@ void create_window() {
     const auto& st = settings::get();
     RECT r{0, 0, g_test_mode ? 1280 : st.window_width, g_test_mode ? 720 : st.window_height};
     AdjustWindowRect(&r, WS_OVERLAPPEDWINDOW, FALSE);
-    g_hwnd = CreateWindowW(L"IB3Window", L"Infinity Blade III", WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN, CW_USEDEFAULT, CW_USEDEFAULT,
+    g_hwnd = CreateWindowW(L"IB3Window", L"IB3", WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN, CW_USEDEFAULT, CW_USEDEFAULT,
                            r.right - r.left, r.bottom - r.top, nullptr, nullptr, wc.hInstance, nullptr);
     if (!g_test_mode) {  // test runs render to a hidden window
         ShowWindow(g_hwnd, SW_SHOW);

@@ -1,9 +1,9 @@
-// Infinity Blade II's engine separates threads with "dsb st", which orders stores only. The render
+// IB2's engine separates threads with "dsb st", which orders stores only. The render
 // thread reads commands from a ring buffer the game thread fills: it loads the write position, then
 // the command. Without ordering between those loads, a phone CPU may read the command before it sees
 // the new position and run a half-written command (a Galaxy S25 FE, Exynos 2400, crashed in
-// RenderingThreadMain on a garbage command vtable). Apple's CPUs never showed it. Infinity Blade III's newer engine uses "dsb sy"
-// at the same places; give Infinity Blade II the same full barriers.
+// RenderingThreadMain on a garbage command vtable). Apple's CPUs never showed it. IB3's newer engine uses "dsb sy"
+// at the same places; give IB2 the same full barriers.
 #include "game/game.h"
 #include "cpu.h"
 #include "macho.h"
