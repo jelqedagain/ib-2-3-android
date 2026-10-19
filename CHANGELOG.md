@@ -96,6 +96,9 @@ Two Android apps, IB2 and IB3, are built from one codebase. Each has its own ver
 
 # IB3
 
+## 1.9.8 (unreleased)
+- Saves made with **Community Patch 3.0** now open with any other .ipa, such as Community Patch 3.0.1 (which went back to the game's own save code, so 3.0 saves no longer opened, on iPhones too, and the game started over). 3.0 stored saves with the game's fixed key instead of each save's own key; the app now tries that key when a save does not open with its own, the same test 3.0 used. The game saves it in its normal format from then on.
+
 ## 1.9.7 (2026-10-19)
 - **Updates from the app**: when you open the app, it looks for a newer version on its archive.org page. If there is one, the menu shows **Update to 1.9.x** with what is new; tapping it downloads the update (checked before installing) and Android asks you to confirm. Your saves and settings stay. The first time, Android asks you to allow this app to install apps. Settings, Game, **Check for updates** turns it off. Only the public file list of the page is read; nothing about you is sent.
 - Edit save: new **Bosses** section with **Story boss level** (0 to 999,999; 0 = the game's own). Story bosses (Ryth, the God King and the others) get a fixed level from the game that only goes up with New Game+, never with the awakening; this sets the level they fight at instead, in all your saves.

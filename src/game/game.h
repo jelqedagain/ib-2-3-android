@@ -63,6 +63,8 @@ void install_fight_text_scale(const macho::Image& img);
 void install_widescreen();
 // IB3 "Dev Mod" .ipa: its developer Options rows are orphaned in SwordGame.xxx; serve a repaired copy (game/devipa.cpp).
 void install_dev_ipa_fix();
+// IB3: saves made with Community Patch 3.0 (its fixed key) open under other .ipa files too (game/savekey.cpp).
+void install_cp30_save_reader(const macho::Image& img);
 // IB2: keeps the item caches loaded while the Options list is open, so its give-all cheat works (game/devipa.cpp).
 void options_item_caches_tick(cpu::Thread& t);
 

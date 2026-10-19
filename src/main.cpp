@@ -217,6 +217,7 @@ int main(int argc, char** argv) {
     game::install_config(img);
     game::install_widescreen();
     game::install_dev_ipa_fix();
+    game::install_cp30_save_reader(img);
     game::install_save_editor(img);
     game::install_touchzones(img);
     game::install_subtitles(img);
