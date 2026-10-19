@@ -96,7 +96,7 @@ Two Android apps, IB2 and IB3, are built from one codebase. Each has its own ver
 
 # IB3
 
-## 1.9.8 (unreleased)
+## 1.9.7.1 (2026-10-19)
 - Saves made with **Community Patch 3.0** now open with any other .ipa, such as Community Patch 3.0.1 (which went back to the game's own save code, so 3.0 saves no longer opened, on iPhones too, and the game started over). 3.0 stored saves with the game's fixed key instead of each save's own key; the app now tries that key when a save does not open with its own, the same test 3.0 used. The game saves it in its normal format from then on.
 
 ## 1.9.7 (2026-10-19)
